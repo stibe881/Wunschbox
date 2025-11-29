@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import apiRoutes from './routes';
+import listEndpoints from 'express-list-endpoints';
 
 dotenv.config();
 
@@ -23,4 +24,6 @@ app.get('/', (req, res) => {
 
 app.listen(port, () => {
   console.log(`Backend server listening on port ${port}`);
+  console.log('Registered endpoints:');
+  console.log(listEndpoints(app));
 });
