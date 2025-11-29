@@ -268,5 +268,39 @@ export const storageService = {
     if (!response.ok) {
         throw new Error('Failed to mark invitation as used');
     }
+  },
+
+  // Contact Methods
+  getContacts: async (userId: string): Promise<Contact[]> => {
+    const response = await fetch(`${API_URL}/contacts/${userId}`);
+    if (!response.ok) {
+        throw new Error('Failed to fetch contacts');
+    }
+    return response.json();
+  },
+
+  saveContact: async (contact: Contact): Promise<Contact> => {
+    const response = await fetch(`${API_URL}/contacts`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(contact),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to save contact');
+    }
+    return response.json();
+  },
+
+  deleteContact: async (contactId: string): Promise<void> => {
+    const response = await fetch(`${API_URL}/contacts/${contactId}`, {
+        method: 'DELETE',
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to delete contact');
+    }
   }
 };

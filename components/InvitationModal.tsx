@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
-import { X, Copy, Check, Send, Mail, UserPlus, Heart } from 'lucide-react';
-import { User, Invitation, Role } from '../types';
+import React, { useState, useEffect } from 'react';
+import { X, Copy, Check, Send, Mail, UserPlus, Heart, BookUser } from 'lucide-react';
+import { User, Invitation, Role, Contact } from '../types';
 import { storageService } from '../services/storage';
 
 interface InvitationModalProps {
@@ -12,18 +12,41 @@ interface InvitationModalProps {
 export const InvitationModal: React.FC<InvitationModalProps> = ({ onClose, currentUser }) => {
   const [activeTab, setActiveTab] = useState<Role>('RELATIVE');
   
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [selectedContactId, setSelectedContactId] = useState<string>('');
   const [guestName, setGuestName] = useState('');
+  const [guestEmail, setGuestEmail] = useState('');
   const [roleDescription, setRoleDescription] = useState('');
   const [customMessage, setCustomMessage] = useState('');
   
   const [generatedLink, setGeneratedLink] = useState('');
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    const fetchContacts = async () => {
+      const contacts = await storageService.getContacts(currentUser.id);
+      setContacts(contacts);
+    };
+    fetchContacts();
+  }, [currentUser.id]);
+
+  useEffect(() => {
+    if (selectedContactId) {
+      const contact = contacts.find(c => c.id === selectedContactId);
+      if (contact) {
+        setGuestName(contact.name);
+        setGuestEmail(contact.email);
+      }
+    } else {
+        setGuestName('');
+        setGuestEmail('');
+    }
+  }, [selectedContactId, contacts]);
+
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!guestName) return;
     
-    // For parents, we set description to 'Elternteil' automatically if not provided
     const finalRoleDesc = activeTab === 'PARENT' ? (roleDescription || 'Elternteil') : roleDescription;
     if (activeTab === 'RELATIVE' && !finalRoleDesc) return;
 
@@ -66,14 +89,16 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ onClose, curre
                  `Hier ist der Link zur Wunschliste:\n${generatedLink}\n\n` +
                  `Liebe Grüsse,\n${currentUser.name}`;
     
-    window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+    window.open(`mailto:${guestEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
   };
 
   const reset = () => {
     setGeneratedLink('');
     setGuestName('');
+    setGuestEmail('');
     setRoleDescription('');
     setCustomMessage('');
+    setSelectedContactId('');
     setCopied(false);
   };
 
@@ -106,14 +131,42 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ onClose, curre
             {!generatedLink ? (
                 <form onSubmit={handleGenerate} className="space-y-4">
                     <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Aus Adressbuch auswählen</label>
+                        <select 
+                            value={selectedContactId}
+                            onChange={e => setSelectedContactId(e.target.value)}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none text-slate-800"
+                        >
+                            <option value="">Manuell eingeben</option>
+                            {contacts.map(contact => (
+                                <option key={contact.id} value={contact.id}>{contact.name} ({contact.email})</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Name des Gastes</label>
                         <input 
                             type="text" 
                             required
                             value={guestName}
                             onChange={e => setGuestName(e.target.value)}
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none text-slate-800"
+                            disabled={!!selectedContactId}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none text-slate-800 disabled:bg-slate-200"
                             placeholder={activeTab === 'PARENT' ? "Name deines Partners" : "z.B. Anna"}
+                        />
+                    </div>
+                    
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-Mail des Gastes</label>
+                        <input 
+                            type="email" 
+                            required
+                            value={guestEmail}
+                            onChange={e => setGuestEmail(e.target.value)}
+                            disabled={!!selectedContactId}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none text-slate-800 disabled:bg-slate-200"
+                            placeholder="email@example.com"
                         />
                     </div>
 

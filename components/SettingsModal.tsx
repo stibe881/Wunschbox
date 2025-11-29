@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
-import { Child, User, Gender } from '../types';
+import { Child, User, Gender, Contact } from '../types';
 import { storageService } from '../services/storage';
-import { X, Plus, Trash2, Calendar, Baby, Settings, Mail, Bell, ToggleLeft, ToggleRight } from 'lucide-react';
+import { X, Plus, Trash2, Calendar, Baby, Settings, Mail, Bell, ToggleLeft, ToggleRight, BookUser } from 'lucide-react';
+import { AddressBookModal } from './AddressBookModal';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -30,7 +31,8 @@ const calculateAge = (birthDate: string): string => {
 };
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, currentUser, childrenList, onUpdate }) => {
-  const [activeTab, setActiveTab] = useState<'CHILDREN' | 'NOTIFICATIONS'>('CHILDREN');
+  const [activeTab, setActiveTab] = useState<'CHILDREN' | 'NOTIFICATIONS' | 'ADDRESS_BOOK'>('CHILDREN');
+  const [isAddressBookModalOpen, setIsAddressBookModalOpen] = useState(false);
   
   // Children Form State
   const [newName, setNewName] = useState('');
@@ -121,6 +123,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, currentUs
                 className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${activeTab === 'CHILDREN' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700'}`}
             >
                 <Baby className="w-4 h-4" /> Meine Kinder
+            </button>
+            <button 
+                onClick={() => setActiveTab('ADDRESS_BOOK')}
+                className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${activeTab === 'ADDRESS_BOOK' ? 'text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50/50' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                <BookUser className="w-4 h-4" /> Adressbuch
             </button>
             <button 
                 onClick={() => setActiveTab('NOTIFICATIONS')}
@@ -217,6 +225,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, currentUs
                 </div>
             )}
 
+            {/* ADDRESS BOOK TAB */}
+            {activeTab === 'ADDRESS_BOOK' && (
+                <div className="animate-in fade-in slide-in-from-right-4 duration-300">
+                    <p className="text-slate-500 text-sm mb-6">
+                        Verwalte deine Kontakte, um Einladungen schneller zu versenden.
+                    </p>
+                    <button 
+                        onClick={() => setIsAddressBookModalOpen(true)}
+                        className="w-full bg-indigo-600 text-white py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 mt-2"
+                    >
+                        <BookUser className="w-4 h-4" /> Adressbuch öffnen
+                    </button>
+                </div>
+            )}
+
             {/* NOTIFICATIONS TAB */}
             {activeTab === 'NOTIFICATIONS' && (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
@@ -257,6 +280,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, currentUs
             )}
 
         </div>
+        {isAddressBookModalOpen && (
+            <AddressBookModal 
+                onClose={() => setIsAddressBookModalOpen(false)}
+                currentUser={currentUser}
+            />
+        )}
       </div>
     </div>
   );

@@ -56,3 +56,11 @@ CREATE TABLE IF NOT EXISTS notifications (
   `read` BOOLEAN DEFAULT FALSE,
   forRole VARCHAR(50)
 );
+
+CREATE TABLE IF NOT EXISTS contacts (
+  id VARCHAR(255) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  createdByUserId VARCHAR(255),
+  FOREIGN KEY (createdByUserId) REFERENCES users(id)
+);

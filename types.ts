@@ -68,3 +68,10 @@ export interface AIGiftSuggestion {
   description: string;
   estimatedPriceRange: string;
 }
+
+export interface Contact {
+  id: string;
+  name: string;
+  email: string;
+  createdByUserId: string;
+}
