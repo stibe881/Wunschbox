@@ -77,21 +77,27 @@ export const GiftModal: React.FC<GiftModalProps> = ({ onClose, onSave, initialGi
   const [showAI, setShowAI] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState<AIGiftSuggestion[]>([]);
-  const [aiParams, setAiParams] = useState({ age: '', interests: '', budget: '', gender: '' });
+  const [aiParams, setAiParams] = useState({ 
+    childId: childrenList.length > 0 ? childrenList[0].id : '', 
+    interests: '', 
+    budget: '' 
+  });
 
-  // Update AI params when opening AI mode
+  // Update AI params when opening AI mode or selected child changes
   useEffect(() => {
-    if (showAI && formData.childName) {
-        const selectedChild = childrenList.find(c => c.name === formData.childName);
+    if (showAI && aiParams.childId) {
+        const selectedChild = childrenList.find(c => c.id === aiParams.childId);
         if (selectedChild) {
-            setAiParams(prev => ({
-                ...prev,
-                age: calculateAge(selectedChild.birthDate),
-                gender: selectedChild.gender === 'MALE' ? 'Junge' : selectedChild.gender === 'FEMALE' ? 'Mädchen' : 'Neutral'
-            }));
+            // Display age and gender based on selected child, but not editable
+            const ageString = calculateAge(selectedChild.birthDate);
+            const genderString = selectedChild.gender === 'MALE' ? 'Junge' : selectedChild.gender === 'FEMALE' ? 'Mädchen' : 'Neutral';
+            // We don't store age/gender in aiParams anymore, but derive them for the prompt
         }
+    } else if (showAI && childrenList.length > 0 && !aiParams.childId) {
+        // Automatically select the first child if none is selected
+        setAiParams(prev => ({ ...prev, childId: childrenList[0].id }));
     }
-  }, [showAI, formData.childName, childrenList]);
+  }, [showAI, aiParams.childId, childrenList]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -128,14 +134,16 @@ export const GiftModal: React.FC<GiftModalProps> = ({ onClose, onSave, initialGi
   };
 
   const handleGenerateIdeas = async () => {
-    if (!aiParams.age || !aiParams.interests) return;
+    const selectedChild = childrenList.find(c => c.id === aiParams.childId);
+    if (!selectedChild || !aiParams.interests) return;
+
     setAiLoading(true);
     const ideas = await generateGiftIdeas(
-      formData.childName || 'Kind',
-      aiParams.age,
+      selectedChild.name,
+      calculateAge(selectedChild.birthDate),
       aiParams.interests,
       aiParams.budget,
-      aiParams.gender
+      selectedChild.gender === 'MALE' ? 'Junge' : selectedChild.gender === 'FEMALE' ? 'Mädchen' : 'Neutral'
     );
     setAiSuggestions(ideas);
     setAiLoading(false);
@@ -193,29 +201,26 @@ export const GiftModal: React.FC<GiftModalProps> = ({ onClose, onSave, initialGi
                     <button onClick={() => setShowAI(false)} className="text-xs text-slate-400 hover:text-slate-600">Zurück zum Formular</button>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3">
                     <div>
-                        <label className="text-xs font-medium text-slate-500 uppercase mb-1 block">Alter</label>
-                        <input 
-                            type="text" 
-                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-indigo-500 transition-colors text-slate-800 text-sm" 
-                            placeholder="z.B. 5 Jahre"
-                            value={aiParams.age}
-                            onChange={e => setAiParams(prev => ({...prev, age: e.target.value}))}
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs font-medium text-slate-500 uppercase mb-1 block">Geschlecht</label>
+                        <label className="text-xs font-medium text-slate-500 uppercase mb-1 block">Kind auswählen</label>
                         <select
-                             className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-indigo-500 transition-colors text-slate-800 text-sm"
-                             value={aiParams.gender}
-                             onChange={e => setAiParams(prev => ({...prev, gender: e.target.value}))}
+                            className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-indigo-500 transition-colors text-slate-800 text-sm"
+                            value={aiParams.childId}
+                            onChange={e => setAiParams(prev => ({...prev, childId: e.target.value}))}
+                            required
                         >
                             <option value="">Bitte wählen</option>
-                            <option value="Junge">Junge</option>
-                            <option value="Mädchen">Mädchen</option>
-                            <option value="Neutral">Neutral</option>
+                            {childrenList.map(child => (
+                                <option key={child.id} value={child.id}>{child.name}</option>
+                            ))}
                         </select>
+                        {aiParams.childId && childrenList.length > 0 && (
+                            <p className="text-xs text-slate-500 mt-2">
+                                Alter: {calculateAge(childrenList.find(c => c.id === aiParams.childId)?.birthDate || '')} | 
+                                Geschlecht: {childrenList.find(c => c.id === aiParams.childId)?.gender === 'MALE' ? 'Junge' : childrenList.find(c => c.id === aiParams.childId)?.gender === 'FEMALE' ? 'Mädchen' : 'Neutral'}
+                            </p>
+                        )}
                     </div>
                 </div>
                 <div className="grid grid-cols-1 gap-3">
@@ -243,7 +248,7 @@ export const GiftModal: React.FC<GiftModalProps> = ({ onClose, onSave, initialGi
 
                 <button 
                     onClick={handleGenerateIdeas}
-                    disabled={aiLoading || !aiParams.age}
+                    disabled={aiLoading || !aiParams.childId || !aiParams.interests}
                     className="w-full bg-violet-600 text-white py-3 rounded-lg font-medium hover:bg-violet-700 disabled:opacity-50 flex justify-center items-center gap-2 mt-2 shadow-lg shadow-violet-200 transition-all"
                 >
                     {aiLoading ? <Loader2 className="animate-spin w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
