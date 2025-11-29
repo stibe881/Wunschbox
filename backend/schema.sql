@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS gifts (
   priceMin DECIMAL(10, 2),
   priceMax DECIMAL(10, 2),
   currency VARCHAR(10),
-  imageUrl TEXT,
+  imageUrl MEDIUMTEXT,
   shopUrl TEXT,
   childName VARCHAR(255),
   priority VARCHAR(50),

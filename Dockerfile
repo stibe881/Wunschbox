@@ -1,6 +1,12 @@
 # Stage 1: Build the application
 FROM node:18-alpine AS builder
 WORKDIR /app
+
+# Accept the API key as a build argument
+ARG GEMINI_API_KEY
+# Make it available as an environment variable
+ENV GEMINI_API_KEY=$GEMINI_API_KEY
+
 COPY package*.json ./
 RUN npm install
 COPY . .
