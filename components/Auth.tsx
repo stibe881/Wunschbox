@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, Role, Invitation } from '../types';
-import { Gift, Users, Heart, ArrowRight, UserPlus, Sparkles, CheckCircle2, ArrowLeft, Mail } from 'lucide-react';
+import { Gift, Users, Heart, ArrowRight, UserPlus, Sparkles, CheckCircle2, ArrowLeft, Mail, Lock } from 'lucide-react';
 import { storageService } from '../services/storage';
 
 interface AuthProps {
@@ -14,6 +14,8 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [view, setView] = useState<AuthView>('LANDING');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
   
   // Invitation State
   const [invitation, setInvitation] = useState<Invitation | null>(null);
@@ -49,29 +51,37 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Determine role: if invitation exists, use its target role. If generic login/reg, default to PARENT.
-    const userRole: Role = invitation ? invitation.targetRole : 'PARENT';
-    const description = invitation ? invitation.guestRoleDescription : undefined;
-
-    const newUser: User = {
-      id: crypto.randomUUID(),
-      name,
-      email,
-      role: userRole,
-      roleDescription: description
-    };
+    setError('');
 
     try {
-      if (invitation) {
-          await storageService.markInvitationUsed(invitation.id);
-          // Clean URL
-          window.history.replaceState({}, '', window.location.pathname);
-      }
-      await onLogin(newUser);
-    } catch (error) {
-      console.error("Login failed:", error);
-      alert("Anmeldung fehlgeschlagen. Bitte versuche es erneut.");
+        if (view === 'LOGIN') {
+            const user = await storageService.login(email, password);
+            await onLogin(user);
+        } else { // REGISTER
+            const userRole: Role = invitation ? invitation.targetRole : 'PARENT';
+            const description = invitation ? invitation.guestRoleDescription : undefined;
+
+            const newUser: User = {
+                id: crypto.randomUUID(),
+                name,
+                email,
+                password,
+                role: userRole,
+                roleDescription: description
+            };
+            
+            const createdUser = await storageService.createUser(newUser);
+
+            if (invitation) {
+                await storageService.markInvitationUsed(invitation.id);
+                // Clean URL
+                window.history.replaceState({}, '', window.location.pathname);
+            }
+            await onLogin(createdUser);
+        }
+    } catch (err) {
+        setError('Anmeldung oder Registrierung fehlgeschlagen. Bitte überprüfen Sie Ihre Eingaben.');
+        console.error(err);
     }
   };
 
@@ -108,7 +118,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                  )}
                  
                  <button 
-                    onClick={handleSubmit}
+                    onClick={() => setView('REGISTER')}
                     className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 rounded-xl transition-all shadow-xl shadow-slate-200 flex items-center justify-center gap-3 group text-lg"
                  >
                      {isPartnerInvite ? 'Partner-Account beitreten' : 'Wunschbox ansehen'} 
@@ -212,20 +222,22 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Dein Name</label>
-            <div className="relative">
-                <Users className="absolute left-3 top-3 text-slate-400 w-5 h-5" />
-                <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 outline-none transition-all text-slate-800"
-                    placeholder="z.B. Mama"
-                />
+          {isRegister && (
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Dein Name</label>
+              <div className="relative">
+                  <Users className="absolute left-3 top-3 text-slate-400 w-5 h-5" />
+                  <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 outline-none transition-all text-slate-800"
+                      placeholder="z.B. Mama"
+                  />
+              </div>
             </div>
-          </div>
+          )}
           
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-Mail Adresse</label>
@@ -234,13 +246,30 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                 <input
                     type="email"
                     value={email}
-                    required={isRegister}
+                    required
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 outline-none transition-all text-slate-800"
                     placeholder="name@beispiel.ch"
                 />
             </div>
           </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Kennwort</label>
+            <div className="relative">
+                <Lock className="absolute left-3 top-3 text-slate-400 w-5 h-5" />
+                <input
+                    type="password"
+                    value={password}
+                    required
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 outline-none transition-all text-slate-800"
+                    placeholder="••••••••"
+                />
+            </div>
+          </div>
+
+          {error && <p className="text-red-500 text-sm text-center">{error}</p>}
 
           <button
             type="submit"

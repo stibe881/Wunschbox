@@ -1,7 +1,33 @@
 import { Router } from 'express';
 import pool from './db';
+import bcrypt from 'bcrypt';
 
 const router = Router();
+const saltRounds = 10;
+
+// Auth routes
+router.post('/auth/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const [rows]: [any[], any] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
+        if (rows.length === 0) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+        const user = rows[0];
+        const match = await bcrypt.compare(password, user.password);
+        if (match) {
+            // Do not send password back to client
+            delete user.password;
+            res.json(user);
+        } else {
+            res.status(401).json({ error: 'Invalid email or password' });
+        }
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Login failed' });
+    }
+});
+
 
 // Gift routes
 router.get('/gifts', async (req, res) => {
@@ -118,10 +144,13 @@ router.get('/users/:id', async (req, res) => {
 
 router.post('/users', async (req, res) => {
     try {
-        const { id, name, email, role, roleDescription, emailNotificationsEnabled } = req.body;
-        const newUser = { id, name, email, role, roleDescription, emailNotificationsEnabled };
+        const { id, name, email, password, role, roleDescription, emailNotificationsEnabled } = req.body;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        const newUser = { id, name, email, password: hashedPassword, role, roleDescription, emailNotificationsEnabled };
 
         await pool.query('INSERT INTO users SET ? ON DUPLICATE KEY UPDATE ?', [newUser, newUser]);
+        // Do not send password back to client
+        delete newUser.password;
         res.status(201).json(newUser);
     } catch (error) {
         console.error(error);
@@ -133,6 +162,9 @@ router.put('/users/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const userData = req.body;
+        if (userData.password) {
+            userData.password = await bcrypt.hash(userData.password, saltRounds);
+        }
         await pool.query('UPDATE users SET ? WHERE id = ?', [userData, id]);
         res.json({ message: 'User updated successfully' });
     } catch (error) {

@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS users (
   id VARCHAR(255) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE,
+  password VARCHAR(255) NOT NULL,
   role VARCHAR(50) NOT NULL,
   roleDescription VARCHAR(255),
   emailNotificationsEnabled BOOLEAN DEFAULT TRUE

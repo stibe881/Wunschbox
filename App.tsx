@@ -7,6 +7,7 @@ import { GiftCard } from './components/GiftCard';
 import { GiftModal } from './components/GiftModal';
 import { InvitationModal } from './components/InvitationModal';
 import { SettingsModal } from './components/SettingsModal';
+import { ConfirmModal } from './components/ConfirmModal';
 import { Plus, LogOut, User as UserIcon, Share2, Gift as GiftIcon, Bell, Filter, Settings } from 'lucide-react';
 
 const CATEGORIES: (Category | 'ALL')[] = ['ALL', 'Spielzeug', 'Bücher', 'Kleidung', 'Sport', 'Elektronik', 'Erlebnis', 'Sonstiges'];
@@ -25,6 +26,8 @@ const App: React.FC = () => {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [editingGift, setEditingGift] = useState<Gift | undefined>(undefined);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [giftToDelete, setGiftToDelete] = useState<string | null>(null);
   
   // Notifications
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -114,15 +117,22 @@ const App: React.FC = () => {
     setEditingGift(undefined);
   };
 
-  const handleDeleteGift = async (id: string) => {
-    if (window.confirm('Möchtest du dieses Geschenk wirklich löschen?')) {
+  const openDeleteConfirm = (id: string) => {
+    setGiftToDelete(id);
+    setIsConfirmModalOpen(true);
+  };
+
+  const handleDeleteGift = async () => {
+    if (giftToDelete) {
       try {
-        await storageService.deleteGift(id);
+        await storageService.deleteGift(giftToDelete);
         if (user) await refreshData(user);
       } catch (error) {
         console.error("Failed to delete gift:", error);
       }
     }
+    setIsConfirmModalOpen(false);
+    setGiftToDelete(null);
   };
 
   const handleToggleStatus = async (gift: Gift) => {
@@ -343,7 +353,7 @@ const App: React.FC = () => {
                     currentUser={user}
                     onToggleStatus={handleToggleStatus}
                     onEdit={(g) => { setEditingGift(g); setIsModalOpen(true); }}
-                    onDelete={handleDeleteGift}
+                    onDelete={openDeleteConfirm}
                     onProxyMark={handleProxyMark}
                 />
             ))}
@@ -389,6 +399,14 @@ const App: React.FC = () => {
             childrenList={children}
         />
       )}
+
+       <ConfirmModal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        onConfirm={handleDeleteGift}
+        title="Geschenk löschen"
+        message="Möchtest du dieses Geschenk wirklich endgültig löschen?"
+      />
 
       {/* Invitation Modal */}
       {isInviteModalOpen && user.role === 'PARENT' && (

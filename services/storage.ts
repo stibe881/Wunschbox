@@ -25,7 +25,7 @@ export const storageService = {
     return response.json();
   },
 
-  login: async (user: User): Promise<User> => {
+  createUser: async (user: User): Promise<User> => {
     // Set default preferences if new user
     if (user.role === 'PARENT' && user.emailNotificationsEnabled === undefined) {
         user.emailNotificationsEnabled = true;
@@ -38,11 +38,25 @@ export const storageService = {
     });
 
     if (!response.ok) {
-        throw new Error('Failed to login');
+        throw new Error('Failed to create user');
     }
     const savedUser = await response.json();
     localStorage.setItem(CURRENT_USER_KEY, savedUser.id);
     return savedUser;
+  },
+
+  login: async (email, password) => {
+    const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+    });
+    if (!response.ok) {
+        throw new Error('Login failed');
+    }
+    const user = await response.json();
+    localStorage.setItem(CURRENT_USER_KEY, user.id);
+    return user;
   },
 
   logout: () => {
