@@ -5,6 +5,50 @@ import bcrypt from 'bcrypt';
 const router = Router();
 const saltRounds = 10;
 
+// Contact routes
+router.get('/contacts/:userId', async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const [rows] = await pool.query('SELECT * FROM contacts WHERE createdByUserId = ?', [userId]);
+        res.json(rows);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch contacts' });
+    }
+});
+
+router.post('/contacts', async (req, res) => {
+    console.log('--- NEW CONTACT REQUEST ---');
+    console.log('Request Headers:', req.headers);
+    console.log('Request Body:', req.body);
+    try {
+        const { id, name, email, createdByUserId } = req.body;
+        if (!id || !name || !email || !createdByUserId) {
+            console.error('Validation failed: Missing data in request body');
+            return res.status(400).json({ error: 'Missing data in request body' });
+        }
+        const newContact = { id, name, email, createdByUserId };
+
+        await pool.query('INSERT INTO contacts SET ?', newContact);
+        console.log('Contact created successfully');
+        res.status(201).json(newContact);
+    } catch (error) {
+        console.error('Error creating contact:', error);
+        res.status(500).json({ error: 'Failed to create contact' });
+    }
+});
+
+router.delete('/contacts/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await pool.query('DELETE FROM contacts WHERE id = ?', [id]);
+        res.json({ message: 'Contact deleted successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to delete contact' });
+    }
+});
+
 // Auth routes
 router.post('/auth/login', async (req, res) => {
     try {
@@ -129,13 +173,59 @@ router.delete('/children/:id', async (req, res) => {
         res.status(500).json({ error: 'Failed to delete child' });
     }
 });
+// Contact routes
+router.get('/contacts/:userId', async (req, res) => {
+    console.log('Fetching contacts for userId:', req.params.userId);
+    try {
+        const { userId } = req.params;
+        const [rows] = await pool.query('SELECT * FROM contacts WHERE createdByUserId = ?', [userId]);
+        res.json(rows);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to fetch contacts' });
+    }
+});
+
+router.post('/contacts', async (req, res) => {
+    console.log('--- NEW CONTACT REQUEST ---');
+    console.log('Request Headers:', req.headers);
+    console.log('Request Body:', req.body);
+    try {
+        const { id, name, email, createdByUserId } = req.body;
+        if (!id || !name || !email || !createdByUserId) {
+            console.error('Validation failed: Missing data in request body');
+            return res.status(400).json({ error: 'Missing data in request body' });
+        }
+        const newContact = { id, name, email, createdByUserId };
+
+        await pool.query('INSERT INTO contacts SET ?', newContact);
+        console.log('Contact created successfully');
+        res.status(201).json(newContact);
+    } catch (error) {
+        console.error('Error creating contact:', error);
+        res.status(500).json({ error: 'Failed to create contact' });
+    }
+});
+
+router.delete('/contacts/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await pool.query('DELETE FROM contacts WHERE id = ?', [id]);
+        res.json({ message: 'Contact deleted successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to delete contact' });
+    }
+});
+
 // User routes
 router.get('/users/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const [rows]: [any[], any] = await pool.query('SELECT * FROM users WHERE id = ?', [id]);
         if (rows.length > 0) {
-            res.json(rows[0]);
+            const { password: _, ...userWithoutPassword } = rows[0];
+            res.json(userWithoutPassword);
         } else {
             res.status(404).json({ error: 'User not found' });
         }
