@@ -5,7 +5,7 @@ const CHILDREN_KEY = 'wishlist_children';
 const NOTIFICATIONS_KEY = 'wishlist_notifications';
 const INVITATIONS_KEY = 'wishlist_invitations';
 const CURRENT_USER_KEY = 'wishlist_current_user';
-const API_URL = 'http://localhost:3011/api';
+const API_URL = '/api';
 
 export const storageService = {
   init: () => {},
