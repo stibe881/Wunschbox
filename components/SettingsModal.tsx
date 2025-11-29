@@ -172,7 +172,52 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, currentUs
                     <div className="border-t border-slate-100 pt-6">
                         <h4 className="text-sm font-bold text-slate-700 uppercase mb-4">Kind hinzufügen</h4>
                         <form onSubmit={handleAddChild} className="space-y-3">
-                           {/* Form fields remain the same */}
+                            <div>
+                                <label className="block text-xs font-medium text-slate-500 mb-1">Name</label>
+                                <input 
+                                    type="text" 
+                                    required
+                                    value={newName}
+                                    onChange={e => setNewName(e.target.value)}
+                                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none text-slate-800"
+                                    placeholder="Vorname"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-500 mb-1">Geburtsdatum</label>
+                                <input 
+                                    type="date" 
+                                    required
+                                    value={newBirthDate}
+                                    onChange={e => setNewBirthDate(e.target.value)}
+                                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:border-indigo-500 outline-none text-slate-800"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-slate-500 mb-1">Geschlecht</label>
+                                <div className="flex gap-2">
+                                    {[
+                                        { val: 'MALE', label: 'Junge', icon: '👦' },
+                                        { val: 'FEMALE', label: 'Mädchen', icon: '👧' },
+                                        { val: 'OTHER', label: 'Neutral', icon: '👶' }
+                                    ].map(opt => (
+                                        <button
+                                            key={opt.val}
+                                            type="button"
+                                            onClick={() => setNewGender(opt.val as Gender)}
+                                            className={`flex-1 py-2 px-3 rounded-lg border text-sm flex items-center justify-center gap-2 transition-all ${newGender === opt.val ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-medium' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                                        >
+                                            <span>{opt.icon}</span> {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <button 
+                                type="submit"
+                                className="w-full bg-slate-900 text-white py-3 rounded-lg font-medium hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 mt-2"
+                            >
+                                <Plus className="w-4 h-4" /> Speichern
+                            </button>
                         </form>
                     </div>
                 </div>
@@ -202,7 +247,35 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, currentUs
             {activeTab === 'NOTIFICATIONS' && (
                  <div className="animate-in fade-in">
                     <h3 className="text-2xl font-bold text-slate-800 mb-6">Benachrichtigungen</h3>
-                    {/* ... content for notifications ... */}
+                    <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex items-start gap-4">
+                        <div className="p-3 bg-indigo-50 rounded-full text-indigo-600">
+                            <Mail className="w-6 h-6" />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-bold text-slate-800">E-Mail Benachrichtigungen</h3>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Erhalte eine E-Mail, wenn ein Verwandter ein Geschenk reserviert.
+                            </p>
+                        </div>
+                        <button 
+                            type="button"
+                            onClick={toggleEmail}
+                            className={`transition-colors ${emailEnabled ? 'text-indigo-600' : 'text-slate-300 hover:text-slate-400'}`}
+                        >
+                            {emailEnabled ? (
+                                <ToggleRight className="w-10 h-10" />
+                            ) : (
+                                <ToggleLeft className="w-10 h-10" />
+                            )}
+                        </button>
+                    </div>
+                    
+                    {emailEnabled && (
+                        <div className="mt-4 p-3 bg-blue-50 text-blue-700 text-xs rounded-lg border border-blue-100 flex gap-2">
+                             <span className="font-bold">Info:</span>
+                             E-Mails werden an {currentUser.email} gesendet.
+                        </div>
+                    )}
                  </div>
             )}
         </div>

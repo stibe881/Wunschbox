@@ -263,6 +263,7 @@ router.put('/invitations/:id/use', async (req, res) => {
 });
 // Contact routes
 router.get('/contacts/:userId', async (req, res) => {
+    console.log('Fetching contacts for userId:', req.params.userId);
     try {
         const { userId } = req.params;
         const [rows] = await pool.query('SELECT * FROM contacts WHERE createdByUserId = ?', [userId]);
