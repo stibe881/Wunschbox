@@ -19,7 +19,7 @@ app.get('/health', (req, res) => {
 app.use('/api', apiRoutes);
 
 app.get('/', (req, res) => {
-  res.send('Backend server is running!');
+  res.json(listEndpoints(app));
 });
 
 app.listen(port, () => {
