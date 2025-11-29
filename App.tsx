@@ -72,14 +72,9 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogin = async (newUser: User) => {
-    try {
-      const savedUser = await storageService.login(newUser);
-      setUser(savedUser);
-      await refreshData(savedUser);
-    } catch (error) {
-      console.error("Failed to login:", error);
-    }
+  const handleLogin = async (user: User) => {
+    setUser(user);
+    await refreshData(user);
   };
 
   const handleLogout = () => {

@@ -11,6 +11,7 @@ export interface User {
   id: string;
   name: string;
   email: string; // Optional, kept for structure
+  password?: string;
   role: Role;
   roleDescription?: string; // e.g. "Gotti", "Onkel"
   emailNotificationsEnabled?: boolean; // New setting
