@@ -9,6 +9,12 @@ export default defineConfig(({ mode }) => {
         port: 3010,
         host: '0.0.0.0',
       },
+      preview: {
+        port: 3010,
+        host: '0.0.0.0',
+        strictPort: true,
+        allowedHosts: ['wunschbox.familie-gross.ch'],
+      },
       plugins: [react()],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
