@@ -1,4 +1,4 @@
-import { User, Gift, Notification, Role, Invitation, Child } from '../types';
+import { User, Gift, Notification, Role, Invitation, Child, Contact } from '../types';
 
 const USERS_KEY = 'wishlist_users';
 const CHILDREN_KEY = 'wishlist_children';
