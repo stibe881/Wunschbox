@@ -41,7 +41,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, currentUs
   const [emailEnabled, setEmailEnabled] = useState<boolean>(currentUser.emailNotificationsEnabled ?? true);
 
   // --- Children Logic ---
-  const handleAddChild = (e: React.FormEvent) => {
+  const handleAddChild = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newBirthDate) return;
 
@@ -53,19 +53,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, currentUs
         createdByUserId: currentUser.id
     };
 
-    storageService.saveChild(child);
-    setNewName('');
-    setNewBirthDate('');
-    setNewGender('MALE');
-    onUpdate(); // Refresh parent to get new list
+    try {
+      await storageService.saveChild(child);
+      setNewName('');
+      setNewBirthDate('');
+      setNewGender('MALE');
+      onUpdate(); // Refresh parent to get new list
+    } catch (error) {
+      console.error("Failed to save child:", error);
+    }
   };
 
-  const handleDeleteChild = (id: string, e: React.MouseEvent) => {
+  const handleDeleteChild = async (id: string, e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
       if (window.confirm('Möchtest du dieses Kind wirklich löschen?')) {
-          storageService.deleteChild(id);
+        try {
+          await storageService.deleteChild(id);
           onUpdate(); // Refresh parent to get new list
+        } catch (error) {
+          console.error("Failed to delete child:", error);
+        }
       }
   };
 
@@ -76,13 +84,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, currentUs
   };
 
   // --- Notification Logic ---
-  const toggleEmail = () => {
+  const toggleEmail = async () => {
       const newValue = !emailEnabled;
       setEmailEnabled(newValue);
       
       const updatedUser = { ...currentUser, emailNotificationsEnabled: newValue };
-      storageService.updateUser(updatedUser);
-      onUpdate(); 
+      try {
+        await storageService.updateUser(updatedUser);
+        onUpdate(); 
+      } catch (error) {
+        console.error("Failed to update user:", error);
+        // Revert the state if the update fails
+        setEmailEnabled(!newValue);
+      }
   };
 
   return (

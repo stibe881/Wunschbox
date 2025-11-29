@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Child, User, Gender } from '../types';
 import { storageService } from '../services/storage';
 import { X, Plus, Trash2, Calendar, Baby, User as UserIcon } from 'lucide-react';
@@ -30,12 +29,24 @@ const calculateAge = (birthDate: string): string => {
 };
 
 export const ChildManager: React.FC<ChildManagerProps> = ({ onClose, currentUser, onUpdate }) => {
-  const [children, setChildren] = useState<Child[]>(storageService.getChildren());
+  const [children, setChildren] = useState<Child[]>([]);
   const [newName, setNewName] = useState('');
   const [newBirthDate, setNewBirthDate] = useState('');
   const [newGender, setNewGender] = useState<Gender>('MALE');
 
-  const handleAddChild = (e: React.FormEvent) => {
+  useEffect(() => {
+    const fetchChildren = async () => {
+      try {
+        const children = await storageService.getChildren();
+        setChildren(children);
+      } catch (error) {
+        console.error("Failed to fetch children:", error);
+      }
+    };
+    fetchChildren();
+  }, []);
+
+  const handleAddChild = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newBirthDate) return;
 
@@ -47,19 +58,29 @@ export const ChildManager: React.FC<ChildManagerProps> = ({ onClose, currentUser
         createdByUserId: currentUser.id
     };
 
-    storageService.saveChild(child);
-    setChildren(storageService.getChildren());
-    setNewName('');
-    setNewBirthDate('');
-    setNewGender('MALE');
-    onUpdate();
+    try {
+      await storageService.saveChild(child);
+      const updatedChildren = await storageService.getChildren();
+      setChildren(updatedChildren);
+      setNewName('');
+      setNewBirthDate('');
+      setNewGender('MALE');
+      onUpdate();
+    } catch (error) {
+      console.error("Failed to save child:", error);
+    }
   };
 
-  const handleDeleteChild = (id: string) => {
+  const handleDeleteChild = async (id: string) => {
       if (window.confirm('Möchtest du dieses Kind wirklich löschen?')) {
-          storageService.deleteChild(id);
-          setChildren(storageService.getChildren());
+        try {
+          await storageService.deleteChild(id);
+          const updatedChildren = await storageService.getChildren();
+          setChildren(updatedChildren);
           onUpdate();
+        } catch (error) {
+          console.error("Failed to delete child:", error);
+        }
       }
   };
 

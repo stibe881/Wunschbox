@@ -5,7 +5,7 @@ import { Gift, Users, Heart, ArrowRight, UserPlus, Sparkles, CheckCircle2, Arrow
 import { storageService } from '../services/storage';
 
 interface AuthProps {
-  onLogin: (user: User) => void;
+  onLogin: (user: User) => Promise<void>;
 }
 
 type AuthView = 'LANDING' | 'LOGIN' | 'REGISTER';
@@ -20,25 +20,34 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check URL for token
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token');
-    
-    if (token) {
-        const invite = storageService.getInvitationByToken(token);
-        if (invite) {
-            setInvitation(invite);
-            setName(invite.guestName);
-        } else {
-            // Invalid or used token
-            window.history.replaceState({}, '', window.location.pathname);
-            alert("Dieser Einladungslink ist ungültig oder wurde bereits verwendet.");
-        }
+    const checkToken = async () => {
+      // Check URL for token
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      
+      if (token) {
+          try {
+              const invite = await storageService.getInvitationByToken(token);
+              if (invite) {
+                  setInvitation(invite);
+                  setName(invite.guestName);
+              } else {
+                  // Invalid or used token
+                  window.history.replaceState({}, '', window.location.pathname);
+                  alert("Dieser Einladungslink ist ungültig oder wurde bereits verwendet.");
+              }
+          } catch (error) {
+              console.error("Failed to fetch invitation:", error);
+              window.history.replaceState({}, '', window.location.pathname);
+              alert("Ein Fehler ist aufgetreten. Bitte versuche es später erneut.");
+          }
+      }
+      setLoading(false);
     }
-    setLoading(false);
+    checkToken();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Determine role: if invitation exists, use its target role. If generic login/reg, default to PARENT.
@@ -53,13 +62,17 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
       roleDescription: description
     };
 
-    if (invitation) {
-        storageService.markInvitationUsed(invitation.id);
-        // Clean URL
-        window.history.replaceState({}, '', window.location.pathname);
+    try {
+      if (invitation) {
+          await storageService.markInvitationUsed(invitation.id);
+          // Clean URL
+          window.history.replaceState({}, '', window.location.pathname);
+      }
+      await onLogin(newUser);
+    } catch (error) {
+      console.error("Login failed:", error);
+      alert("Anmeldung fehlgeschlagen. Bitte versuche es erneut.");
     }
-
-    onLogin(newUser);
   };
 
   if (loading) return null;

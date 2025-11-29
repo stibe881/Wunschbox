@@ -19,7 +19,7 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ onClose, curre
   const [generatedLink, setGeneratedLink] = useState('');
   const [copied, setCopied] = useState(false);
 
-  const handleGenerate = (e: React.FormEvent) => {
+  const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!guestName) return;
     
@@ -40,10 +40,14 @@ export const InvitationModal: React.FC<InvitationModalProps> = ({ onClose, curre
       isUsed: false
     };
 
-    storageService.createInvitation(invitation);
-
-    const url = `${window.location.origin}${window.location.pathname}?token=${token}`;
-    setGeneratedLink(url);
+    try {
+      await storageService.createInvitation(invitation);
+      const url = `${window.location.origin}${window.location.pathname}?token=${token}`;
+      setGeneratedLink(url);
+    } catch (error) {
+      console.error("Failed to create invitation:", error);
+      alert("Einladung konnte nicht erstellt werden. Bitte versuche es erneut.");
+    }
   };
 
   const copyToClipboard = () => {

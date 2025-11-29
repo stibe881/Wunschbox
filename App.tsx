@@ -31,33 +31,52 @@ const App: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
 
   useEffect(() => {
-    storageService.init();
-    const currentUser = storageService.getCurrentUser();
-    
-    // Check if there is a token, if so, ignore local storage auth to force invitation check in Auth component
-    const params = new URLSearchParams(window.location.search);
-    if (!params.get('token') && currentUser) {
-      setUser(currentUser);
-      refreshData(currentUser);
+    const loadUser = async () => {
+      storageService.init();
+      // Check if there is a token, if so, ignore local storage auth to force invitation check in Auth component
+      const params = new URLSearchParams(window.location.search);
+      if (!params.get('token')) {
+        const currentUser = await storageService.getCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+          await refreshData(currentUser);
+        }
+      }
     }
+    loadUser();
   }, []);
 
-  const refreshData = (currentUser: User) => {
-    setGifts(storageService.getGifts());
-    setChildren(storageService.getChildren());
-    // Also update current user object in state from storage to catch settings changes
-    const updatedUser = storageService.getCurrentUser();
-    if (updatedUser) setUser(updatedUser);
+  const refreshData = async (currentUser: User) => {
+    try {
+      const gifts = await storageService.getGifts();
+      setGifts(gifts);
+      const children = await storageService.getChildren();
+      setChildren(children);
+      // Also update current user object in state from storage to catch settings changes
+      const updatedUser = await storageService.getCurrentUser();
+      if (updatedUser) setUser(updatedUser);
+    } catch (error) {
+      console.error("Failed to fetch data:", error);
+    }
 
     if (currentUser.role === 'PARENT') {
-        setNotifications(storageService.getNotifications('PARENT'));
+        try {
+            const notifications = await storageService.getNotifications('PARENT');
+            setNotifications(notifications);
+        } catch (error) {
+            console.error("Failed to fetch notifications:", error);
+        }
     }
   };
 
-  const handleLogin = (newUser: User) => {
-    storageService.login(newUser);
-    setUser(newUser);
-    refreshData(newUser);
+  const handleLogin = async (newUser: User) => {
+    try {
+      const savedUser = await storageService.login(newUser);
+      setUser(savedUser);
+      await refreshData(savedUser);
+    } catch (error) {
+      console.error("Failed to login:", error);
+    }
   };
 
   const handleLogout = () => {
@@ -65,7 +84,7 @@ const App: React.FC = () => {
     setUser(null);
   };
 
-  const handleSaveGift = (giftData: Partial<Gift>) => {
+  const handleSaveGift = async (giftData: Partial<Gift>) => {
     const newGift: Gift = {
       id: editingGift ? editingGift.id : crypto.randomUUID(),
       title: giftData.title || 'Unbenannt',
@@ -84,20 +103,28 @@ const App: React.FC = () => {
       createdAt: editingGift ? editingGift.createdAt : Date.now(),
     };
 
-    storageService.saveGift(newGift);
-    if (user) refreshData(user);
+    try {
+      await storageService.saveGift(newGift);
+      if (user) await refreshData(user);
+    } catch (error) {
+      console.error("Failed to save gift:", error);
+    }
     setIsModalOpen(false);
     setEditingGift(undefined);
   };
 
-  const handleDeleteGift = (id: string) => {
+  const handleDeleteGift = async (id: string) => {
     if (window.confirm('Möchtest du dieses Geschenk wirklich löschen?')) {
-        storageService.deleteGift(id);
-        if (user) refreshData(user);
+      try {
+        await storageService.deleteGift(id);
+        if (user) await refreshData(user);
+      } catch (error) {
+        console.error("Failed to delete gift:", error);
+      }
     }
   };
 
-  const handleToggleStatus = (gift: Gift) => {
+  const handleToggleStatus = async (gift: Gift) => {
     if (!user) return;
 
     if (gift.isGifted) {
@@ -105,35 +132,39 @@ const App: React.FC = () => {
         if (user.role === 'PARENT') {
              // Parent can force unmark anyone's gift
              if (window.confirm(`Möchtest du das Geschenk "${gift.title}" wirklich wieder freigeben?`)) {
-                 storageService.unmarkGift(gift.id);
-                 refreshData(user);
+                 await storageService.unmarkGift(gift.id);
+                 await refreshData(user);
              }
         } else {
              // Standard user can only unmark if they were the giver
-             storageService.toggleGiftStatus(gift.id, user.id, user.name);
-             refreshData(user);
+             await storageService.toggleGiftStatus(gift.id, user.id, user.name);
+             await refreshData(user);
         }
     } else {
         // MARKING FLOW (Gift it)
-        storageService.toggleGiftStatus(gift.id, user.id, user.name);
-        refreshData(user);
+        await storageService.toggleGiftStatus(gift.id, user.id, user.name);
+        await refreshData(user);
     }
   };
 
-  const handleProxyMark = (gift: Gift) => {
+  const handleProxyMark = async (gift: Gift) => {
     if (!user || user.role !== 'PARENT') return;
     const name = window.prompt(`Wer schenkt "${gift.title}"? (Name eingeben)`);
     if (name && name.trim()) {
-        storageService.markGiftAsGiftedByProxy(gift.id, name.trim(), user.id);
-        refreshData(user);
+        await storageService.markGiftAsGiftedByProxy(gift.id, name.trim(), user.id);
+        await refreshData(user);
     }
   };
 
-  const handleReadNotifications = () => {
+  const handleReadNotifications = async () => {
     setShowNotifications(!showNotifications);
     if (!showNotifications && user && user.role === 'PARENT') {
-        storageService.markNotificationsRead('PARENT');
-        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+        try {
+            await storageService.markNotificationsRead('PARENT');
+            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+        } catch (error) {
+            console.error("Failed to mark notifications as read:", error);
+        }
     }
   };
 

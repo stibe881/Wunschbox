@@ -1,243 +1,258 @@
-
 import { User, Gift, Notification, Role, Invitation, Child } from '../types';
 
 const USERS_KEY = 'wishlist_users';
-const GIFTS_KEY = 'wishlist_gifts';
 const CHILDREN_KEY = 'wishlist_children';
 const NOTIFICATIONS_KEY = 'wishlist_notifications';
 const INVITATIONS_KEY = 'wishlist_invitations';
 const CURRENT_USER_KEY = 'wishlist_current_user';
-
-// Seed data if empty
-const seedData = () => {
-  if (!localStorage.getItem(GIFTS_KEY)) {
-    // Seed Children first if empty
-    if (!localStorage.getItem(CHILDREN_KEY)) {
-        const initialChildren: Child[] = [
-            { id: 'c1', name: 'Levin', birthDate: '2018-05-15', gender: 'MALE', createdByUserId: 'system' },
-            { id: 'c2', name: 'Lina', birthDate: '2020-11-20', gender: 'FEMALE', createdByUserId: 'system' }
-        ];
-        localStorage.setItem(CHILDREN_KEY, JSON.stringify(initialChildren));
-    }
-
-    const initialGifts: Gift[] = [
-      {
-        id: '1',
-        title: 'LEGO Technic Rennwagen',
-        purpose: 'Geburtstag',
-        priceMin: 40,
-        priceMax: 60,
-        currency: 'CHF',
-        imageUrl: 'https://images.unsplash.com/photo-1585366119957-e9730b6d0f60?w=500&q=80',
-        shopUrl: 'https://www.lego.com',
-        childName: 'Levin',
-        priority: 'HIGH',
-        category: 'Spielzeug',
-        isGifted: false,
-        createdAt: Date.now(),
-      },
-      {
-        id: '2',
-        title: 'Malset Deluxe',
-        purpose: 'Weihnachten',
-        priceMin: 20,
-        priceMax: 35,
-        currency: 'CHF',
-        imageUrl: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=500&q=80',
-        shopUrl: 'https://www.amazon.de',
-        childName: 'Lina',
-        priority: 'MEDIUM',
-        category: 'Sonstiges',
-        isGifted: true,
-        giftedByUserName: 'Gotti Anna',
-        createdAt: Date.now() - 10000,
-      }
-    ];
-    localStorage.setItem(GIFTS_KEY, JSON.stringify(initialGifts));
-  }
-};
+const API_URL = 'http://localhost:3011/api';
 
 export const storageService = {
-  init: seedData,
+  init: () => {},
 
-  getCurrentUser: (): User | null => {
-    const data = localStorage.getItem(CURRENT_USER_KEY);
-    return data ? JSON.parse(data) : null;
+  getCurrentUser: async (): Promise<User | null> => {
+    const userId = localStorage.getItem(CURRENT_USER_KEY);
+    if (!userId) return null;
+
+    const response = await fetch(`${API_URL}/users/${userId}`);
+    if (!response.ok) {
+        // If user not found on backend, remove from local storage
+        if (response.status === 404) {
+            localStorage.removeItem(CURRENT_USER_KEY);
+        }
+        throw new Error('Failed to fetch user');
+    }
+    return response.json();
   },
 
-  login: (user: User) => {
+  login: async (user: User): Promise<User> => {
     // Set default preferences if new user
     if (user.role === 'PARENT' && user.emailNotificationsEnabled === undefined) {
         user.emailNotificationsEnabled = true;
     }
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    
+    const response = await fetch(`${API_URL}/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user)
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to login');
+    }
+    const savedUser = await response.json();
+    localStorage.setItem(CURRENT_USER_KEY, savedUser.id);
+    return savedUser;
   },
 
   logout: () => {
     localStorage.removeItem(CURRENT_USER_KEY);
   },
 
-  updateUser: (updatedUser: User) => {
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedUser));
+  updateUser: async (updatedUser: User): Promise<User> => {
+    const response = await fetch(`${API_URL}/users/${updatedUser.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedUser)
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to update user');
+    }
+    return response.json();
   },
 
   // Children Methods
-  getChildren: (): Child[] => {
-    const data = localStorage.getItem(CHILDREN_KEY);
-    return data ? JSON.parse(data) : [];
-  },
-
-  saveChild: (child: Child) => {
-    const children = storageService.getChildren();
-    const index = children.findIndex(c => c.id === child.id);
-    if (index >= 0) {
-        children[index] = child;
-    } else {
-        children.push(child);
+  getChildren: async (): Promise<Child[]> => {
+    const response = await fetch(`${API_URL}/children`);
+    if (!response.ok) {
+        throw new Error('Failed to fetch children');
     }
-    localStorage.setItem(CHILDREN_KEY, JSON.stringify(children));
+    return response.json();
   },
 
-  deleteChild: (childId: string) => {
-    const children = storageService.getChildren();
-    const newChildren = children.filter(c => c.id !== childId);
-    localStorage.setItem(CHILDREN_KEY, JSON.stringify(newChildren));
+  saveChild: async (child: Child): Promise<Child> => {
+    const method = child.id ? 'PUT' : 'POST';
+    const url = child.id ? `${API_URL}/children/${child.id}` : `${API_URL}/children`;
+
+    const response = await fetch(url, {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(child),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to save child');
+    }
+    return response.json();
+  },
+
+  deleteChild: async (childId: string): Promise<void> => {
+    const response = await fetch(`${API_URL}/children/${childId}`, {
+        method: 'DELETE',
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to delete child');
+    }
   },
 
   // Gift Methods
-  getGifts: (): Gift[] => {
-    const data = localStorage.getItem(GIFTS_KEY);
-    return data ? JSON.parse(data) : [];
-  },
-
-  saveGift: (gift: Gift) => {
-    const gifts = storageService.getGifts();
-    const existingIndex = gifts.findIndex(g => g.id === gift.id);
-    if (existingIndex >= 0) {
-      gifts[existingIndex] = gift;
-    } else {
-      gifts.push(gift);
+  getGifts: async (): Promise<Gift[]> => {
+    const response = await fetch(`${API_URL}/gifts`);
+    if (!response.ok) {
+        throw new Error('Failed to fetch gifts');
     }
-    localStorage.setItem(GIFTS_KEY, JSON.stringify(gifts));
+    return response.json();
   },
 
-  deleteGift: (giftId: string) => {
-    const gifts = storageService.getGifts();
-    const newGifts = gifts.filter(g => g.id !== giftId);
-    localStorage.setItem(GIFTS_KEY, JSON.stringify(newGifts));
+  saveGift: async (gift: Gift): Promise<Gift> => {
+    const method = gift.id ? 'PUT' : 'POST';
+    const url = gift.id ? `${API_URL}/gifts/${gift.id}` : `${API_URL}/gifts`;
+
+    const response = await fetch(url, {
+        method,
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(gift),
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to save gift');
+    }
+    return response.json();
+  },
+
+  deleteGift: async (giftId: string): Promise<void> => {
+    const response = await fetch(`${API_URL}/gifts/${giftId}`, {
+        method: 'DELETE',
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to delete gift');
+    }
   },
 
   // Toggle for current user (standard flow)
-  toggleGiftStatus: (giftId: string, userId: string, userName: string) => {
-    const gifts = storageService.getGifts();
-    const newGifts = gifts.map(gift => {
-        if (gift.id === giftId) {
-            if (gift.isGifted) {
-                // Can only unmark if gifted by self
-                if (gift.giftedByUserId === userId) {
-                    return { ...gift, isGifted: false, giftedByUserId: undefined, giftedByUserName: undefined };
-                }
-            } else {
-                // MARK AS GIFTED
-                
-                // 1. Create In-App Notification
-                storageService.addNotification({
-                    id: crypto.randomUUID(),
-                    message: `${userName} schenkt "${gift.title}" an ${gift.childName}`,
-                    createdAt: Date.now(),
-                    read: false,
-                    forRole: 'PARENT'
-                });
+  toggleGiftStatus: async (giftId: string, userId: string, userName: string) => {
+    const gift = (await storageService.getGifts()).find(g => g.id === giftId);
+    if (!gift) throw new Error("Gift not found");
 
-                // 2. Simulate Email Notification Trigger
-                // In a real backend, we would fetch all users with role=PARENT and emailNotificationsEnabled=true
-                // Here we just log it for demonstration
-                console.log(`[SIMULATION] Checking if parents enabled email notifications...`);
-                console.log(`[SIMULATION] Sending email to parents: "${userName} hat ${gift.title} für ${gift.childName} reserviert."`);
-
-                return { 
-                    ...gift, 
-                    isGifted: true, 
-                    giftedByUserId: userId, 
-                    giftedByUserName: userName 
-                };
-            }
+    if (gift.isGifted) {
+        // Can only unmark if gifted by self
+        if (gift.giftedByUserId === userId) {
+            const updatedGift = { ...gift, isGifted: false, giftedByUserId: undefined, giftedByUserName: undefined };
+            await storageService.saveGift(updatedGift);
         }
-        return gift;
-    });
-    localStorage.setItem(GIFTS_KEY, JSON.stringify(newGifts));
+    } else {
+        // MARK AS GIFTED
+        
+        // 1. Create In-App Notification
+        await storageService.addNotification({
+            id: crypto.randomUUID(),
+            message: `${userName} schenkt "${gift.title}" an ${gift.childName}`,
+            createdAt: Date.now(),
+            read: false,
+            forRole: 'PARENT'
+        });
+
+        // 2. In a real backend, we would fetch all users with role=PARENT and emailNotificationsEnabled=true
+        console.log(`[SIMULATION] Sending email to parents: "${userName} hat ${gift.title} für ${gift.childName} reserviert."`);
+
+        const updatedGift = { 
+            ...gift, 
+            isGifted: true, 
+            giftedByUserId: userId, 
+            giftedByUserName: userName 
+        };
+        await storageService.saveGift(updatedGift);
+    }
   },
 
   // Manual mark by parent (proxy)
-  markGiftAsGiftedByProxy: (giftId: string, proxyName: string, parentId: string) => {
-    const gifts = storageService.getGifts();
-    const newGifts = gifts.map(gift => {
-        if (gift.id === giftId) {
-            return {
-                ...gift,
-                isGifted: true,
-                giftedByUserId: parentId,
-                giftedByUserName: proxyName
-            };
-        }
-        return gift;
-    });
-    localStorage.setItem(GIFTS_KEY, JSON.stringify(newGifts));
+  markGiftAsGiftedByProxy: async (giftId: string, proxyName: string, parentId: string) => {
+    const gift = (await storageService.getGifts()).find(g => g.id === giftId);
+    if (!gift) throw new Error("Gift not found");
+    const updatedGift = {
+        ...gift,
+        isGifted: true,
+        giftedByUserId: parentId,
+        giftedByUserName: proxyName
+    };
+    await storageService.saveGift(updatedGift);
   },
 
   // Force unmark (for parents)
-  unmarkGift: (giftId: string) => {
-    const gifts = storageService.getGifts();
-    const newGifts = gifts.map(gift => {
-        if (gift.id === giftId) {
-             return { ...gift, isGifted: false, giftedByUserId: undefined, giftedByUserName: undefined };
-        }
-        return gift;
-    });
-    localStorage.setItem(GIFTS_KEY, JSON.stringify(newGifts));
+  unmarkGift: async (giftId: string) => {
+    const gift = (await storageService.getGifts()).find(g => g.id === giftId);
+    if (!gift) throw new Error("Gift not found");
+    const updatedGift = { ...gift, isGifted: false, giftedByUserId: undefined, giftedByUserName: undefined };
+    await storageService.saveGift(updatedGift);
   },
 
   // Notification Methods
-  getNotifications: (role: Role): Notification[] => {
-    const data = localStorage.getItem(NOTIFICATIONS_KEY);
-    const all: Notification[] = data ? JSON.parse(data) : [];
-    return all.filter(n => n.forRole === role).sort((a, b) => b.createdAt - a.createdAt);
+  getNotifications: async (role: Role): Promise<Notification[]> => {
+    const response = await fetch(`${API_URL}/notifications/${role}`);
+    if (!response.ok) {
+        throw new Error('Failed to fetch notifications');
+    }
+    return response.json();
   },
 
-  addNotification: (notification: Notification) => {
-    const data = localStorage.getItem(NOTIFICATIONS_KEY);
-    const all: Notification[] = data ? JSON.parse(data) : [];
-    all.push(notification);
-    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(all));
+  addNotification: async (notification: Notification): Promise<Notification> => {
+    const response = await fetch(`${API_URL}/notifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(notification),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to add notification');
+    }
+    return response.json();
   },
 
-  markNotificationsRead: (role: Role) => {
-    const data = localStorage.getItem(NOTIFICATIONS_KEY);
-    if (!data) return;
-    let all: Notification[] = JSON.parse(data);
-    all = all.map(n => n.forRole === role ? { ...n, read: true } : n);
-    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(all));
+  markNotificationsRead: async (role: Role): Promise<void> => {
+    const response = await fetch(`${API_URL}/notifications/read/${role}`, {
+        method: 'PUT',
+    });
+    if (!response.ok) {
+        throw new Error('Failed to mark notifications as read');
+    }
   },
 
   // Invitation Methods
-  createInvitation: (invitation: Invitation) => {
-    const data = localStorage.getItem(INVITATIONS_KEY);
-    const all: Invitation[] = data ? JSON.parse(data) : [];
-    all.push(invitation);
-    localStorage.setItem(INVITATIONS_KEY, JSON.stringify(all));
+  createInvitation: async (invitation: Invitation): Promise<Invitation> => {
+    const response = await fetch(`${API_URL}/invitations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(invitation),
+    });
+    if (!response.ok) {
+        throw new Error('Failed to create invitation');
+    }
+    return response.json();
   },
 
-  getInvitationByToken: (token: string): Invitation | undefined => {
-    const data = localStorage.getItem(INVITATIONS_KEY);
-    const all: Invitation[] = data ? JSON.parse(data) : [];
-    return all.find(i => i.token === token && !i.isUsed);
+  getInvitationByToken: async (token: string): Promise<Invitation | undefined> => {
+    const response = await fetch(`${API_URL}/invitations/${token}`);
+    if (!response.ok) {
+        if (response.status === 404) {
+            return undefined;
+        }
+        throw new Error('Failed to fetch invitation');
+    }
+    return response.json();
   },
 
-  markInvitationUsed: (id: string) => {
-    const data = localStorage.getItem(INVITATIONS_KEY);
-    if (!data) return;
-    let all: Invitation[] = JSON.parse(data);
-    all = all.map(i => i.id === id ? { ...i, isUsed: true } : i);
-    localStorage.setItem(INVITATIONS_KEY, JSON.stringify(all));
+  markInvitationUsed: async (id: string): Promise<void> => {
+    const response = await fetch(`${API_URL}/invitations/${id}/use`, {
+        method: 'PUT',
+    });
+    if (!response.ok) {
+        throw new Error('Failed to mark invitation as used');
+    }
   }
 };
