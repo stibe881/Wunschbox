@@ -6,6 +6,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3010:3010"
+    environment:
+      - GEMINI_API_KEY=IHREN_API_SCHLÜSSEL_HIER_EINFÜGEN
     depends_on:
       - backend
   backend:

@@ -85,6 +85,7 @@ const App: React.FC = () => {
   };
 
   const handleSaveGift = async (giftData: Partial<Gift>) => {
+    const isNew = !editingGift;
     const newGift: Gift = {
       id: editingGift ? editingGift.id : crypto.randomUUID(),
       title: giftData.title || 'Unbenannt',
@@ -104,7 +105,7 @@ const App: React.FC = () => {
     };
 
     try {
-      await storageService.saveGift(newGift);
+      await storageService.saveGift(newGift, isNew);
       if (user) await refreshData(user);
     } catch (error) {
       console.error("Failed to save gift:", error);

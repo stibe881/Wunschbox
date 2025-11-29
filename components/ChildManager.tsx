@@ -59,7 +59,7 @@ export const ChildManager: React.FC<ChildManagerProps> = ({ onClose, currentUser
     };
 
     try {
-      await storageService.saveChild(child);
+      await storageService.saveChild(child, true);
       const updatedChildren = await storageService.getChildren();
       setChildren(updatedChildren);
       setNewName('');

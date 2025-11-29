@@ -71,9 +71,9 @@ export const storageService = {
     return response.json();
   },
 
-  saveChild: async (child: Child): Promise<Child> => {
-    const method = child.id ? 'PUT' : 'POST';
-    const url = child.id ? `${API_URL}/children/${child.id}` : `${API_URL}/children`;
+  saveChild: async (child: Child, isNew: boolean): Promise<Child> => {
+    const method = isNew ? 'POST' : 'PUT';
+    const url = isNew ? `${API_URL}/children` : `${API_URL}/children/${child.id}`;
 
     const response = await fetch(url, {
         method,
@@ -108,9 +108,9 @@ export const storageService = {
     return response.json();
   },
 
-  saveGift: async (gift: Gift): Promise<Gift> => {
-    const method = gift.id ? 'PUT' : 'POST';
-    const url = gift.id ? `${API_URL}/gifts/${gift.id}` : `${API_URL}/gifts`;
+  saveGift: async (gift: Gift, isNew: boolean): Promise<Gift> => {
+    const method = isNew ? 'POST' : 'PUT';
+    const url = isNew ? `${API_URL}/gifts` : `${API_URL}/gifts/${gift.id}`;
 
     const response = await fetch(url, {
         method,
