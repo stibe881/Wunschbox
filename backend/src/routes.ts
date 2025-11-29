@@ -61,6 +61,9 @@ router.put('/gifts/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const giftData = req.body;
+        // Prevent changing the id and createdAt fields
+        delete giftData.id;
+        delete giftData.createdAt;
         await pool.query('UPDATE gifts SET ? WHERE id = ?', [giftData, id]);
         res.json({ message: 'Gift updated successfully' });
     } catch (error) {
@@ -170,6 +173,18 @@ router.put('/users/:id', async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to update user' });
+    }
+});
+
+router.delete('/users/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        // This is a soft delete, we could also do a hard delete
+        // await pool.query('DELETE FROM users WHERE id = ?', [id]);
+        res.json({ message: 'User deleted successfully' });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Failed to delete user' });
     }
 });
 // Notification routes

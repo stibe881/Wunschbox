@@ -418,6 +418,7 @@ const App: React.FC = () => {
             currentUser={user}
             childrenList={children}
             onUpdate={() => refreshData(user)}
+            onDelete={handleLogout}
           />
       )}
     </div>

@@ -76,6 +76,16 @@ export const storageService = {
     return response.json();
   },
 
+  deleteUser: async (userId: string): Promise<void> => {
+    const response = await fetch(`${API_URL}/users/${userId}`, {
+        method: 'DELETE',
+    });
+
+    if (!response.ok) {
+        throw new Error('Failed to delete user');
+    }
+  },
+
   // Children Methods
   getChildren: async (): Promise<Child[]> => {
     const response = await fetch(`${API_URL}/children`);
