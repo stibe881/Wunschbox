@@ -275,6 +275,7 @@ router.get('/contacts/:userId', async (req, res) => {
 });
 
 router.post('/contacts', async (req, res) => {
+    console.log('Creating contact with body:', req.body);
     try {
         const { id, name, email, createdByUserId } = req.body;
         const newContact = { id, name, email, createdByUserId };
