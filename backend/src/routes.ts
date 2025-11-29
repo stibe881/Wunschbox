@@ -17,8 +17,8 @@ router.post('/auth/login', async (req, res) => {
         const match = await bcrypt.compare(password, user.password);
         if (match) {
             // Do not send password back to client
-            delete user.password;
-            res.json(user);
+            const { password: _, ...userWithoutPassword } = user;
+            res.json(userWithoutPassword);
         } else {
             res.status(401).json({ error: 'Invalid email or password' });
         }
@@ -150,8 +150,8 @@ router.post('/users', async (req, res) => {
 
         await pool.query('INSERT INTO users SET ? ON DUPLICATE KEY UPDATE ?', [newUser, newUser]);
         // Do not send password back to client
-        delete newUser.password;
-        res.status(201).json(newUser);
+        const { password: _, ...userWithoutPassword } = newUser;
+        res.status(201).json(userWithoutPassword);
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Failed to create or update user' });
