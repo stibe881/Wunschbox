@@ -145,7 +145,7 @@ export const storageService = {
         // Can only unmark if gifted by self
         if (gift.giftedByUserId === userId) {
             const updatedGift = { ...gift, isGifted: false, giftedByUserId: undefined, giftedByUserName: undefined };
-            await storageService.saveGift(updatedGift);
+            await storageService.saveGift(updatedGift, false);
         }
     } else {
         // MARK AS GIFTED
@@ -168,7 +168,7 @@ export const storageService = {
             giftedByUserId: userId, 
             giftedByUserName: userName 
         };
-        await storageService.saveGift(updatedGift);
+        await storageService.saveGift(updatedGift, false);
     }
   },
 
@@ -182,7 +182,7 @@ export const storageService = {
         giftedByUserId: parentId,
         giftedByUserName: proxyName
     };
-    await storageService.saveGift(updatedGift);
+    await storageService.saveGift(updatedGift, false);
   },
 
   // Force unmark (for parents)
@@ -190,7 +190,7 @@ export const storageService = {
     const gift = (await storageService.getGifts()).find(g => g.id === giftId);
     if (!gift) throw new Error("Gift not found");
     const updatedGift = { ...gift, isGifted: false, giftedByUserId: undefined, giftedByUserName: undefined };
-    await storageService.saveGift(updatedGift);
+    await storageService.saveGift(updatedGift, false);
   },
 
   // Notification Methods

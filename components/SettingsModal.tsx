@@ -54,7 +54,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, currentUs
     };
 
     try {
-      await storageService.saveChild(child);
+      await storageService.saveChild(child, true);
       setNewName('');
       setNewBirthDate('');
       setNewGender('MALE');
