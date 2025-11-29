@@ -15,6 +15,14 @@ export default defineConfig(({ mode }) => {
         strictPort: true,
         allowedHosts: ['wunschbox.familie-gross.ch'],
       },
+      css: {
+        postcss: {
+          plugins: [
+            'tailwindcss',
+            'autoprefixer',
+          ],
+        },
+      },
       plugins: [react()],
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
