@@ -41,14 +41,26 @@ export interface Location {
   operatingHours: { days: string; open: string; close: string }
 }
 
+export type ScenarioPriority = 'hoch' | 'mittel' | 'tief'
+
 export interface Scenario {
   id: string
   icon: string
   title: string
   category: string
+  priority: ScenarioPriority
+  /** Sofortmassnahmen – Schritt für Schritt */
   instructions: string[]
+  /** Weiterführende Massnahmen nach der Akutphase */
+  followUp: string[]
   checklist: string[]
   silentDefault: boolean
+  /** Vorauswahl der Alarmierungskanäle beim Auslösen */
+  defaultChannels: Channel[]
+  /** Zuständige Gruppen – werden beim Auslösen vorausgewählt */
+  responsibleGroupIds: string[]
+  /** Verknüpfte Notfallkontakte (extern) */
+  contactIds: string[]
   custom?: boolean
 }
 

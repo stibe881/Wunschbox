@@ -83,7 +83,12 @@ export default function TriggerAlarm() {
           {state.scenarios.map((s) => (
             <button
               key={s.id}
-              onClick={() => { setScenarioId(s.id); setSilent(s.silentDefault) }}
+              onClick={() => {
+                setScenarioId(s.id)
+                setSilent(s.silentDefault)
+                if (s.defaultChannels.length > 0) setChannels(s.defaultChannels)
+                if (s.responsibleGroupIds.length > 0) setGroupIds(s.responsibleGroupIds)
+              }}
               className={`rounded-lg border p-3 text-left text-sm transition ${
                 s.id === scenarioId ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-400'
               }`}

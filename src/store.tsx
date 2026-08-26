@@ -4,7 +4,8 @@ import { CHANNEL_LABELS } from './types'
 import { createInitialState } from './data/seed'
 import { LEGACY_EMOJI_TO_ICON } from './components/ScenarioIcon'
 
-const STORAGE_KEY = 'e-mergency-state-v1'
+// v2: Sonnenberg-Datensatz und erweitertes Szenario-Modell – alte Stände werden verworfen
+const STORAGE_KEY = 'e-mergency-state-v2'
 
 export function uid(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
@@ -373,10 +374,16 @@ function loadState(): AppState {
     if (raw) {
       const parsed = JSON.parse(raw) as AppState
       if (parsed.users && parsed.scenarios) {
-        // Migration: früher gespeicherte Emoji-Icons auf Icon-Schlüssel umstellen
-        parsed.scenarios = parsed.scenarios.map((s) =>
-          LEGACY_EMOJI_TO_ICON[s.icon] ? { ...s, icon: LEGACY_EMOJI_TO_ICON[s.icon] } : s,
-        )
+        // Migration: Emoji-Icons auf Icon-Schlüssel umstellen, fehlende Szenario-Felder auffüllen
+        parsed.scenarios = parsed.scenarios.map((s) => ({
+          ...s,
+          priority: s.priority ?? 'mittel',
+          followUp: s.followUp ?? [],
+          defaultChannels: s.defaultChannels ?? [],
+          responsibleGroupIds: s.responsibleGroupIds ?? [],
+          contactIds: s.contactIds ?? [],
+          icon: LEGACY_EMOJI_TO_ICON[s.icon] ?? s.icon,
+        }))
         return parsed
       }
     }

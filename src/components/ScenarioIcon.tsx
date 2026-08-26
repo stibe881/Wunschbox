@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import {
-  Activity, Bomb, Biohazard, ClipboardList, CloudLightning, DoorOpen, Droplets, Flame, Hand,
-  HeartPulse, LockOpen, Search, ServerCrash, ShieldAlert, Stethoscope, Users, ZapOff,
+  Activity, Bomb, Biohazard, Bus, ClipboardList, CloudLightning, DoorOpen, Droplets, Flame, Hand,
+  HeartCrack, HeartPulse, LifeBuoy, LockOpen, Pill, Search, ServerCrash, ShieldAlert, Stethoscope, Users, ZapOff,
 } from 'lucide-react'
 
 /** Verfügbare Szenario-Icons: Schlüssel wird im Datenmodell gespeichert */
@@ -22,6 +22,10 @@ export const SCENARIO_ICONS: Record<string, { icon: LucideIcon; label: string }>
   'stethoscope': { icon: Stethoscope, label: 'Pandemie' },
   'search': { icon: Search, label: 'Vermisst' },
   'users': { icon: Users, label: 'Krisenstab' },
+  'bus': { icon: Bus, label: 'Transport' },
+  'pill': { icon: Pill, label: 'Medikamente' },
+  'heart-crack': { icon: HeartCrack, label: 'Todesfall' },
+  'life-buoy': { icon: LifeBuoy, label: 'Psychische Krise' },
   'clipboard-list': { icon: ClipboardList, label: 'Allgemein' },
 }
 

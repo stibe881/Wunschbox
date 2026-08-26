@@ -51,9 +51,9 @@ export default function App() {
         <div className="px-5 py-4 border-b border-slate-800">
           <div className="flex items-center gap-2 text-white font-bold text-lg">
             <AlertTriangle className="text-brand-500" size={22} />
-            Notfall-Manager
+            Sonnenberg Notfall
           </div>
-          <div className="text-xs text-slate-500 mt-0.5">Alarmserver · Cloud-Hosting Schweiz</div>
+          <div className="text-xs text-slate-500 mt-0.5">Kompetenzzentrum Baar · Menzingen · Kloten</div>
         </div>
         <nav className="flex-1 overflow-y-auto py-3">
           {NAV.map((item, i) =>

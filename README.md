@@ -1,17 +1,18 @@
-# Notfall- & Krisenmanagement Webapp
+# Sonnenberg Notfall- & Krisenmanagement
 
-Eine vollständige Webapp für betriebliches Notfall- und Krisenmanagement – inspiriert vom Funktionsumfang von e-mergency®:
+Webapp für das Notfall- und Krisenmanagement des Sonnenberg Kompetenzzentrums (heilpädagogische Schule)
+mit den Standorten **Baar (Hauptsitz), Menzingen und Kloten** – inspiriert vom Funktionsumfang von e-mergency®:
 Alarmserver, Multikanal-Alarmierung, Notfallszenarien mit Handlungsanweisungen und Alleinarbeiterschutz.
 
 ## Funktionsübersicht
 
 ### 01 Vorbereitung (Admin-Web)
-- **Szenarien & Checklisten (CMS):** 16 vorkonfigurierte Best-Practice-Notfallszenarien (Brand, Evakuierung, medizinischer Notfall, Amok, Bombendrohung, IT-Ausfall/Cyberangriff, Stromausfall, u. v. m.) mit Handlungsanweisungen und Checklisten. Eigene Szenarien erstellen und bearbeiten – Änderungen werden sofort verteilt.
+- **Szenarien & Checklisten (CMS):** 22 vorkonfigurierte, heilpädagogisch-schulische Notfallszenarien (u. a. Brand, Evakuierung, vermisste Schüler:innen/Weglaufen, Krampfanfall/Epilepsie, allergische Reaktion, herausforderndes Verhalten/Eskalation, Medikamenten-Zwischenfall, Unfall Schülertransport, Todesfall, akute psychische Krise, Kindesschutz, Notfall im Therapiebad, Amok, Bombendrohung, IT-Ausfall u. v. m.). Jedes Szenario mit Priorität, Sofort- und Folgemassnahmen, Checkliste, zuständigen Gruppen, Standard-Alarmkanälen und verknüpften Notrufnummern – alles im Editor anpassbar, eigene Szenarien erstellbar.
 - **Benutzerverwaltung:** manuelle Erfassung, CSV-Import (`Vorname;Nachname;E-Mail;Telefon;Rolle`), Rollen/Berechtigungen (Admin, Krisenstab, Mitarbeiter), Ferienabwesenheiten und Teilzeit, App-Sprache pro Nutzer (DE/EN/FR/IT).
 - **Gruppen & Krisenteams:** Nutzergruppen mit Mitgliederverwaltung, Kennzeichnung als Krisenteam.
-- **Standorte:** Adressen, Betriebszeiten, Geofencing (Koordinaten + Radius) zur automatischen Standortzuweisung.
+- **Standorte:** Baar (Hauptsitz, inkl. Wohngruppen rund um die Uhr), Menzingen und Kloten – mit Betriebszeiten und Geofencing (Koordinaten + Radius) zur automatischen Standortzuweisung.
 - **Alarmpläne:** vorkonfigurierte Alarmierung (Szenario, Zielgruppen, Standorte, Kanäle, Quittierungspflicht, Betriebszeiten) mit mehrstufiger Eskalation inkl. Benachrichtigung von Blaulichtorganisationen.
-- **Notfallkontakte:** externe Notrufnummern (117, 118, 144, 112, 145, Rega 1414) – erweiterbar.
+- **Notfallkontakte:** externe Notrufnummern (117, 118, 144, 112, Tox Info 145, Rega 1414, Dargebotene Hand 143, Pro Juventute 147) – erweiterbar.
 
 ### 02 Gefahrenabwehr
 - **Alarm auslösen:** Szenariowahl, zielgruppenspezifische Alarmierung nach Standort/Gruppe, Kanalwahl.
@@ -46,7 +47,7 @@ npm run preview  # Produktions-Build lokal testen
 
 ## Bedienung (Schnellstart)
 
-1. **Alarm auslösen** → Szenario wählen (oder Alarmplan anwenden) → Zielgruppen/Kanäle prüfen → auslösen.
+1. **Alarm auslösen** → Szenario wählen (Kanäle und zuständige Gruppen werden automatisch vorbefüllt) → prüfen → auslösen.
 2. In der **Alarmzentrale** den Live-Zustellstatus und das Alarmjournal beobachten.
 3. In der **Mitarbeiter-App** unten links den Nutzer wechseln und den Alarm quittieren.
 4. Unter **Alleinarbeit** einen kurzen Timer (1 Min.) starten und ablaufen lassen – der automatische Alarm erscheint in der Alarmzentrale.

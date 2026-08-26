@@ -73,6 +73,31 @@ export default function EmployeeApp() {
                     </li>
                   ))}
                 </ol>
+                {openScenario.contactIds.length > 0 && (
+                  <div className="mb-5 space-y-1.5">
+                    {state.contacts
+                      .filter((c) => openScenario.contactIds.includes(c.id))
+                      .map((c) => (
+                        <div key={c.id} className="flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-3 py-2 text-sm">
+                          <Phone size={14} className="text-brand-600" />
+                          <span className="text-slate-700 flex-1">{c.name}</span>
+                          <span className="font-bold text-brand-600">{c.number}</span>
+                        </div>
+                      ))}
+                  </div>
+                )}
+                {openScenario.followUp.length > 0 && (
+                  <>
+                    <h4 className="font-semibold text-slate-700 text-sm mb-2">Danach</h4>
+                    <ul className="space-y-1.5 mb-5">
+                      {openScenario.followUp.map((step, i) => (
+                        <li key={i} className="flex gap-2 text-sm text-slate-700">
+                          <span className="text-slate-400 shrink-0">–</span> {step}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
                 <h4 className="font-semibold text-slate-700 text-sm mb-2">Checkliste</h4>
                 <ul className="space-y-1.5">
                   {openScenario.checklist.map((item, i) => {
