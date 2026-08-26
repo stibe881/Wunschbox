@@ -11,7 +11,10 @@
     "primaryColor": "#c81e1e",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "ch.sonnenberg.notfall"
+      "bundleIdentifier": "ch.sonnenberg.notfall",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "ch.sonnenberg.notfall",
