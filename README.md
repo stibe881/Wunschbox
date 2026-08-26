@@ -36,6 +36,12 @@ Alarmserver, Multikanal-Alarmierung, Notfallszenarien mit Handlungsanweisungen u
 - Ein Simulations-Ticker bildet den Alarmserver nach: Zustellstatus (pending → gesendet → zugestellt/fehlgeschlagen), Eskalationsstufen und Alleinarbeits-Timer laufen in Echtzeit
 - **Hinweis:** Es werden keine echten SMS/Anrufe/Push-Nachrichten versendet – alle Kanäle sind simuliert. Für den Produktivbetrieb wären entsprechende Gateways (SMS-Provider, Push-Dienste, Telefonie) anzubinden.
 
+## Native Mobile-App (Expo)
+
+Im Ordner **`mobile/`** liegt eine native React-Native-Version der Mitarbeiter-App (Expo SDK 57).
+Testen mit **Expo Go**: `cd mobile && npm install && npx expo start`, dann den QR-Code scannen.
+Publishen für das Team via **EAS Update** (`eas update --branch preview`). Details: [`mobile/README.md`](mobile/README.md).
+
 ## iOS / Smartphone (PWA)
 
 Die App ist eine **Progressive Web App** und lässt sich auf dem iPhone wie eine native App installieren:
