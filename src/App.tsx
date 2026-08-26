@@ -18,14 +18,14 @@ import Buttons from './pages/Buttons'
 import Integrations from './pages/Integrations'
 import Contacts from './pages/Contacts'
 import AuditLog from './pages/AuditLog'
-import EmployeeApp from './pages/EmployeeApp'
+import UserApp from './pages/UserApp'
 
 const NAV = [
   { section: 'Gefahrenabwehr' },
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/alarm', label: 'Alarm auslösen', icon: Siren },
   { to: '/monitor', label: 'Alarmzentrale', icon: BellRing },
-  { to: '/app', label: 'Mitarbeiter-App', icon: Smartphone },
+  { to: '/app', label: 'Benutzeransicht (App)', icon: Smartphone },
   { section: 'Alleinarbeiterschutz' },
   { to: '/alleinarbeit', label: 'Alleinarbeit (Timer)', icon: Timer },
   { to: '/alarmknoepfe', label: 'Alarmknöpfe', icon: Radio },
@@ -104,6 +104,12 @@ export default function App() {
   const [navOpen, setNavOpen] = useState(false)
   const location = useLocation()
   const activeAlarms = state.alarms.filter((a) => a.status === 'active')
+  const currentUser = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+
+  // Mitarbeitende sehen ausschliesslich die Benutzer-App; Admin/Krisenstab können sie via /app öffnen
+  if (currentUser.role === 'mitarbeiter' || location.pathname === '/app') {
+    return <UserApp />
+  }
 
   return (
     <div className="min-h-screen flex">
@@ -158,7 +164,6 @@ export default function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/alarm" element={<TriggerAlarm />} />
             <Route path="/monitor" element={<AlarmMonitor />} />
-            <Route path="/app" element={<EmployeeApp />} />
             <Route path="/alleinarbeit" element={<LoneWorker />} />
             <Route path="/alarmknoepfe" element={<Buttons />} />
             <Route path="/szenarien" element={<Scenarios />} />

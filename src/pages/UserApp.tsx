@@ -1,0 +1,515 @@
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import {
+  ArrowRight, BellRing, BookOpen, Check, CheckCircle2, ChevronLeft, Clock, LayoutDashboard,
+  MapPin, Phone, Play, Search, ShieldAlert, Siren, Timer, User, Volume2, WifiOff, X,
+} from 'lucide-react'
+import { createAlarm, uid, useStore } from '../store'
+import type { LoneWorkSession, Scenario } from '../types'
+import { Badge, HoldButton, Toggle, formatDuration, inputClass } from '../components/ui'
+import { ScenarioIcon } from '../components/ScenarioIcon'
+
+type Tab = 'start' | 'szenarien' | 'alleinarbeit' | 'notruf' | 'profil'
+
+const TABS: { key: Tab; label: string; icon: typeof Siren }[] = [
+  { key: 'start', label: 'Start', icon: Siren },
+  { key: 'szenarien', label: 'Szenarien', icon: BookOpen },
+  { key: 'alleinarbeit', label: 'Alleinarbeit', icon: Timer },
+  { key: 'notruf', label: 'Notruf', icon: Phone },
+  { key: 'profil', label: 'Profil', icon: User },
+]
+
+export default function UserApp() {
+  const { state } = useStore()
+  const [tab, setTab] = useState<Tab>('start')
+  const [openScenario, setOpenScenario] = useState<Scenario | null>(null)
+
+  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+  const myLocation = state.locations.find((l) => l.id === me.locationId)
+  const myAlarms = state.alarms.filter(
+    (a) => a.status === 'active' && a.deliveries.some((d) => d.userId === me.id),
+  )
+
+  return (
+    <div className="min-h-screen bg-slate-100 flex flex-col max-w-lg mx-auto lg:border-x lg:border-slate-200">
+      <header className="sticky top-0 z-30 bg-slate-900 text-white px-4 py-3 flex items-center gap-2.5">
+        <Siren size={20} className="text-brand-500" />
+        <div className="min-w-0 flex-1">
+          <div className="font-bold leading-tight">Sonnenberg Notfall</div>
+          <div className="text-xs text-slate-400 truncate flex items-center gap-1">
+            {me.firstName} {me.lastName} · <MapPin size={10} /> {myLocation?.name}
+          </div>
+        </div>
+        <span className="text-[10px] text-slate-400 flex items-center gap-1 shrink-0">
+          <WifiOff size={11} /> offline-fähig
+        </span>
+      </header>
+
+      {myAlarms.length > 0 && tab !== 'start' && (
+        <button
+          onClick={() => { setTab('start'); setOpenScenario(null) }}
+          className="bg-brand-600 text-white text-sm font-semibold px-4 py-2 flex items-center gap-2 alarm-pulse"
+        >
+          <BellRing size={15} className="animate-pulse" />
+          {myAlarms.length} aktiver Alarm{myAlarms.length > 1 ? 'e' : ''} – antippen
+        </button>
+      )}
+
+      <main className="flex-1 p-4 pb-28">
+        {openScenario ? (
+          <ScenarioView scenario={openScenario} onBack={() => setOpenScenario(null)} />
+        ) : tab === 'start' ? (
+          <StartTab onOpenScenario={setOpenScenario} />
+        ) : tab === 'szenarien' ? (
+          <ScenarioListTab onOpen={setOpenScenario} />
+        ) : tab === 'alleinarbeit' ? (
+          <LoneWorkTab />
+        ) : tab === 'notruf' ? (
+          <ContactsTab />
+        ) : (
+          <ProfileTab />
+        )}
+      </main>
+
+      <nav
+        className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 max-w-lg mx-auto"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="grid grid-cols-5">
+          {TABS.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => { setTab(key); setOpenScenario(null) }}
+              className={`py-2.5 flex flex-col items-center gap-0.5 text-[11px] ${
+                tab === key && !openScenario ? 'text-brand-600 font-semibold' : 'text-slate-400'
+              }`}
+            >
+              <Icon size={20} />
+              {label}
+            </button>
+          ))}
+        </div>
+      </nav>
+    </div>
+  )
+}
+
+// ---------- Start: Alarme + SOS ----------
+
+function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario) => void }) {
+  const { state, dispatch } = useStore()
+  const navigate = useNavigate()
+  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+  const myAlarms = state.alarms.filter(
+    (a) => a.status === 'active' && a.deliveries.some((d) => d.userId === me.id),
+  )
+
+  function sos() {
+    const alarm = createAlarm(state, {
+      scenarioId: 'sc-medizin',
+      message: `SOS-Alarm von ${me.firstName} ${me.lastName} (App) – Standort: ${state.locations.find((l) => l.id === me.locationId)?.name ?? 'unbekannt'}`,
+      silent: false,
+      requireAck: true,
+      channels: ['push', 'sms', 'voice'],
+      groupIds: ['gr-ersthelfer', 'gr-sicherheit'],
+      locationIds: [me.locationId],
+      triggeredByUserId: me.id,
+      triggeredVia: 'app',
+      escalation: [{ afterMinutes: 3, channels: ['voice'], groupIds: ['gr-krisenstab'], notifyEmergencyServices: true }],
+    })
+    dispatch({ type: 'TRIGGER_ALARM', alarm, audit: `SOS-Alarm via App: ${me.firstName} ${me.lastName}` })
+  }
+
+  return (
+    <div className="space-y-4">
+      {myAlarms.map((a) => {
+        const scenario = state.scenarios.find((s) => s.id === a.scenarioId)
+        const myAck = a.deliveries.find((d) => d.userId === me.id)?.ack ?? 'none'
+        return (
+          <div key={a.id} className={`rounded-2xl border-2 p-4 bg-white ${a.silent ? 'border-violet-400' : 'border-brand-500 alarm-pulse'}`}>
+            <div className="flex items-center gap-2 font-bold text-slate-800">
+              <BellRing size={18} className={a.silent ? 'text-violet-600' : 'text-brand-600 animate-pulse'} />
+              <ScenarioIcon name={scenario?.icon ?? ''} size={18} className="text-slate-500" />
+              <span className="flex-1">{scenario?.title}</span>
+              {a.silent && <Badge color="violet">still</Badge>}
+            </div>
+            <p className="text-sm text-slate-700 mt-2">{a.message}</p>
+            {!a.silent && (
+              <div className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-1">
+                <Volume2 size={12} /> Critical Alert – auch bei stummgeschaltetem Gerät hörbar
+              </div>
+            )}
+            {scenario && (
+              <button
+                className="mt-3 w-full rounded-xl bg-slate-800 text-white py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5"
+                onClick={() => onOpenScenario(scenario)}
+              >
+                Handlungsanweisungen öffnen <ArrowRight size={14} />
+              </button>
+            )}
+            {a.requireAck && myAck === 'none' && (
+              <div className="flex gap-2 mt-2">
+                <button
+                  className="flex-1 bg-emerald-600 text-white rounded-xl py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5"
+                  onClick={() => dispatch({ type: 'ACK_ALARM', alarmId: a.id, userId: me.id, ack: 'acknowledged' })}
+                >
+                  <Check size={15} /> Ich komme
+                </button>
+                <button
+                  className="flex-1 bg-slate-200 text-slate-700 rounded-xl py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5"
+                  onClick={() => dispatch({ type: 'ACK_ALARM', alarmId: a.id, userId: me.id, ack: 'declined' })}
+                >
+                  <X size={15} /> Nicht verfügbar
+                </button>
+              </div>
+            )}
+            {a.requireAck && myAck !== 'none' && (
+              <div className="mt-2">
+                {myAck === 'acknowledged'
+                  ? <Badge color="green"><CheckCircle2 size={12} /> quittiert – Sie nehmen teil</Badge>
+                  : <Badge>als nicht verfügbar gemeldet</Badge>}
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {myAlarms.length === 0 && (
+        <div className="rounded-2xl bg-white border border-slate-200 p-4 text-center">
+          <CheckCircle2 size={26} className="text-emerald-500 mx-auto mb-1.5" />
+          <div className="text-sm font-medium text-slate-700">Keine aktiven Alarme</div>
+          <div className="text-xs text-slate-400 mt-0.5">Sie werden bei einem Ereignis sofort benachrichtigt.</div>
+        </div>
+      )}
+
+      <HoldButton onTrigger={() => { sos(); navigate('.') }} hint="Zum Auslösen gedrückt halten" className="w-full">
+        <Siren size={24} /> SOS
+      </HoldButton>
+      <div className="text-xs text-center text-slate-500">
+        Alarmiert sofort Schulsanität und Hausdienst an Ihrem Standort – mit automatischer Eskalation.
+      </div>
+
+      {state.integrations.hotline.enabled && (
+        <a
+          href={`tel:${state.integrations.hotline.number.replace(/\s/g, '')}`}
+          className="flex items-center gap-3 rounded-2xl bg-white border border-slate-200 p-4"
+        >
+          <Phone size={20} className="text-brand-600" />
+          <div className="flex-1">
+            <div className="text-sm font-semibold text-slate-800">Interne Notfallnummer</div>
+            <div className="text-xs text-slate-400">Alarmauslösung per Anruf</div>
+          </div>
+          <span className="font-bold text-brand-600">{state.integrations.hotline.number}</span>
+        </a>
+      )}
+    </div>
+  )
+}
+
+// ---------- Szenarien ----------
+
+function ScenarioListTab({ onOpen }: { onOpen: (s: Scenario) => void }) {
+  const { state } = useStore()
+  const [search, setSearch] = useState('')
+  const filtered = state.scenarios.filter((s) => !search || s.title.toLowerCase().includes(search.toLowerCase()))
+
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input
+          className={inputClass + ' pl-9'}
+          placeholder="Szenario suchen…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        {filtered.map((s) => (
+          <button
+            key={s.id}
+            className="rounded-2xl border border-slate-200 bg-white p-3.5 text-left active:scale-[0.98] transition"
+            onClick={() => onOpen(s)}
+          >
+            <ScenarioIcon name={s.icon} size={22} className={s.priority === 'hoch' ? 'text-brand-600' : 'text-slate-500'} />
+            <div className="text-sm font-semibold text-slate-800 leading-tight mt-1.5">{s.title}</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">{s.category}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ScenarioView({ scenario, onBack }: { scenario: Scenario; onBack: () => void }) {
+  const { state } = useStore()
+  const [checked, setChecked] = useState<Record<number, boolean>>({})
+  const contacts = state.contacts.filter((c) => scenario.contactIds.includes(c.id))
+
+  return (
+    <div>
+      <button className="flex items-center gap-1 text-sm text-slate-500 mb-3" onClick={onBack}>
+        <ChevronLeft size={16} /> Zurück
+      </button>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+          <ScenarioIcon name={scenario.icon} size={26} />
+        </div>
+        <h2 className="font-bold text-slate-800 text-xl leading-tight">{scenario.title}</h2>
+      </div>
+
+      {contacts.length > 0 && (
+        <div className="space-y-2 mb-4">
+          {contacts.map((c) => (
+            <a
+              key={c.id}
+              href={`tel:${c.number}`}
+              className="flex items-center gap-3 rounded-xl bg-brand-600 text-white px-4 py-3 active:scale-[0.99] transition"
+            >
+              <Phone size={18} />
+              <span className="flex-1 font-semibold text-sm">{c.name} anrufen</span>
+              <span className="font-bold text-lg">{c.number}</span>
+            </a>
+          ))}
+        </div>
+      )}
+
+      <h3 className="font-semibold text-slate-700 text-sm mb-2">Sofortmassnahmen</h3>
+      <ol className="space-y-2.5 mb-5">
+        {scenario.instructions.map((step, i) => (
+          <li key={i} className="flex gap-2.5 text-sm bg-white rounded-xl border border-slate-200 p-3">
+            <span className="shrink-0 w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-xs font-bold">{i + 1}</span>
+            <span className="text-slate-700 pt-0.5">{step}</span>
+          </li>
+        ))}
+      </ol>
+
+      {scenario.followUp.length > 0 && (
+        <>
+          <h3 className="font-semibold text-slate-700 text-sm mb-2">Danach</h3>
+          <ul className="space-y-1.5 mb-5">
+            {scenario.followUp.map((step, i) => (
+              <li key={i} className="flex gap-2 text-sm text-slate-600">
+                <span className="text-slate-400 shrink-0">–</span> {step}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      <h3 className="font-semibold text-slate-700 text-sm mb-2">Checkliste</h3>
+      <ul className="space-y-1.5">
+        {scenario.checklist.map((item, i) => (
+          <li key={i}>
+            <label className="flex items-center gap-2.5 text-sm text-slate-700 bg-white rounded-xl border border-slate-200 p-3">
+              <input type="checkbox" checked={checked[i] ?? false} onChange={() => setChecked({ ...checked, [i]: !checked[i] })} />
+              <span className={checked[i] ? 'line-through text-slate-400' : ''}>{item}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// ---------- Alleinarbeit ----------
+
+function LoneWorkTab() {
+  const { state, dispatch } = useStore()
+  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+  const [activity, setActivity] = useState('')
+  const [durationMin, setDurationMin] = useState(30)
+  const [silent, setSilent] = useState(false)
+  const [now, setNow] = useState(Date.now())
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+
+  const mySessions = state.loneWorkSessions.filter((s) => s.userId === me.id)
+  const running = mySessions.find((s) => s.status === 'running')
+
+  function start() {
+    const session: LoneWorkSession = {
+      id: uid('lw'),
+      userId: me.id,
+      locationId: me.locationId,
+      activity: activity || 'Alleinarbeit',
+      startedAt: Date.now(),
+      durationMin,
+      expiresAt: Date.now() + durationMin * 60_000,
+      silent,
+      status: 'running',
+    }
+    dispatch({ type: 'START_LONE_WORK', session })
+    setActivity('')
+  }
+
+  if (running) {
+    const remaining = running.expiresAt - now
+    const critical = remaining < 5 * 60_000
+    return (
+      <div className="space-y-4">
+        <div className={`rounded-2xl border-2 bg-white p-5 text-center ${critical ? 'border-brand-500' : 'border-slate-200'}`}>
+          <div className="text-sm text-slate-500">{running.activity}</div>
+          <div className={`text-5xl font-mono font-bold my-3 ${critical ? 'text-brand-600' : 'text-slate-800'}`}>
+            {formatDuration(remaining)}
+          </div>
+          <div className="text-xs text-slate-400 mb-4">
+            {critical
+              ? 'Bald läuft der Timer ab – Lebenszeichen geben!'
+              : 'Läuft der Timer ab, wird automatisch alarmiert.'}
+          </div>
+          <button
+            className="w-full rounded-xl bg-emerald-600 text-white py-3.5 font-semibold text-base active:scale-[0.99] transition"
+            onClick={() => dispatch({ type: 'EXTEND_LONE_WORK', sessionId: running.id, minutes: running.durationMin })}
+          >
+            <Clock size={18} className="inline mr-1.5 -mt-0.5" /> Lebenszeichen (+{running.durationMin} Min.)
+          </button>
+          <button
+            className="w-full rounded-xl bg-slate-800 text-white py-3 font-semibold text-sm mt-2"
+            onClick={() => dispatch({ type: 'COMPLETE_LONE_WORK', sessionId: running.id })}
+          >
+            <CheckCircle2 size={16} className="inline mr-1.5 -mt-0.5" /> Arbeit sicher beendet
+          </button>
+        </div>
+        {running.silent && <div className="text-xs text-center text-slate-400">Stille Alarmauslösung aktiviert.</div>}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl bg-white border border-slate-200 p-4">
+        <h2 className="font-semibold text-slate-800 flex items-center gap-2 mb-3"><Timer size={18} /> Alleinarbeit starten</h2>
+        <input
+          className={inputClass + ' mb-3'}
+          placeholder="Tätigkeit (z. B. Abendrundgang, Wartung)"
+          value={activity}
+          onChange={(e) => setActivity(e.target.value)}
+        />
+        <div className="text-sm font-medium text-slate-600 mb-1">Timer: {durationMin} Minuten</div>
+        <input type="range" min={1} max={120} value={durationMin} onChange={(e) => setDurationMin(Number(e.target.value))} className="w-full mb-3" />
+        <div className="mb-4">
+          <Toggle checked={silent} onChange={setSilent} label="Stille Alarmauslösung" />
+        </div>
+        <button className="w-full rounded-xl bg-slate-800 text-white py-3 font-semibold flex items-center justify-center gap-2" onClick={start}>
+          <Play size={16} /> Timer starten
+        </button>
+        <div className="text-xs text-slate-400 mt-2">
+          Melden Sie sich vor Ablauf zurück – sonst alarmiert das System automatisch Schulsanität und Hausdienst.
+        </div>
+      </div>
+
+      {mySessions.length > 0 && (
+        <div className="rounded-2xl bg-white border border-slate-200 p-4">
+          <h3 className="text-sm font-semibold text-slate-700 mb-2">Verlauf</h3>
+          {mySessions.slice(0, 5).map((s) => (
+            <div key={s.id} className="flex items-center gap-2 text-sm py-1.5 border-b border-slate-50 last:border-0">
+              <span className="text-slate-600 flex-1 truncate">{s.activity}</span>
+              {s.status === 'completed' && <Badge color="green">beendet</Badge>}
+              {s.status === 'alarm' && <Badge color="red"><ShieldAlert size={11} /> Alarm</Badge>}
+              {s.status === 'running' && <Badge color="amber">läuft</Badge>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------- Notruf ----------
+
+function ContactsTab() {
+  const { state } = useStore()
+  return (
+    <div className="space-y-2.5">
+      {state.contacts.map((c) => (
+        <a
+          key={c.id}
+          href={`tel:${c.number}`}
+          className="flex items-center gap-3 rounded-2xl bg-white border border-slate-200 p-4 active:scale-[0.99] transition"
+        >
+          <div className="w-11 h-11 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+            <Phone size={18} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-slate-800">{c.name}</div>
+            <div className="text-xs text-slate-400 truncate">{c.description}</div>
+          </div>
+          <span className="text-xl font-bold text-brand-600">{c.number}</span>
+        </a>
+      ))}
+      <div className="text-xs text-center text-slate-400 pt-1">Antippen ruft direkt an.</div>
+    </div>
+  )
+}
+
+// ---------- Profil ----------
+
+function ProfileTab() {
+  const { state, dispatch } = useStore()
+  const navigate = useNavigate()
+  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+  const myLocation = state.locations.find((l) => l.id === me.locationId)
+  const myGroups = state.groups.filter((g) => me.groupIds.includes(g.id))
+  const isStaff = me.role === 'admin' || me.role === 'krisenstab'
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-2xl bg-white border border-slate-200 p-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-lg shrink-0">
+            {me.firstName[0]}{me.lastName[0]}
+          </div>
+          <div className="min-w-0">
+            <div className="font-semibold text-slate-800">{me.firstName} {me.lastName}</div>
+            <div className="text-xs text-slate-400">{me.email}</div>
+          </div>
+        </div>
+        <div className="mt-3 space-y-1.5 text-sm text-slate-600">
+          <div className="flex items-center gap-2"><MapPin size={13} className="text-slate-400" /> {myLocation?.name}</div>
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            <Badge color={me.role === 'admin' ? 'red' : me.role === 'krisenstab' ? 'violet' : 'slate'}>{me.role}</Badge>
+            {myGroups.map((g) => <Badge key={g.id}>{g.name}</Badge>)}
+          </div>
+        </div>
+      </div>
+
+      {isStaff && (
+        <button
+          className="w-full rounded-2xl bg-slate-800 text-white py-3 font-semibold flex items-center justify-center gap-2"
+          onClick={() => navigate('/dashboard')}
+        >
+          <LayoutDashboard size={16} /> Zur Verwaltung wechseln
+        </button>
+      )}
+
+      <div className="rounded-2xl bg-white border border-slate-200 p-4">
+        <div className="text-sm font-semibold text-slate-700 mb-1.5">Als App auf dem iPhone installieren</div>
+        <ol className="text-xs text-slate-500 space-y-1 list-decimal pl-4">
+          <li>Diese Seite in Safari öffnen</li>
+          <li>Teilen-Symbol antippen</li>
+          <li>«Zum Home-Bildschirm» wählen</li>
+        </ol>
+        <div className="text-xs text-slate-400 mt-2">
+          Die App startet dann vollbildig mit eigenem Symbol und funktioniert auch offline.
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-white border border-slate-200 p-4">
+        <div className="text-sm font-semibold text-slate-700 mb-2">Demo: Benutzer wechseln</div>
+        <select
+          className={inputClass}
+          value={me.id}
+          onChange={(e) => dispatch({ type: 'SET_CURRENT_USER', userId: e.target.value })}
+        >
+          {state.users.map((u) => (
+            <option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.role})</option>
+          ))}
+        </select>
+      </div>
+    </div>
+  )
+}
