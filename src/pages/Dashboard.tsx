@@ -37,12 +37,14 @@ export default function Dashboard() {
           >
             <Timer size={16} /> Alleinarbeit starten
           </Link>
-          <Link
-            to="/app"
+          <a
+            href="#/app"
+            target="_blank"
+            rel="noopener"
             className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-300 text-slate-700 px-4 py-2.5 text-sm font-semibold hover:bg-slate-50 transition"
           >
             <Smartphone size={16} /> Benutzeransicht
-          </Link>
+          </a>
         </div>
       </div>
 

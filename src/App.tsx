@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import {
-  AlertTriangle, BellRing, BookOpen, Building2, ClipboardList, FileClock, LayoutDashboard,
+  AlertTriangle, BellRing, BookOpen, Building2, ClipboardList, ExternalLink, FileClock, LayoutDashboard,
   Menu, Phone, Plug, Radio, Siren, Smartphone, Timer, Users, UsersRound, X,
 } from 'lucide-react'
 import { useStore } from './store'
@@ -25,7 +25,7 @@ const NAV = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/alarm', label: 'Alarm auslösen', icon: Siren },
   { to: '/monitor', label: 'Alarmzentrale', icon: BellRing },
-  { to: '/app', label: 'Benutzeransicht (App)', icon: Smartphone },
+  { to: '/app', label: 'Benutzeransicht (App)', icon: Smartphone, newTab: true },
   { section: 'Alleinarbeiterschutz' },
   { to: '/alleinarbeit', label: 'Alleinarbeit (Timer)', icon: Timer },
   { to: '/alarmknoepfe', label: 'Alarmknöpfe', icon: Radio },
@@ -61,6 +61,19 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <div key={i} className="px-5 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               {item.section}
             </div>
+          ) : 'newTab' in item && item.newTab ? (
+            <a
+              key={item.to}
+              href={`#${item.to}`}
+              target="_blank"
+              rel="noopener"
+              onClick={onNavigate}
+              className="flex items-center gap-2.5 px-5 py-2.5 lg:py-2 text-sm transition hover:bg-slate-800/60 hover:text-white"
+            >
+              <item.icon size={16} />
+              {item.label}
+              <ExternalLink size={12} className="ml-auto text-slate-500" />
+            </a>
           ) : (
             <NavLink
               key={item.to}
