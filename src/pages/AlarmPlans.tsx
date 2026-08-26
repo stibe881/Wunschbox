@@ -3,7 +3,7 @@ import { ClipboardList, Pencil, Plus, Trash2 } from 'lucide-react'
 import { uid, useStore } from '../store'
 import type { AlarmPlan, Channel, EscalationLevel } from '../types'
 import { CHANNEL_LABELS } from '../types'
-import { Badge, Button, Card, Field, Modal, Toggle, inputClass } from '../components/ui'
+import { Badge, Button, Card, Field, Modal, Toggle, inputClass, useConfirm } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 
 const ALL_CHANNELS: Channel[] = ['push', 'sms', 'email', 'voice', 'conference', 'tts', 'teams']
@@ -11,6 +11,7 @@ const ALL_CHANNELS: Channel[] = ['push', 'sms', 'email', 'voice', 'conference', 
 export default function AlarmPlans() {
   const { state, dispatch } = useStore()
   const [editing, setEditing] = useState<AlarmPlan | null>(null)
+  const { ask, confirmEl } = useConfirm()
 
   function newPlan(): AlarmPlan {
     return {
@@ -73,7 +74,7 @@ export default function AlarmPlans() {
               </div>
               <div className="flex gap-2 mt-4">
                 <Button variant="ghost" onClick={() => setEditing(p)}><Pencil size={14} /></Button>
-                <Button variant="ghost" onClick={() => { if (confirm(`Alarmplan «${p.name}» löschen?`)) dispatch({ type: 'DELETE_PLAN', planId: p.id }) }}>
+                <Button variant="ghost" onClick={() => ask(`Alarmplan «${p.name}» löschen?`, () => dispatch({ type: 'DELETE_PLAN', planId: p.id }))}>
                   <Trash2 size={14} />
                 </Button>
               </div>
@@ -82,6 +83,7 @@ export default function AlarmPlans() {
         })}
       </div>
 
+      {confirmEl}
       {editing && <PlanEditor plan={editing} onClose={() => setEditing(null)} />}
     </div>
   )

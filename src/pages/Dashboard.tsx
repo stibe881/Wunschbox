@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
-import { Activity, AlertTriangle, ArrowRight, BellRing, Radio, Server, Siren, Timer, Users } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowRight, BellRing, Radio, Server, Siren, Smartphone, Timer, Users } from 'lucide-react'
 import { useStore } from '../store'
-import { Badge, Card, formatDateTime } from '../components/ui'
+import { Badge, Card, formatRelative } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 
 export default function Dashboard() {
@@ -19,9 +19,31 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
-        <p className="text-sm text-slate-500">Lageübersicht Notfall- und Krisenmanagement</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
+          <p className="text-sm text-slate-500">Lageübersicht Notfall- und Krisenmanagement</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to="/alarm"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 text-white px-4 py-2.5 text-sm font-semibold hover:bg-brand-700 transition shadow-sm"
+          >
+            <Siren size={16} /> Alarm auslösen
+          </Link>
+          <Link
+            to="/alleinarbeit"
+            className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-300 text-slate-700 px-4 py-2.5 text-sm font-semibold hover:bg-slate-50 transition"
+          >
+            <Timer size={16} /> Alleinarbeit starten
+          </Link>
+          <Link
+            to="/app"
+            className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-300 text-slate-700 px-4 py-2.5 text-sm font-semibold hover:bg-slate-50 transition"
+          >
+            <Smartphone size={16} /> Benutzeransicht
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -59,7 +81,7 @@ export default function Dashboard() {
         <Card title={<span className="flex items-center gap-2"><Activity size={16} /> Letzte Ereignisse</span>}>
           {state.audit.slice(0, 8).map((e) => (
             <div key={e.id} className="flex items-start gap-3 py-2 border-b border-slate-50 last:border-0 text-sm">
-              <span className="text-xs text-slate-400 whitespace-nowrap mt-0.5">{formatDateTime(e.ts)}</span>
+              <span className="text-xs text-slate-400 whitespace-nowrap mt-0.5 w-20 shrink-0">{formatRelative(e.ts)}</span>
               <span className="text-slate-700">{e.message}</span>
             </div>
           ))}

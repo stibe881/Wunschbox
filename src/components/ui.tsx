@@ -43,6 +43,14 @@ export function Button({ variant = 'primary', className = '', ...props }: React.
 }
 
 export function Modal({ title, onClose, children, wide = false }: { title: string; onClose: () => void; children: React.ReactNode; wide?: boolean }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/50 p-4 overflow-y-auto" onClick={onClose}>
       <div className={`bg-white rounded-xl shadow-xl w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} mt-10`} onClick={(e) => e.stopPropagation()}>
@@ -79,6 +87,51 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
       {label}
     </button>
   )
+}
+
+/**
+ * Bestätigungsdialog als Hook – Ersatz für natives confirm().
+ * Verwendung: const { ask, confirmEl } = useConfirm(); ask('Löschen?', () => ...); {confirmEl} rendern.
+ */
+export function useConfirm() {
+  const [req, setReq] = useState<{ message: string; label: string; onConfirm: () => void } | null>(null)
+
+  function ask(message: string, onConfirm: () => void, label = 'Löschen') {
+    setReq({ message, label, onConfirm })
+  }
+
+  const confirmEl = req ? (
+    <div className="fixed inset-0 z-[55] flex items-center justify-center bg-slate-900/60 p-4" onClick={() => setReq(null)}>
+      <div className="toast-in bg-white rounded-2xl shadow-xl max-w-sm w-full p-5" onClick={(e) => e.stopPropagation()}>
+        <p className="text-sm text-slate-700">{req.message}</p>
+        <div className="flex justify-end gap-2 mt-5">
+          <Button variant="secondary" onClick={() => setReq(null)} autoFocus>
+            Abbrechen
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              req.onConfirm()
+              setReq(null)
+            }}
+          >
+            {req.label}
+          </Button>
+        </div>
+      </div>
+    </div>
+  ) : null
+
+  return { ask, confirmEl }
+}
+
+/** Relative Zeitangabe: «gerade eben», «vor 5 Min.», sonst Datum/Zeit */
+export function formatRelative(ts: number): string {
+  const diff = Date.now() - ts
+  if (diff < 60_000) return 'gerade eben'
+  if (diff < 3600_000) return `vor ${Math.floor(diff / 60_000)} Min.`
+  if (diff < 86_400_000) return `vor ${Math.floor(diff / 3_600_000)} Std.`
+  return formatDateTime(ts)
 }
 
 /**

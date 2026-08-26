@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Phone, Plus, Trash2 } from 'lucide-react'
 import { uid, useStore } from '../store'
-import { Button, Card, Field, Modal, inputClass } from '../components/ui'
+import { Button, Card, Field, Modal, inputClass, useConfirm } from '../components/ui'
 
 export default function Contacts() {
   const { state, dispatch } = useStore()
@@ -9,6 +9,7 @@ export default function Contacts() {
   const [name, setName] = useState('')
   const [number, setNumber] = useState('')
   const [description, setDescription] = useState('')
+  const { ask, confirmEl } = useConfirm()
 
   return (
     <div className="space-y-6">
@@ -34,7 +35,7 @@ export default function Contacts() {
                 <div className="text-2xl font-bold text-brand-600">{c.number}</div>
                 <div className="text-xs text-slate-400">{c.description}</div>
               </div>
-              <Button variant="ghost" onClick={() => { if (confirm(`Kontakt «${c.name}» löschen?`)) dispatch({ type: 'DELETE_CONTACT', contactId: c.id }) }}>
+              <Button variant="ghost" onClick={() => ask(`Kontakt «${c.name}» löschen?`, () => dispatch({ type: 'DELETE_CONTACT', contactId: c.id }))}>
                 <Trash2 size={14} />
               </Button>
             </div>
@@ -42,6 +43,7 @@ export default function Contacts() {
         ))}
       </div>
 
+      {confirmEl}
       {adding && (
         <Modal title="Notfallkontakt hinzufügen" onClose={() => setAdding(false)}>
           <Field label="Name">

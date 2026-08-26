@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { Pencil, Plus, Trash2, UsersRound } from 'lucide-react'
 import { uid, useStore } from '../store'
 import type { Group } from '../types'
-import { Badge, Button, Card, Field, Modal, Toggle, inputClass } from '../components/ui'
+import { Badge, Button, Card, Field, Modal, Toggle, inputClass, useConfirm } from '../components/ui'
 
 export default function Groups() {
   const { state, dispatch } = useStore()
   const [editing, setEditing] = useState<Group | null>(null)
+  const { ask, confirmEl } = useConfirm()
 
   return (
     <div className="space-y-6">
@@ -42,7 +43,7 @@ export default function Groups() {
               </div>
               <div className="flex gap-2 mt-4">
                 <Button variant="ghost" onClick={() => setEditing(g)}><Pencil size={14} /></Button>
-                <Button variant="ghost" onClick={() => { if (confirm(`Gruppe «${g.name}» löschen?`)) dispatch({ type: 'DELETE_GROUP', groupId: g.id }) }}>
+                <Button variant="ghost" onClick={() => ask(`Gruppe «${g.name}» löschen?`, () => dispatch({ type: 'DELETE_GROUP', groupId: g.id }))}>
                   <Trash2 size={14} />
                 </Button>
               </div>
@@ -51,6 +52,7 @@ export default function Groups() {
         })}
       </div>
 
+      {confirmEl}
       {editing && <GroupEditor group={editing} onClose={() => setEditing(null)} />}
     </div>
   )

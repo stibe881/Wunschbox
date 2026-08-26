@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { RotateCcw } from 'lucide-react'
 import { useStore } from '../store'
-import { Badge, Button, Card, formatDateTime, inputClass } from '../components/ui'
+import { Badge, Button, Card, formatDateTime, inputClass, useConfirm } from '../components/ui'
 
 const TYPE_COLORS: Record<string, 'red' | 'blue' | 'violet' | 'amber' | 'green' | 'slate'> = {
   alarm: 'red',
@@ -16,6 +16,7 @@ const TYPE_COLORS: Record<string, 'red' | 'blue' | 'violet' | 'amber' | 'green' 
 export default function AuditLog() {
   const { state, dispatch } = useStore()
   const [typeFilter, setTypeFilter] = useState('')
+  const { ask, confirmEl } = useConfirm()
 
   const types = [...new Set(state.audit.map((e) => e.type))]
   const entries = state.audit.filter((e) => !typeFilter || e.type === typeFilter)
@@ -29,12 +30,13 @@ export default function AuditLog() {
         </div>
         <Button
           variant="secondary"
-          onClick={() => { if (confirm('Demo-Daten vollständig zurücksetzen? Alle Änderungen gehen verloren.')) dispatch({ type: 'RESET_DEMO' }) }}
+          onClick={() => ask('Demo-Daten vollständig zurücksetzen? Alle Änderungen gehen verloren.', () => dispatch({ type: 'RESET_DEMO' }), 'Zurücksetzen')}
         >
           <RotateCcw size={14} /> Demo zurücksetzen
         </Button>
       </div>
 
+      {confirmEl}
       <Card>
         <select className={inputClass + ' max-w-xs mb-4'} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
           <option value="">Alle Kategorien</option>

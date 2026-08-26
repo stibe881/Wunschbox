@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { Building2, MapPin, Pencil, Plus, Trash2 } from 'lucide-react'
 import { uid, useStore } from '../store'
 import type { Location } from '../types'
-import { Badge, Button, Card, Field, Modal, inputClass } from '../components/ui'
+import { Badge, Button, Card, Field, Modal, inputClass, useConfirm } from '../components/ui'
 
 export default function Locations() {
   const { state, dispatch } = useStore()
   const [editing, setEditing] = useState<Location | null>(null)
+  const { ask, confirmEl } = useConfirm()
 
   function newLocation(): Location {
     return {
@@ -50,7 +51,7 @@ export default function Locations() {
               </div>
               <div className="flex gap-2 mt-4">
                 <Button variant="ghost" onClick={() => setEditing(l)}><Pencil size={14} /></Button>
-                <Button variant="ghost" onClick={() => { if (confirm(`Standort «${l.name}» löschen?`)) dispatch({ type: 'DELETE_LOCATION', locationId: l.id }) }}>
+                <Button variant="ghost" onClick={() => ask(`Standort «${l.name}» löschen?`, () => dispatch({ type: 'DELETE_LOCATION', locationId: l.id }))}>
                   <Trash2 size={14} />
                 </Button>
               </div>
@@ -59,6 +60,7 @@ export default function Locations() {
         })}
       </div>
 
+      {confirmEl}
       {editing && <LocationEditor location={editing} onClose={() => setEditing(null)} />}
     </div>
   )

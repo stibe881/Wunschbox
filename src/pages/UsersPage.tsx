@@ -2,13 +2,14 @@ import { useRef, useState } from 'react'
 import { Pencil, Plus, Trash2, Upload } from 'lucide-react'
 import { uid, useStore } from '../store'
 import type { Role, User } from '../types'
-import { Badge, Button, Card, Field, Modal, inputClass } from '../components/ui'
+import { Badge, Button, Card, Field, Modal, inputClass, useConfirm } from '../components/ui'
 
 export default function UsersPage() {
   const { state, dispatch } = useStore()
   const [editing, setEditing] = useState<User | null>(null)
   const [filter, setFilter] = useState('')
   const fileInput = useRef<HTMLInputElement>(null)
+  const { ask, confirmEl } = useConfirm()
   const today = new Date().toISOString().slice(0, 10)
 
   function newUser(): User {
@@ -112,7 +113,7 @@ export default function UsersPage() {
                     </td>
                     <td className="py-2.5 text-right whitespace-nowrap">
                       <Button variant="ghost" onClick={() => setEditing(u)}><Pencil size={14} /></Button>
-                      <Button variant="ghost" onClick={() => { if (confirm(`${u.firstName} ${u.lastName} löschen?`)) dispatch({ type: 'DELETE_USER', userId: u.id }) }}>
+                      <Button variant="ghost" onClick={() => ask(`${u.firstName} ${u.lastName} löschen?`, () => dispatch({ type: 'DELETE_USER', userId: u.id }))}>
                         <Trash2 size={14} />
                       </Button>
                     </td>
@@ -127,6 +128,7 @@ export default function UsersPage() {
         </div>
       </Card>
 
+      {confirmEl}
       {editing && <UserEditor user={editing} onClose={() => setEditing(null)} />}
     </div>
   )

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { createAlarm, uid, useStore } from '../store'
 import type { LoneWorkSession, Scenario } from '../types'
-import { Badge, HoldButton, Toggle, formatDuration, inputClass } from '../components/ui'
+import { Badge, HoldButton, Toggle, formatDuration, formatRelative, inputClass, useConfirm } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 
 type Tab = 'start' | 'szenarien' | 'alleinarbeit' | 'notruf' | 'profil'
@@ -27,7 +27,7 @@ export default function UserApp() {
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
   const myLocation = state.locations.find((l) => l.id === me.locationId)
   const myAlarms = state.alarms.filter(
-    (a) => a.status === 'active' && a.deliveries.some((d) => d.userId === me.id),
+    (a) => a.status === 'active' && (a.deliveries.some((d) => d.userId === me.id) || a.triggeredByUserId === me.id),
   )
 
   return (
@@ -80,11 +80,18 @@ export default function UserApp() {
             <button
               key={key}
               onClick={() => { setTab(key); setOpenScenario(null) }}
-              className={`py-2.5 flex flex-col items-center gap-0.5 text-[11px] ${
+              className={`relative py-2.5 flex flex-col items-center gap-0.5 text-[11px] ${
                 tab === key && !openScenario ? 'text-brand-600 font-semibold' : 'text-slate-400'
               }`}
             >
-              <Icon size={20} />
+              <span className="relative">
+                <Icon size={20} />
+                {key === 'start' && myAlarms.length > 0 && (
+                  <span className="absolute -top-1.5 -right-2 bg-brand-600 text-white text-[9px] font-bold rounded-full min-w-[15px] h-[15px] px-0.5 flex items-center justify-center">
+                    {myAlarms.length}
+                  </span>
+                )}
+              </span>
               {label}
             </button>
           ))}
@@ -98,13 +105,15 @@ export default function UserApp() {
 
 function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario) => void }) {
   const { state, dispatch } = useStore()
-  const navigate = useNavigate()
+  const { ask, confirmEl } = useConfirm()
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+  const mySos = state.alarms.filter((a) => a.status === 'active' && a.triggeredByUserId === me.id)
   const myAlarms = state.alarms.filter(
-    (a) => a.status === 'active' && a.deliveries.some((d) => d.userId === me.id),
+    (a) => a.status === 'active' && a.triggeredByUserId !== me.id && a.deliveries.some((d) => d.userId === me.id),
   )
 
   function sos() {
+    navigator.vibrate?.([120, 60, 120])
     const alarm = createAlarm(state, {
       scenarioId: 'sc-medizin',
       message: `SOS-Alarm von ${me.firstName} ${me.lastName} (App) – Standort: ${state.locations.find((l) => l.id === me.locationId)?.name ?? 'unbekannt'}`,
@@ -122,6 +131,49 @@ function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario) => void })
 
   return (
     <div className="space-y-4">
+      {confirmEl}
+      {mySos.map((a) => {
+        const delivered = a.deliveries.filter((d) => d.status === 'delivered').length
+        const helpers = [...new Set(a.deliveries.filter((d) => d.ack === 'acknowledged').map((d) => d.userId))]
+          .map((id) => state.users.find((u) => u.id === id))
+          .filter(Boolean)
+        return (
+          <div key={a.id} className="rounded-2xl border-2 border-brand-500 bg-white p-4 alarm-pulse">
+            <div className="flex items-center gap-2 font-bold text-brand-700">
+              <Siren size={18} className="animate-pulse" /> Ihr Alarm ist aktiv
+              <span className="ml-auto text-xs font-normal text-slate-400">{formatRelative(a.triggeredAt)}</span>
+            </div>
+            <div className="mt-2.5 text-sm text-slate-700">
+              {delivered}/{a.deliveries.length} Benachrichtigungen zugestellt
+            </div>
+            <div className="mt-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 transition-all"
+                style={{ width: `${a.deliveries.length ? (delivered / a.deliveries.length) * 100 : 0}%` }}
+              />
+            </div>
+            <div className="mt-2.5 text-sm">
+              {helpers.length > 0 ? (
+                <span className="text-emerald-700 font-medium flex items-center gap-1.5">
+                  <CheckCircle2 size={15} />
+                  {helpers.map((u) => `${u!.firstName} ${u!.lastName}`).join(', ')} {helpers.length === 1 ? 'kommt' : 'kommen'}
+                </span>
+              ) : (
+                <span className="text-slate-500">Warten auf Rückmeldung der Einsatzkräfte…</span>
+              )}
+            </div>
+            <button
+              className="mt-3 w-full rounded-xl border border-slate-300 text-slate-700 py-2.5 text-sm font-semibold"
+              onClick={() =>
+                ask('Entwarnung geben und den Alarm beenden?', () => dispatch({ type: 'END_ALARM', alarmId: a.id, byUserId: me.id }), 'Entwarnung geben')
+              }
+            >
+              Entwarnung – mir geht es gut
+            </button>
+          </div>
+        )
+      })}
+
       {myAlarms.map((a) => {
         const scenario = state.scenarios.find((s) => s.id === a.scenarioId)
         const myAck = a.deliveries.find((d) => d.userId === me.id)?.ack ?? 'none'
@@ -174,7 +226,7 @@ function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario) => void })
         )
       })}
 
-      {myAlarms.length === 0 && (
+      {myAlarms.length === 0 && mySos.length === 0 && (
         <div className="rounded-2xl bg-white border border-slate-200 p-4 text-center">
           <CheckCircle2 size={26} className="text-emerald-500 mx-auto mb-1.5" />
           <div className="text-sm font-medium text-slate-700">Keine aktiven Alarme</div>
@@ -182,12 +234,16 @@ function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario) => void })
         </div>
       )}
 
-      <HoldButton onTrigger={() => { sos(); navigate('.') }} hint="Zum Auslösen gedrückt halten" className="w-full">
-        <Siren size={24} /> SOS
-      </HoldButton>
-      <div className="text-xs text-center text-slate-500">
-        Alarmiert sofort Schulsanität und Hausdienst an Ihrem Standort – mit automatischer Eskalation.
-      </div>
+      {mySos.length === 0 && (
+        <>
+          <HoldButton onTrigger={sos} hint="Zum Auslösen gedrückt halten" className="w-full">
+            <Siren size={24} /> SOS
+          </HoldButton>
+          <div className="text-xs text-center text-slate-500">
+            Alarmiert sofort Schulsanität und Hausdienst an Ihrem Standort – mit automatischer Eskalation.
+          </div>
+        </>
+      )}
 
       {state.integrations.hotline.enabled && (
         <a

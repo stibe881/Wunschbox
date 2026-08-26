@@ -3,7 +3,7 @@ import { Pencil, Phone, Plus, Trash2, Users, WifiOff } from 'lucide-react'
 import { uid, useStore } from '../store'
 import type { Channel, Scenario, ScenarioPriority } from '../types'
 import { CHANNEL_LABELS } from '../types'
-import { Badge, Button, Card, Field, Modal, Toggle, inputClass } from '../components/ui'
+import { Badge, Button, Card, Field, Modal, Toggle, inputClass, useConfirm } from '../components/ui'
 import { SCENARIO_ICONS, ScenarioIcon } from '../components/ScenarioIcon'
 
 const CATEGORIES = ['Schüler:innen', 'Gesundheit', 'Sicherheit', 'Gebäude & Technik', 'Naturereignis', 'Organisation']
@@ -20,6 +20,7 @@ export default function Scenarios() {
   const [editing, setEditing] = useState<Scenario | null>(null)
   const [viewing, setViewing] = useState<Scenario | null>(null)
   const [categoryFilter, setCategoryFilter] = useState('')
+  const { ask, confirmEl } = useConfirm()
   const [search, setSearch] = useState('')
 
   function newScenario(): Scenario {
@@ -107,7 +108,7 @@ export default function Scenarios() {
             <div className="flex gap-2 mt-4">
               <Button variant="secondary" onClick={() => setViewing(s)}>Ansehen</Button>
               <Button variant="ghost" onClick={() => setEditing(s)}><Pencil size={14} /></Button>
-              <Button variant="ghost" onClick={() => { if (confirm(`Szenario «${s.title}» löschen?`)) dispatch({ type: 'DELETE_SCENARIO', scenarioId: s.id }) }}>
+              <Button variant="ghost" onClick={() => ask(`Szenario «${s.title}» löschen?`, () => dispatch({ type: 'DELETE_SCENARIO', scenarioId: s.id }))}>
                 <Trash2 size={14} />
               </Button>
             </div>
@@ -118,6 +119,7 @@ export default function Scenarios() {
         )}
       </div>
 
+      {confirmEl}
       {viewing && <ScenarioDetail scenario={viewing} onClose={() => setViewing(null)} />}
       {editing && <ScenarioEditor scenario={editing} onClose={() => setEditing(null)} />}
     </div>

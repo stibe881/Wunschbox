@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { BellOff, CheckCircle2, ChevronDown, ChevronRight, XCircle } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { BellOff, CheckCircle2, ChevronDown, ChevronRight, Siren, XCircle } from 'lucide-react'
 import { useStore } from '../store'
 import type { Alarm, Delivery } from '../types'
 import { CHANNEL_LABELS } from '../types'
-import { Badge, Button, Card, EmptyState, formatDateTime, formatTime } from '../components/ui'
+import { Badge, Button, Card, formatDateTime, formatRelative, formatTime } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 
 export default function AlarmMonitor() {
@@ -19,7 +20,25 @@ export default function AlarmMonitor() {
       </div>
 
       {active.length === 0 && ended.length === 0 && (
-        <Card><EmptyState>Keine Alarme vorhanden. Lösen Sie unter «Alarm auslösen» einen Test-Alarm aus.</EmptyState></Card>
+        <Card>
+          <div className="text-center py-10">
+            <CheckCircle2 size={32} className="text-emerald-500 mx-auto mb-2" />
+            <div className="font-medium text-slate-700">Keine Alarme – Lage ruhig</div>
+            <p className="text-sm text-slate-400 mt-1">Ausgelöste Alarme erscheinen hier in Echtzeit mit Zustellstatus und Journal.</p>
+            <Link
+              to="/alarm"
+              className="inline-flex items-center gap-2 mt-4 rounded-xl bg-brand-600 text-white px-4 py-2.5 text-sm font-semibold hover:bg-brand-700 transition"
+            >
+              <Siren size={15} /> Test-Alarm auslösen
+            </Link>
+          </div>
+        </Card>
+      )}
+
+      {active.length === 0 && ended.length > 0 && (
+        <div className="text-sm text-slate-500 bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center gap-2">
+          <CheckCircle2 size={16} className="text-emerald-500" /> Keine aktiven Alarme – Lage ruhig.
+        </div>
       )}
 
       {active.map((a) => <AlarmCard key={a.id} alarm={a} />)}
@@ -65,8 +84,9 @@ function AlarmCard({ alarm, collapsed = false }: { alarm: Alarm; collapsed?: boo
             <Badge color={alarm.status === 'active' ? 'red' : 'slate'}>{alarm.status === 'active' ? 'AKTIV' : 'beendet'}</Badge>
           </div>
           <div className="text-sm text-slate-500 truncate">{alarm.message}</div>
-          <div className="text-xs text-slate-400 mt-0.5">
-            {formatDateTime(alarm.triggeredAt)} · ausgelöst von {triggeredBy?.firstName} {triggeredBy?.lastName} via {alarm.triggeredVia}
+          <div className="text-xs text-slate-400 mt-0.5" title={formatDateTime(alarm.triggeredAt)}>
+            {alarm.status === 'active' ? formatRelative(alarm.triggeredAt) : formatDateTime(alarm.triggeredAt)} · ausgelöst von{' '}
+            {triggeredBy?.firstName} {triggeredBy?.lastName} via {alarm.triggeredVia}
           </div>
         </div>
         <div className="text-right text-sm shrink-0">

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, ChevronLeft, ChevronUp, Pencil, Siren, Users } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronUp, Pencil, Search, Siren, Users } from 'lucide-react'
 import { createAlarm, resolveRecipients, useStore } from '../store'
 import type { AlarmPlan, Channel, Scenario } from '../types'
 import { CHANNEL_LABELS } from '../types'
@@ -24,6 +24,8 @@ export default function TriggerAlarm() {
   const [silent, setSilent] = useState(false)
   const [requireAck, setRequireAck] = useState(false)
   const [adjustOpen, setAdjustOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
 
   const scenario = state.scenarios.find((s) => s.id === scenarioId)
   const recipients = useMemo(() => resolveRecipients(state, groupIds, locationIds), [state, groupIds, locationIds])
@@ -80,11 +82,45 @@ export default function TriggerAlarm() {
 
   // ---------- Schritt 1: Szenario wählen ----------
   if (!scenario) {
+    const categories = [...new Set(state.scenarios.map((s) => s.category))]
+    const visibleScenarios = state.scenarios.filter(
+      (s) =>
+        (!categoryFilter || s.category === categoryFilter) &&
+        (!search || s.title.toLowerCase().includes(search.toLowerCase())),
+    )
     return (
-      <div className="space-y-5 max-w-4xl mx-auto">
+      <div className="space-y-4 max-w-4xl mx-auto">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Alarm auslösen</h1>
           <p className="text-sm text-slate-500">Szenario antippen – Empfänger und Kanäle werden automatisch vorbereitet.</p>
+        </div>
+
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            className={inputClass + ' pl-9'}
+            placeholder="Szenario suchen…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            onClick={() => setCategoryFilter('')}
+            className={`px-2.5 py-1 rounded-full text-xs font-medium ${!categoryFilter ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}
+          >
+            Alle
+          </button>
+          {categories.map((c) => (
+            <button
+              key={c}
+              onClick={() => setCategoryFilter(c === categoryFilter ? '' : c)}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium ${c === categoryFilter ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}
+            >
+              {c}
+            </button>
+          ))}
         </div>
 
         <select className={inputClass} value={planId} onChange={(e) => applyPlan(e.target.value)}>
@@ -95,7 +131,7 @@ export default function TriggerAlarm() {
         </select>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {state.scenarios.map((s) => (
+          {visibleScenarios.map((s) => (
             <button
               key={s.id}
               onClick={() => selectScenario(s)}
@@ -109,6 +145,9 @@ export default function TriggerAlarm() {
               <div className="text-xs text-slate-400 mt-1">{s.category}</div>
             </button>
           ))}
+          {visibleScenarios.length === 0 && (
+            <div className="col-span-full text-center text-sm text-slate-400 py-8">Kein Szenario gefunden.</div>
+          )}
         </div>
       </div>
     )

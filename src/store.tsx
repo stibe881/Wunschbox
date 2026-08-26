@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useReducer } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react'
+import { CheckCircle2, Siren } from 'lucide-react'
 import type { AppState, Alarm, AlarmButton, AlarmPlan, Channel, Delivery, EscalationLevel, Group, Location, LoneWorkSession, Scenario, User, Webhook, AuditEntry } from './types'
 import { CHANNEL_LABELS } from './types'
 import { createInitialState } from './data/seed'
@@ -364,6 +365,92 @@ function reducer(state: AppState, action: Action): AppState {
   }
 }
 
+// ---------- Toasts: automatische Rückmeldung für Aktionen ----------
+
+interface Toast {
+  id: number
+  message: string
+  kind: 'success' | 'alarm'
+}
+
+function toastForAction(action: Action): Toast['message'] | { message: string; kind: 'alarm' } | null {
+  switch (action.type) {
+    case 'TRIGGER_ALARM':
+      return { message: 'Alarm ausgelöst – Empfänger werden benachrichtigt', kind: 'alarm' }
+    case 'END_ALARM':
+      return 'Alarm beendet – Entwarnung versendet'
+    case 'ACK_ALARM':
+      return action.ack === 'acknowledged' ? 'Quittiert – Sie nehmen teil' : 'Als nicht verfügbar gemeldet'
+    case 'UPSERT_USER':
+      return 'Benutzer gespeichert'
+    case 'DELETE_USER':
+      return 'Benutzer gelöscht'
+    case 'IMPORT_USERS':
+      return `${action.users.length} Benutzer importiert`
+    case 'UPSERT_GROUP':
+      return 'Gruppe gespeichert'
+    case 'DELETE_GROUP':
+      return 'Gruppe gelöscht'
+    case 'UPSERT_LOCATION':
+      return 'Standort gespeichert'
+    case 'DELETE_LOCATION':
+      return 'Standort gelöscht'
+    case 'UPSERT_SCENARIO':
+      return 'Szenario gespeichert und an alle Apps verteilt'
+    case 'DELETE_SCENARIO':
+      return 'Szenario gelöscht'
+    case 'UPSERT_PLAN':
+      return 'Alarmplan gespeichert'
+    case 'DELETE_PLAN':
+      return 'Alarmplan gelöscht'
+    case 'UPSERT_BUTTON':
+      return 'Alarmknopf gespeichert'
+    case 'DELETE_BUTTON':
+      return 'Alarmknopf entfernt'
+    case 'START_LONE_WORK':
+      return 'Alleinarbeits-Timer gestartet'
+    case 'EXTEND_LONE_WORK':
+      return 'Lebenszeichen erhalten – Timer verlängert'
+    case 'COMPLETE_LONE_WORK':
+      return 'Alleinarbeit sicher beendet'
+    case 'UPSERT_WEBHOOK':
+      return 'Webhook gespeichert'
+    case 'DELETE_WEBHOOK':
+      return 'Webhook gelöscht'
+    case 'ADD_ACCESS_CODE':
+      return 'Zugangscode erstellt'
+    case 'ADD_CONTACT':
+      return 'Notfallkontakt gespeichert'
+    case 'DELETE_CONTACT':
+      return 'Notfallkontakt gelöscht'
+    case 'UPDATE_INTEGRATIONS':
+      return 'Einstellungen gespeichert'
+    case 'RESET_DEMO':
+      return 'Demo zurückgesetzt'
+    default:
+      return null
+  }
+}
+
+function ToastHost({ toasts }: { toasts: Toast[] }) {
+  return (
+    <div className="fixed z-[60] bottom-24 lg:bottom-6 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-sm space-y-2 pointer-events-none">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={`toast-in flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm font-medium text-white shadow-lg ${
+            t.kind === 'alarm' ? 'bg-brand-600' : 'bg-slate-800'
+          }`}
+          role="status"
+        >
+          {t.kind === 'alarm' ? <Siren size={16} className="shrink-0" /> : <CheckCircle2 size={16} className="shrink-0 text-emerald-400" />}
+          {t.message}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ---------- Context / Provider ----------
 
 const StoreContext = createContext<{ state: AppState; dispatch: React.Dispatch<Action> } | null>(null)
@@ -394,7 +481,31 @@ function loadState(): AppState {
 }
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, undefined, loadState)
+  const [state, rawDispatch] = useReducer(reducer, undefined, loadState)
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const toastId = useRef(0)
+  const lastToast = useRef({ message: '', ts: 0 })
+
+  const pushToast = useCallback((message: string, kind: Toast['kind'] = 'success') => {
+    const now = Date.now()
+    if (lastToast.current.message === message && now - lastToast.current.ts < 1500) return
+    lastToast.current = { message, ts: now }
+    const id = ++toastId.current
+    setToasts((t) => [...t.slice(-2), { id, message, kind }])
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500)
+  }, [])
+
+  const dispatch = useCallback(
+    (action: Action) => {
+      rawDispatch(action)
+      const t = toastForAction(action)
+      if (t) {
+        if (typeof t === 'string') pushToast(t)
+        else pushToast(t.message, t.kind)
+      }
+    },
+    [pushToast],
+  )
 
   useEffect(() => {
     try {
@@ -405,11 +516,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [state])
 
   useEffect(() => {
-    const interval = setInterval(() => dispatch({ type: 'TICK', now: Date.now() }), 1000)
+    const interval = setInterval(() => rawDispatch({ type: 'TICK', now: Date.now() }), 1000)
     return () => clearInterval(interval)
   }, [])
 
-  return <StoreContext.Provider value={{ state, dispatch }}>{children}</StoreContext.Provider>
+  return (
+    <StoreContext.Provider value={{ state, dispatch }}>
+      {children}
+      <ToastHost toasts={toasts} />
+    </StoreContext.Provider>
+  )
 }
 
 export function useStore() {

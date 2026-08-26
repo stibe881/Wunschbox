@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { BatteryLow, BatteryMedium, BatteryFull, MapPin, Pencil, Plus, Radio, Trash2, Zap } from 'lucide-react'
 import { createAlarm, uid, useStore } from '../store'
 import type { AlarmButton } from '../types'
-import { Badge, Button, Card, Field, Modal, formatDateTime, inputClass } from '../components/ui'
+import { Badge, Button, Card, Field, Modal, formatDateTime, inputClass, useConfirm } from '../components/ui'
 
 export default function Buttons() {
   const { state, dispatch } = useStore()
   const navigate = useNavigate()
   const [editing, setEditing] = useState<AlarmButton | null>(null)
+  const { ask, confirmEl } = useConfirm()
 
   function newButton(): AlarmButton {
     return {
@@ -78,9 +79,9 @@ export default function Buttons() {
                 <div>Eskalation an Blaulicht nach {b.escalateToEmergencyServicesAfterMin} Min. ohne Reaktion</div>
               </div>
               <div className="flex gap-2 mt-4">
-                <Button variant="danger" onClick={() => testFire(b)}><Zap size={14} /> Auslösen (Test)</Button>
+                <Button variant="danger" onClick={() => ask(`Alarmknopf «${b.name}» jetzt testweise auslösen?`, () => testFire(b), 'Auslösen')}><Zap size={14} /> Auslösen (Test)</Button>
                 <Button variant="ghost" onClick={() => setEditing(b)}><Pencil size={14} /></Button>
-                <Button variant="ghost" onClick={() => { if (confirm(`Alarmknopf «${b.name}» entfernen?`)) dispatch({ type: 'DELETE_BUTTON', buttonId: b.id }) }}>
+                <Button variant="ghost" onClick={() => ask(`Alarmknopf «${b.name}» entfernen?`, () => dispatch({ type: 'DELETE_BUTTON', buttonId: b.id }), 'Entfernen')}>
                   <Trash2 size={14} />
                 </Button>
               </div>
@@ -89,6 +90,7 @@ export default function Buttons() {
         })}
       </div>
 
+      {confirmEl}
       {editing && <ButtonEditor button={editing} onClose={() => setEditing(null)} />}
     </div>
   )
