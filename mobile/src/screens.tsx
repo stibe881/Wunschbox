@@ -410,6 +410,47 @@ export function ContactsScreen() {
 
 // ---------- Profil ----------
 
+/** Demo/Live-Umschalter – nur für Admins sichtbar */
+function ModeCard() {
+  const { state, switchMode } = useStore()
+  return (
+    <Card>
+      <Text style={[styles.cardTitle, { marginBottom: 8 }]}>Modus</Text>
+      <View style={{ flexDirection: 'row', backgroundColor: '#e2e8f0', borderRadius: 10, padding: 3 }}>
+        {(['demo', 'live'] as const).map((m) => (
+          <Pressable
+            key={m}
+            onPress={() => switchMode(m)}
+            style={{
+              flex: 1,
+              paddingVertical: 8,
+              borderRadius: 8,
+              alignItems: 'center',
+              backgroundColor: state.mode === m ? (m === 'live' ? '#059669' : '#f59e0b') : 'transparent',
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: '800',
+                letterSpacing: 0.5,
+                color: state.mode === m ? (m === 'live' ? '#fff' : '#0f172a') : colors.muted,
+              }}
+            >
+              {m === 'demo' ? 'DEMO' : 'LIVE'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={[styles.faint, { marginTop: 8 }]}>
+        {state.mode === 'demo'
+          ? 'Beispieldaten, Zustellung und Rückmeldungen werden simuliert.'
+          : 'Eigener Datenbestand ohne Simulation – Zustellungen bleiben offen, bis ein Versand-Gateway angebunden ist. Beide Modi behalten ihre Daten.'}
+      </Text>
+    </Card>
+  )
+}
+
 function PushStatusCard() {
   const [granted, setGranted] = useState<boolean | null>(null)
   const [token, setToken] = useState<string | null>(null)
@@ -498,6 +539,8 @@ export function ProfileScreen() {
         ))}
       </Card>
 
+      {me.role === 'admin' && <ModeCard />}
+
       <PushStatusCard />
 
       <Card>
@@ -506,7 +549,7 @@ export function ProfileScreen() {
           <Text style={[styles.cardTitle, { flex: 1 }]}>Über diese App</Text>
         </View>
         <Text style={[styles.faint, { marginTop: 6 }]}>
-          SONNENBERG Notfall – Demo der Mitarbeiter-App (Expo). Der Alarmserver wird lokal simuliert:
+          SOBE Notfall – Demo der Mitarbeiter-App (Expo). Der Alarmserver wird lokal simuliert:
           Zustellungen, Rückmeldungen der Einsatzkräfte und Eskalationen laufen auf dem Gerät.
           Es werden keine echten Benachrichtigungen versendet.
         </Text>

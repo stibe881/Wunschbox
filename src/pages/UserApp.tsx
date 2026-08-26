@@ -35,7 +35,7 @@ export default function UserApp() {
       <header className="sticky top-0 z-30 bg-slate-900 text-white px-4 py-3 flex items-center gap-2.5">
         <Siren size={20} className="text-brand-500" />
         <div className="min-w-0 flex-1">
-          <div className="font-bold leading-tight">SONNENBERG Notfall</div>
+          <div className="font-bold leading-tight">SOBE Notfall</div>
           <div className="text-xs text-slate-400 truncate flex items-center gap-1">
             {me.firstName} {me.lastName} · <MapPin size={10} /> {myLocation?.name}
           </div>
@@ -532,6 +532,34 @@ function ProfileTab() {
           </div>
         </div>
       </div>
+
+      {me.role === 'admin' && (
+        <div className="rounded-2xl bg-white border border-slate-200 p-4">
+          <div className="text-sm font-semibold text-slate-700 mb-2">Modus</div>
+          <div className="flex rounded-xl bg-slate-100 p-1">
+            {(['demo', 'live'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => dispatch({ type: 'SET_MODE', mode: m })}
+                className={`flex-1 rounded-lg py-2 text-xs font-bold uppercase tracking-wide transition ${
+                  state.mode === m
+                    ? m === 'live'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-amber-500 text-slate-900'
+                    : 'text-slate-500'
+                }`}
+              >
+                {m === 'demo' ? 'Demo' : 'Live'}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-slate-400 mt-2">
+            {state.mode === 'demo'
+              ? 'Beispieldaten, Zustellung wird simuliert.'
+              : 'Eigener Datenbestand ohne Simulation. Beide Modi behalten ihre Daten.'}
+          </p>
+        </div>
+      )}
 
       {isStaff && (
         <button

@@ -70,7 +70,7 @@ function NoWebAccess() {
         </p>
         <div className="mt-6 rounded-2xl bg-slate-800 p-5 text-left">
           <div className="flex items-center gap-2.5 text-white font-semibold">
-            <Smartphone size={18} className="text-brand-500" /> SONNENBERG Notfall-App verwenden
+            <Smartphone size={18} className="text-brand-500" /> SOBE Notfall-App verwenden
           </div>
           <p className="text-sm text-slate-400 mt-2">
             Als Mitarbeiter:in nutzen Sie die App auf dem iPhone: SOS-Alarm, Handlungsanweisungen zu allen
@@ -106,7 +106,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       <div className="px-5 py-4 border-b border-slate-800">
         <div className="flex items-center gap-2 text-white font-bold text-lg">
           <AlertTriangle className="text-brand-500" size={22} />
-          SONNENBERG Notfall
+          SOBE Notfall
           <ModeBadge mode={state.mode} />
         </div>
         <div className="text-xs text-slate-500 mt-0.5">Kompetenzzentrum Baar · Menzingen · Kloten</div>
@@ -239,7 +239,7 @@ export default function App() {
             <Menu size={22} />
           </button>
           <span className="font-bold flex items-center gap-1.5">
-            <AlertTriangle className="text-brand-500" size={18} /> SONNENBERG Notfall <ModeBadge mode={state.mode} />
+            <AlertTriangle className="text-brand-500" size={18} /> SOBE Notfall <ModeBadge mode={state.mode} />
           </span>
           {activeAlarms.length > 0 && location.pathname !== '/monitor' && (
             <NavLink to="/monitor" className="ml-auto bg-brand-600 text-white text-xs font-semibold rounded-full px-2.5 py-1 alarm-pulse">

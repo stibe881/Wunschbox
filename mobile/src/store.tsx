@@ -6,22 +6,32 @@ import { CHANNEL_LABELS } from './types'
 import { SEED_GROUPS, SEED_SCENARIOS, SEED_USERS } from './seed'
 import { notifyNow } from './notifications'
 
-const STORAGE_KEY = 'sonnenberg-mobile-v1'
+export type AppMode = 'demo' | 'live'
+
+const MODE_KEY = 'sonnenberg-mobile-mode'
+const DATA_KEYS: Record<AppMode, string> = {
+  demo: 'sonnenberg-mobile-v1',
+  live: 'sonnenberg-mobile-live-v1',
+}
 
 export function uid(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 }
 
 export interface MobileState {
+  mode: AppMode
   currentUserId: string
   alarms: Alarm[]
   loneWorkSessions: LoneWorkSession[]
 }
 
-const INITIAL: MobileState = {
-  currentUserId: 'u-weber',
-  alarms: [],
-  loneWorkSessions: [],
+function initialState(mode: AppMode): MobileState {
+  return {
+    mode,
+    currentUserId: 'u-weber',
+    alarms: [],
+    loneWorkSessions: [],
+  }
 }
 
 // ---------- Alarm-Logik (identisch zur Web-App, Alarmserver wird lokal simuliert) ----------
@@ -96,30 +106,33 @@ export type Action =
   | { type: 'HYDRATE'; state: MobileState }
   | { type: 'RESET' }
 
-/** Simulation: Zustellungen, Rückmeldungen der Einsatzkräfte, Eskalation, Alleinarbeits-Timer */
+/** Zustellsimulation (nur Demo), Eskalation, Alleinarbeits-Timer */
 function tick(state: MobileState, now: number): MobileState {
   let changed = false
+  const simulate = state.mode === 'demo'
 
   const alarms = state.alarms.map((alarm) => {
     if (alarm.status !== 'active') return alarm
     let aChanged = false
-    let deliveries = alarm.deliveries.map((d) => {
-      const age = now - d.updatedAt
-      if (d.status === 'pending' && age > 1200 + Math.random() * 1500) {
-        aChanged = true
-        return { ...d, status: 'sent' as const, updatedAt: now }
-      }
-      if (d.status === 'sent' && age > 1500 + Math.random() * 2500) {
-        aChanged = true
-        return { ...d, status: Math.random() < 0.04 ? ('failed' as const) : ('delivered' as const), updatedAt: now }
-      }
-      return d
-    })
+    let deliveries = !simulate
+      ? alarm.deliveries
+      : alarm.deliveries.map((d) => {
+          const age = now - d.updatedAt
+          if (d.status === 'pending' && age > 1200 + Math.random() * 1500) {
+            aChanged = true
+            return { ...d, status: 'sent' as const, updatedAt: now }
+          }
+          if (d.status === 'sent' && age > 1500 + Math.random() * 2500) {
+            aChanged = true
+            return { ...d, status: Math.random() < 0.04 ? ('failed' as const) : ('delivered' as const), updatedAt: now }
+          }
+          return d
+        })
 
     const log: AlarmLogEntry[] = [...alarm.log]
 
-    // Simulierte Rückmeldungen: alarmierte Personen quittieren nach Zustellung
-    if (alarm.requireAck) {
+    // Simulierte Rückmeldungen (nur Demo): alarmierte Personen quittieren nach Zustellung
+    if (simulate && alarm.requireAck) {
       const pendingUsers = [...new Set(deliveries.map((d) => d.userId))].filter(
         (userId) =>
           userId !== state.currentUserId &&
@@ -237,7 +250,7 @@ function reducer(state: MobileState, action: Action): MobileState {
     case 'HYDRATE':
       return action.state
     case 'RESET':
-      return INITIAL
+      return initialState(state.mode)
     default:
       return state
   }
@@ -274,9 +287,26 @@ function toastForAction(action: Action): Toast['message'] | { message: string; k
 
 // ---------- Provider ----------
 
+async function loadStateForMode(mode: AppMode): Promise<MobileState> {
+  try {
+    const raw = await AsyncStorage.getItem(DATA_KEYS[mode])
+    if (raw) {
+      const parsed = JSON.parse(raw) as MobileState
+      if (parsed.currentUserId) {
+        parsed.mode = mode
+        return parsed
+      }
+    }
+  } catch {
+    // korrupte Daten -> Ausgangszustand
+  }
+  return initialState(mode)
+}
+
 interface StoreCtx {
   state: MobileState
   dispatch: React.Dispatch<Action>
+  switchMode: (mode: AppMode) => void
   toasts: Toast[]
   hydrated: boolean
 }
@@ -284,7 +314,9 @@ interface StoreCtx {
 const StoreContext = createContext<StoreCtx | null>(null)
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
-  const [state, rawDispatch] = useReducer(reducer, INITIAL)
+  const [state, rawDispatch] = useReducer(reducer, undefined, () => initialState('demo'))
+  const stateRef = useRef(state)
+  stateRef.current = state
   const [hydrated, setHydrated] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
   const toastId = useRef(0)
@@ -312,30 +344,42 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   )
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((raw) => {
-        if (raw) {
-          const parsed = JSON.parse(raw) as MobileState
-          if (parsed.currentUserId) rawDispatch({ type: 'HYDRATE', state: parsed })
-        }
-      })
+    AsyncStorage.getItem(MODE_KEY)
+      .then((stored) => loadStateForMode(stored === 'live' ? 'live' : 'demo'))
+      .then((loaded) => rawDispatch({ type: 'HYDRATE', state: loaded }))
       .catch(() => {
-        // korrupte Daten -> Neustart mit Ausgangszustand
+        // kein Storage verfügbar -> Demo-Ausgangszustand
       })
       .finally(() => setHydrated(true))
   }, [])
 
   useEffect(() => {
     if (!hydrated) return
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {})
+    AsyncStorage.setItem(DATA_KEYS[state.mode], JSON.stringify(state)).catch(() => {})
+    AsyncStorage.setItem(MODE_KEY, state.mode).catch(() => {})
   }, [state, hydrated])
+
+  const switchMode = useCallback(
+    (mode: AppMode) => {
+      if (stateRef.current.mode === mode) return
+      loadStateForMode(mode).then((loaded) => {
+        rawDispatch({ type: 'HYDRATE', state: loaded })
+        pushToast(
+          mode === 'live'
+            ? 'Live-Modus aktiv – keine Simulation, eigener Datenbestand'
+            : 'Demo-Modus aktiv – Zustellung wird simuliert',
+        )
+      })
+    },
+    [pushToast],
+  )
 
   useEffect(() => {
     const interval = setInterval(() => rawDispatch({ type: 'TICK', now: Date.now() }), 1000)
     return () => clearInterval(interval)
   }, [])
 
-  return <StoreContext.Provider value={{ state, dispatch, toasts, hydrated }}>{children}</StoreContext.Provider>
+  return <StoreContext.Provider value={{ state, dispatch, switchMode, toasts, hydrated }}>{children}</StoreContext.Provider>
 }
 
 export function useStore() {
