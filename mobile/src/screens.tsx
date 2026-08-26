@@ -4,7 +4,7 @@ import {
   BellRing, Check, CheckCircle2, ChevronLeft, Clock, MapPin, Phone, Play, Search as SearchIcon,
   ShieldAlert, Siren, Timer, X,
 } from 'lucide-react-native'
-import { createAlarm, uid, useStore } from './store'
+import { createAlarm, resolveRecipients, uid, useStore } from './store'
 import { ScenarioIcon } from './ScenarioIcon'
 import { cancelScheduled, ensurePermissions, getPushToken, remotePushAvailability, scheduleAt } from './notifications'
 import { SEED_CONTACTS, SEED_LOCATIONS, SEED_SCENARIOS, SEED_USERS, SEED_GROUPS } from './seed'
@@ -197,9 +197,11 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
   const [notifiedUserIds, setNotifiedUserIds] = useState<string[]>([])
 
   const me = SEED_USERS.find((u) => u.id === state.currentUserId) ?? SEED_USERS[0]
-  const myLocation = SEED_LOCATIONS.find((l) => l.id === me.locationId)
+  const [alarmLocationIds, setAlarmLocationIds] = useState<string[]>([me.locationId])
   const contacts = SEED_CONTACTS.filter((c) => scenario.contactIds.includes(c.id))
   const responsibleGroups = SEED_GROUPS.filter((g) => scenario.responsibleGroupIds.includes(g.id))
+  const alarmGroupIds = responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.id) : ['gr-alle']
+  const alarmRecipientCount = resolveRecipients(alarmGroupIds, alarmLocationIds).length
   const crisisGroups = SEED_GROUPS.filter((g) => g.isCrisisTeam)
   const crisisMembers = SEED_USERS.filter((u) => u.id !== me.id && u.groupIds.some((g) => crisisGroups.some((cg) => cg.id === g)))
 
@@ -218,17 +220,20 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
   ]
 
   function triggerGroupAlarm() {
-    const groupIds = responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.id) : ['gr-alle']
+    const locationNames = alarmLocationIds
+      .map((id) => SEED_LOCATIONS.find((l) => l.id === id)?.name)
+      .filter(Boolean)
+      .join(', ')
     dispatch({
       type: 'TRIGGER_ALARM',
       alarm: createAlarm({
         scenarioId: scenario.id,
-        message: `${scenario.title}: Alarm aus Handlungsanweisung von ${me.firstName} ${me.lastName} – Standort ${myLocation?.name ?? 'unbekannt'}.`,
+        message: `${scenario.title} – Standort ${locationNames || 'alle Standorte'}. Ausgelöst von ${me.firstName} ${me.lastName}, bitte Handlungsanweisungen in der App befolgen.`,
         silent: scenario.silentDefault,
         requireAck: true,
         channels: scenario.defaultChannels.length > 0 ? scenario.defaultChannels : ['push', 'sms'],
-        groupIds,
-        locationIds: [me.locationId],
+        groupIds: alarmGroupIds,
+        locationIds: alarmLocationIds,
         triggeredByUserId: me.id,
         triggeredVia: 'app',
         escalation: [{ afterMinutes: 5, channels: ['voice'], groupIds: ['gr-krisenstab'], notifyEmergencyServices: false }],
@@ -358,14 +363,45 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
             </>
           )}
           <Text style={styles.sectionTitle}>Interne Alarmierung{scenario.silentDefault ? ' (still)' : ''}</Text>
+          <Text style={[styles.body, { fontWeight: '600', marginTop: 0 }]}>Betroffener Standort wählen:</Text>
+          <View style={[styles.row, { flexWrap: 'wrap', gap: 8 }]}>
+            {SEED_LOCATIONS.map((l) => {
+              const selected = alarmLocationIds.includes(l.id)
+              return (
+                <Pressable
+                  key={l.id}
+                  disabled={!!myScenarioAlarm}
+                  onPress={() =>
+                    setAlarmLocationIds(selected ? alarmLocationIds.filter((id) => id !== l.id) : [...alarmLocationIds, l.id])
+                  }
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    paddingHorizontal: 12,
+                    paddingVertical: 7,
+                    borderColor: selected ? colors.brandLight : '#cbd5e1',
+                    backgroundColor: selected ? colors.brandLight : colors.card,
+                  }}
+                >
+                  <MapPin size={11} color={selected ? '#fff' : colors.muted} />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: selected ? '#fff' : colors.muted }}>{l.name}</Text>
+                </Pressable>
+              )
+            })}
+          </View>
           <Text style={styles.faint}>
-            Alarmiert {responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(', ') : 'alle Mitarbeitenden'} an Ihrem Standort – mit Quittierung.
+            Alarmiert {responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(', ') : 'alle Mitarbeitenden mit App'}
+            {alarmLocationIds.length === 0 ? ' an allen Standorten' : ' am gewählten Standort'} – mit Quittierung.{' '}
+            <Text style={{ fontWeight: '700', color: colors.text }}>{alarmRecipientCount} Empfänger:innen</Text> werden benachrichtigt.
           </Text>
           {myScenarioAlarm ? (
             <AlarmStatus alarm={myScenarioAlarm} />
           ) : (
             <HoldButton
-              label={`${responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(' & ') : 'Alle'} alarmieren`}
+              label={`${responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(' & ') : 'Alle'} alarmieren (${alarmRecipientCount})`}
               hint="Zum Alarmieren gedrückt halten"
               onTrigger={triggerGroupAlarm}
             />

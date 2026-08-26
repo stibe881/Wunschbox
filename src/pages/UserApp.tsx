@@ -4,7 +4,7 @@ import {
   ArrowRight, BellRing, BookOpen, Check, CheckCircle2, ChevronLeft, ClipboardCheck, Clock, LayoutDashboard,
   ListChecks, MapPin, Megaphone, Phone, PhoneCall, Play, Search, ShieldAlert, Siren, Timer, User, Users, Volume2, WifiOff, X,
 } from 'lucide-react'
-import { createAlarm, uid, useStore } from '../store'
+import { createAlarm, resolveRecipients, uid, useStore } from '../store'
 import type { Channel, LoneWorkSession, Scenario } from '../types'
 import { CHANNEL_LABELS } from '../types'
 import { Badge, HoldButton, Toggle, formatDuration, formatRelative, inputClass, useConfirm } from '../components/ui'
@@ -306,9 +306,12 @@ function ScenarioView({ scenario, onBack }: { scenario: Scenario; onBack: () => 
   const [notifiedUserIds, setNotifiedUserIds] = useState<string[]>([])
 
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+  const [alarmLocationIds, setAlarmLocationIds] = useState<string[]>([me.locationId])
   const myLocation = state.locations.find((l) => l.id === me.locationId)
   const contacts = state.contacts.filter((c) => scenario.contactIds.includes(c.id))
   const responsibleGroups = state.groups.filter((g) => scenario.responsibleGroupIds.includes(g.id))
+  const alarmGroupIds = responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.id) : ['gr-alle']
+  const alarmRecipientCount = resolveRecipients(state, alarmGroupIds, alarmLocationIds).length
   const crisisGroups = state.groups.filter((g) => g.isCrisisTeam)
   const crisisMembers = state.users.filter((u) => u.id !== me.id && u.groupIds.some((g) => crisisGroups.some((cg) => cg.id === g)))
 
@@ -327,20 +330,23 @@ function ScenarioView({ scenario, onBack }: { scenario: Scenario; onBack: () => 
   ]
 
   function triggerGroupAlarm() {
-    const groupIds = responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.id) : ['gr-alle']
+    const locationNames = alarmLocationIds
+      .map((id) => state.locations.find((l) => l.id === id)?.name)
+      .filter(Boolean)
+      .join(', ')
     const alarm = createAlarm(state, {
       scenarioId: scenario.id,
-      message: `${scenario.title}: Alarm aus Handlungsanweisung von ${me.firstName} ${me.lastName} – Standort ${myLocation?.name ?? 'unbekannt'}.`,
+      message: `${scenario.title} – Standort ${locationNames || 'alle Standorte'}. Ausgelöst von ${me.firstName} ${me.lastName}, bitte Handlungsanweisungen in der App befolgen.`,
       silent: scenario.silentDefault,
       requireAck: true,
       channels: scenario.defaultChannels.length > 0 ? scenario.defaultChannels : ['push', 'sms'],
-      groupIds,
-      locationIds: [me.locationId],
+      groupIds: alarmGroupIds,
+      locationIds: alarmLocationIds,
       triggeredByUserId: me.id,
       triggeredVia: 'app',
       escalation: [{ afterMinutes: 5, channels: ['voice'], groupIds: ['gr-krisenstab'], notifyEmergencyServices: false }],
     })
-    dispatch({ type: 'TRIGGER_ALARM', alarm, audit: `Alarm aus Szenario «${scenario.title}» (App): ${me.firstName} ${me.lastName}` })
+    dispatch({ type: 'TRIGGER_ALARM', alarm, audit: `Alarm aus Szenario «${scenario.title}» (App, ${locationNames}): ${me.firstName} ${me.lastName}` })
   }
 
   function triggerCrisisTeam() {
@@ -462,15 +468,45 @@ function ScenarioView({ scenario, onBack }: { scenario: Scenario; onBack: () => 
           <div className="text-sm font-semibold text-slate-700 pt-2">
             Interne Alarmierung {scenario.silentDefault && <Badge color="violet">still</Badge>}
           </div>
+          <div className="text-xs font-medium text-slate-600">Betroffener Standort wählen:</div>
+          <div className="flex flex-wrap gap-1.5">
+            {state.locations.map((l) => {
+              const selected = alarmLocationIds.includes(l.id)
+              return (
+                <button
+                  key={l.id}
+                  disabled={!!myScenarioAlarm}
+                  onClick={() =>
+                    setAlarmLocationIds(
+                      selected ? alarmLocationIds.filter((id) => id !== l.id) : [...alarmLocationIds, l.id],
+                    )
+                  }
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
+                    selected ? 'bg-brand-600 border-brand-600 text-white' : 'bg-white border-slate-300 text-slate-600'
+                  }`}
+                >
+                  <MapPin size={11} className="inline -mt-0.5 mr-1" />
+                  {l.name}
+                </button>
+              )
+            })}
+          </div>
           <div className="text-xs text-slate-500">
-            Alarmiert {responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(', ') : 'alle Mitarbeitenden'} an Ihrem Standort
-            per {(scenario.defaultChannels.length > 0 ? scenario.defaultChannels : (['push', 'sms'] as Channel[])).map((c) => CHANNEL_LABELS[c].split(' ')[0]).join(', ')} – mit Quittierung.
+            Alarmiert {responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(', ') : 'alle Mitarbeitenden mit App'}
+            {alarmLocationIds.length === 0 ? ' an allen Standorten' : ''} per{' '}
+            {(scenario.defaultChannels.length > 0 ? scenario.defaultChannels : (['push', 'sms'] as Channel[])).map((c) => CHANNEL_LABELS[c].split(' ')[0]).join(', ')} – mit Quittierung.{' '}
+            <span className="font-semibold text-slate-700">{alarmRecipientCount} Empfänger:innen</span> werden benachrichtigt.
           </div>
           {myScenarioAlarm ? (
             alarmStatus(myScenarioAlarm)
           ) : (
-            <HoldButton onTrigger={triggerGroupAlarm} hint="Zum Alarmieren gedrückt halten" className="w-full">
-              <Siren size={20} /> {responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(' & ') : 'Alle'} alarmieren
+            <HoldButton
+              onTrigger={triggerGroupAlarm}
+              disabled={alarmRecipientCount === 0}
+              hint="Zum Alarmieren gedrückt halten"
+              className="w-full"
+            >
+              <Siren size={20} /> {responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(' & ') : 'Alle'} alarmieren ({alarmRecipientCount})
             </HoldButton>
           )}
         </div>
