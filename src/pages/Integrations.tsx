@@ -181,7 +181,7 @@ function WebhookEditor({ webhook, onClose }: { webhook: Webhook; onClose: () => 
         <Field label="Auszulösendes Szenario">
           <select className={inputClass} value={draft.scenarioId ?? ''} onChange={(e) => setDraft({ ...draft, scenarioId: e.target.value || undefined })}>
             <option value="">–</option>
-            {state.scenarios.map((s) => <option key={s.id} value={s.id}>{s.icon} {s.title}</option>)}
+            {state.scenarios.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
           </select>
         </Field>
       )}

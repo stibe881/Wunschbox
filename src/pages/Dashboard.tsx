@@ -1,7 +1,8 @@
 import { Link } from 'react-router-dom'
-import { Activity, BellRing, Radio, Server, Siren, Timer, Users } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowRight, BellRing, Radio, Server, Siren, Timer, Users } from 'lucide-react'
 import { useStore } from '../store'
 import { Badge, Card, formatDateTime } from '../components/ui'
+import { ScenarioIcon } from '../components/ScenarioIcon'
 
 export default function Dashboard() {
   const { state } = useStore()
@@ -49,8 +50,8 @@ export default function Dashboard() {
             <StatusRow label="Interne Notfallnummer" ok={state.integrations.hotline.enabled} detail={state.integrations.hotline.number} />
           </ul>
           {lowBattery.length > 0 && (
-            <div className="mt-4 text-sm text-amber-700 bg-amber-50 rounded-lg p-3">
-              ⚠️ {lowBattery.length} Alarmknopf/-knöpfe mit niedrigem Batteriestand
+            <div className="mt-4 text-sm text-amber-700 bg-amber-50 rounded-lg p-3 flex items-center gap-2">
+              <AlertTriangle size={16} className="shrink-0" /> {lowBattery.length} Alarmknopf/-knöpfe mit niedrigem Batteriestand
             </div>
           )}
         </Card>
@@ -62,8 +63,8 @@ export default function Dashboard() {
               <span className="text-slate-700">{e.message}</span>
             </div>
           ))}
-          <Link to="/protokoll" className="inline-block mt-3 text-sm text-slate-500 hover:text-slate-800 underline">
-            Vollständiges Protokoll →
+          <Link to="/protokoll" className="inline-flex items-center gap-1 mt-3 text-sm text-slate-500 hover:text-slate-800 underline">
+            Vollständiges Protokoll <ArrowRight size={13} />
           </Link>
         </Card>
       </div>
@@ -74,7 +75,7 @@ export default function Dashboard() {
             const scenario = state.scenarios.find((s) => s.id === a.scenarioId)
             return (
               <Link key={a.id} to="/monitor" className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0 text-sm hover:bg-slate-50 rounded px-2">
-                <span className="text-xl">{scenario?.icon}</span>
+                <ScenarioIcon name={scenario?.icon ?? ''} size={22} className="text-brand-600 shrink-0" />
                 <div className="flex-1">
                   <div className="font-medium text-slate-800">{scenario?.title}</div>
                   <div className="text-slate-500 text-xs">{a.message}</div>

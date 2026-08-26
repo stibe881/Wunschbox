@@ -4,6 +4,7 @@ import { uid, useStore } from '../store'
 import type { AlarmPlan, Channel, EscalationLevel } from '../types'
 import { CHANNEL_LABELS } from '../types'
 import { Badge, Button, Card, Field, Modal, Toggle, inputClass } from '../components/ui'
+import { ScenarioIcon } from '../components/ScenarioIcon'
 
 const ALL_CHANNELS: Channel[] = ['push', 'sms', 'email', 'voice', 'conference', 'tts', 'teams']
 
@@ -39,7 +40,15 @@ export default function AlarmPlans() {
                 <ClipboardList size={22} className="text-slate-400 mt-0.5" />
                 <div className="flex-1 min-w-0">
                   <div className="font-semibold text-slate-800">{p.name}</div>
-                  <div className="text-sm text-slate-500">{scenario ? `${scenario.icon} ${scenario.title}` : 'ohne festes Szenario'}</div>
+                  <div className="text-sm text-slate-500 flex items-center gap-1.5">
+                    {scenario ? (
+                      <>
+                        <ScenarioIcon name={scenario.icon} size={15} className="text-slate-400" /> {scenario.title}
+                      </>
+                    ) : (
+                      'ohne festes Szenario'
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-1.5 mt-2">
                     {p.channels.map((c) => <Badge key={c} color="blue">{CHANNEL_LABELS[c].split(' ')[0]}</Badge>)}
                     {p.requireAck && <Badge color="violet">Quittierung</Badge>}
@@ -99,7 +108,7 @@ function PlanEditor({ plan, onClose }: { plan: AlarmPlan; onClose: () => void })
         <Field label="Verknüpftes Szenario">
           <select className={inputClass} value={draft.scenarioId ?? ''} onChange={(e) => setDraft({ ...draft, scenarioId: e.target.value || undefined })}>
             <option value="">–</option>
-            {state.scenarios.map((s) => <option key={s.id} value={s.id}>{s.icon} {s.title}</option>)}
+            {state.scenarios.map((s) => <option key={s.id} value={s.id}>{s.title}</option>)}
           </select>
         </Field>
       </div>

@@ -4,6 +4,7 @@ import { useStore } from '../store'
 import type { Alarm, Delivery } from '../types'
 import { CHANNEL_LABELS } from '../types'
 import { Badge, Button, Card, EmptyState, formatDateTime, formatTime } from '../components/ui'
+import { ScenarioIcon } from '../components/ScenarioIcon'
 
 export default function AlarmMonitor() {
   const { state } = useStore()
@@ -50,7 +51,11 @@ function AlarmCard({ alarm, collapsed = false }: { alarm: Alarm; collapsed?: boo
     <div className={`bg-white rounded-xl border shadow-sm ${alarm.status === 'active' ? 'border-brand-500' : 'border-slate-200'}`}>
       <div className="px-5 py-4 flex items-center gap-3 cursor-pointer" onClick={() => setOpen(!open)}>
         {open ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
-        <span className="text-2xl">{scenario?.icon}</span>
+        <ScenarioIcon
+          name={scenario?.icon ?? ''}
+          size={26}
+          className={alarm.status === 'active' ? 'text-brand-600 shrink-0' : 'text-slate-400 shrink-0'}
+        />
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-slate-800 flex items-center gap-2 flex-wrap">
             {scenario?.title}

@@ -5,6 +5,7 @@ import { createAlarm, resolveRecipients, useStore } from '../store'
 import type { Channel } from '../types'
 import { CHANNEL_LABELS } from '../types'
 import { Badge, Button, Card, Field, Toggle, inputClass } from '../components/ui'
+import { ScenarioIcon } from '../components/ScenarioIcon'
 
 const ALL_CHANNELS: Channel[] = ['push', 'sms', 'email', 'voice', 'conference', 'tts', 'teams']
 
@@ -87,7 +88,7 @@ export default function TriggerAlarm() {
                 s.id === scenarioId ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-400'
               }`}
             >
-              <div className="text-xl mb-1">{s.icon}</div>
+              <ScenarioIcon name={s.icon} size={22} className={`mb-1 ${s.id === scenarioId ? 'text-brand-600' : 'text-slate-500'}`} />
               <div className="font-medium text-slate-800 leading-tight">{s.title}</div>
               <div className="text-xs text-slate-400 mt-0.5">{s.category}</div>
             </button>
@@ -172,7 +173,7 @@ export default function TriggerAlarm() {
               <Siren className="text-brand-600" /> Alarm bestätigen
             </h3>
             <p className="text-sm text-slate-600 mt-2">
-              <strong>{scenario?.icon} {scenario?.title}</strong> wird sofort an <strong>{recipients.length} Personen</strong> über{' '}
+              <strong>{scenario?.title}</strong> wird sofort an <strong>{recipients.length} Personen</strong> über{' '}
               {channels.map((c) => CHANNEL_LABELS[c]).join(', ')} ausgelöst.
             </p>
             <div className="flex justify-end gap-2 mt-5">

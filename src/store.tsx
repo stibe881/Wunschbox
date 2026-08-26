@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useReducer } from 'react'
 import type { AppState, Alarm, AlarmButton, AlarmPlan, Channel, Delivery, EscalationLevel, Group, Location, LoneWorkSession, Scenario, User, Webhook, AuditEntry } from './types'
 import { CHANNEL_LABELS } from './types'
 import { createInitialState } from './data/seed'
+import { LEGACY_EMOJI_TO_ICON } from './components/ScenarioIcon'
 
 const STORAGE_KEY = 'e-mergency-state-v1'
 
@@ -371,7 +372,13 @@ function loadState(): AppState {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
       const parsed = JSON.parse(raw) as AppState
-      if (parsed.users && parsed.scenarios) return parsed
+      if (parsed.users && parsed.scenarios) {
+        // Migration: früher gespeicherte Emoji-Icons auf Icon-Schlüssel umstellen
+        parsed.scenarios = parsed.scenarios.map((s) =>
+          LEGACY_EMOJI_TO_ICON[s.icon] ? { ...s, icon: LEGACY_EMOJI_TO_ICON[s.icon] } : s,
+        )
+        return parsed
+      }
     }
   } catch {
     // korrupte Daten -> Neustart mit Seed

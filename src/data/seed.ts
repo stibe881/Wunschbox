@@ -3,7 +3,7 @@ import type { AppState, Scenario, User, Group, Location, AlarmPlan, AlarmButton,
 // 16 vorkonfigurierte Best-Practice-Notfallszenarien
 export const SEED_SCENARIOS: Scenario[] = [
   {
-    id: 'sc-brand', icon: '🔥', title: 'Brand / Feuer', category: 'Gebäude', silentDefault: false,
+    id: 'sc-brand', icon: 'flame', title: 'Brand / Feuer', category: 'Gebäude', silentDefault: false,
     instructions: [
       'Ruhe bewahren – keine Panik verbreiten.',
       'Brand melden: Feuerwehr 118 alarmieren.',
@@ -15,7 +15,7 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['Feuerwehr 118 alarmiert', 'Etage evakuiert', 'Türen geschlossen', 'Sammelplatz erreicht', 'Personen gezählt', 'Einsatzkräfte eingewiesen'],
   },
   {
-    id: 'sc-evak', icon: '🚪', title: 'Evakuierung', category: 'Gebäude', silentDefault: false,
+    id: 'sc-evak', icon: 'door-open', title: 'Evakuierung', category: 'Gebäude', silentDefault: false,
     instructions: [
       'Evakuierungsdurchsage abwarten bzw. auslösen.',
       'Arbeitsplatz sichern (Maschinen stoppen, Dokumente sichern).',
@@ -26,7 +26,7 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['Durchsage erfolgt', 'Bereich geräumt', 'Hilfsbedürftige begleitet', 'Sammelplatz erreicht', 'Zählung abgeschlossen'],
   },
   {
-    id: 'sc-medizin', icon: '🚑', title: 'Medizinischer Notfall', category: 'Personen', silentDefault: false,
+    id: 'sc-medizin', icon: 'heart-pulse', title: 'Medizinischer Notfall', category: 'Personen', silentDefault: false,
     instructions: [
       'Situation beurteilen – Eigenschutz beachten.',
       'Sanität 144 alarmieren.',
@@ -37,7 +37,7 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['144 alarmiert', 'Ersthelfer vor Ort', 'AED geholt', 'Rettungsdienst eingewiesen', 'Angehörige informiert'],
   },
   {
-    id: 'sc-amok', icon: '⚠️', title: 'Amok / Bedrohungslage', category: 'Sicherheit', silentDefault: true,
+    id: 'sc-amok', icon: 'shield-alert', title: 'Amok / Bedrohungslage', category: 'Sicherheit', silentDefault: true,
     instructions: [
       'Flüchten, wenn gefahrlos möglich.',
       'Verstecken: Türen verriegeln, Licht löschen, Handy stumm.',
@@ -48,7 +48,7 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['Polizei 117 informiert', 'Bereich verriegelt', 'Stiller Alarm ausgelöst', 'Personen in Sicherheit'],
   },
   {
-    id: 'sc-bombe', icon: '💣', title: 'Bombendrohung', category: 'Sicherheit', silentDefault: true,
+    id: 'sc-bombe', icon: 'bomb', title: 'Bombendrohung', category: 'Sicherheit', silentDefault: true,
     instructions: [
       'Anruf ernst nehmen, Gespräch in die Länge ziehen.',
       'Wortlaut, Hintergrundgeräusche und Stimme notieren.',
@@ -59,7 +59,7 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['Drohungsprotokoll ausgefüllt', 'Polizei 117 informiert', 'Krisenstab einberufen', 'Entscheidung Evakuierung getroffen'],
   },
   {
-    id: 'sc-einbruch', icon: '🔓', title: 'Einbruch / Diebstahl', category: 'Sicherheit', silentDefault: false,
+    id: 'sc-einbruch', icon: 'lock-open', title: 'Einbruch / Diebstahl', category: 'Sicherheit', silentDefault: false,
     instructions: [
       'Tatort nicht verändern, nichts berühren.',
       'Polizei 117 alarmieren.',
@@ -69,7 +69,7 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['Polizei informiert', 'Tatort gesichert', 'Schadensliste erstellt', 'Versicherung gemeldet'],
   },
   {
-    id: 'sc-gewalt', icon: '🥊', title: 'Gewalt / Übergriff', category: 'Personen', silentDefault: true,
+    id: 'sc-gewalt', icon: 'hand', title: 'Gewalt / Übergriff', category: 'Personen', silentDefault: true,
     instructions: [
       'Eigenschutz hat Vorrang – Distanz halten.',
       'Stillen Alarm auslösen oder Kollegen alarmieren.',
@@ -80,7 +80,7 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['Stiller Alarm ausgelöst', 'Sicherheitsdienst vor Ort', 'Betroffene betreut', 'Vorfall protokolliert'],
   },
   {
-    id: 'sc-it', icon: '💻', title: 'IT-Ausfall / Cyberangriff', category: 'Technik', silentDefault: false,
+    id: 'sc-it', icon: 'server-crash', title: 'IT-Ausfall / Cyberangriff', category: 'Technik', silentDefault: false,
     instructions: [
       'Betroffene Systeme nicht ausschalten, aber vom Netz trennen.',
       'IT-Notfallteam alarmieren.',
@@ -91,7 +91,7 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['IT-Team alarmiert', 'Systeme isoliert', 'Behörden (NCSC) informiert', 'Notbetrieb aktiviert', 'Kommunikationsplan aktiv'],
   },
   {
-    id: 'sc-strom', icon: '⚡', title: 'Stromausfall', category: 'Technik', silentDefault: false,
+    id: 'sc-strom', icon: 'zap-off', title: 'Stromausfall', category: 'Technik', silentDefault: false,
     instructions: [
       'Ruhe bewahren, Notbeleuchtung beachten.',
       'Technischer Dienst prüft Ursache und USV.',
@@ -102,7 +102,7 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['Technischer Dienst informiert', 'Aufzüge geprüft', 'Kritische Systeme gesichert', 'Versorger kontaktiert'],
   },
   {
-    id: 'sc-wasser', icon: '💧', title: 'Wasserschaden', category: 'Gebäude', silentDefault: false,
+    id: 'sc-wasser', icon: 'droplets', title: 'Wasserschaden', category: 'Gebäude', silentDefault: false,
     instructions: [
       'Hauptwasserhahn schliessen, wenn möglich.',
       'Elektrische Geräte im betroffenen Bereich vom Strom trennen.',
@@ -112,7 +112,7 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['Wasserzufuhr gestoppt', 'Strom getrennt', 'Bereich abgesperrt', 'Trocknungsfirma bestellt'],
   },
   {
-    id: 'sc-gas', icon: '☣️', title: 'Gasaustritt / Chemieunfall', category: 'Gebäude', silentDefault: false,
+    id: 'sc-gas', icon: 'biohazard', title: 'Gasaustritt / Chemieunfall', category: 'Gebäude', silentDefault: false,
     instructions: [
       'Keine offenen Flammen, keine elektrischen Schalter betätigen.',
       'Fenster öffnen (nur wenn gefahrlos), Bereich verlassen.',
@@ -123,7 +123,7 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['118 alarmiert', 'Bereich evakuiert', 'Zündquellen eliminiert', 'Sicherheitsdatenblatt bereitgestellt'],
   },
   {
-    id: 'sc-erdbeben', icon: '🌍', title: 'Erdbeben', category: 'Naturereignis', silentDefault: false,
+    id: 'sc-erdbeben', icon: 'activity', title: 'Erdbeben', category: 'Naturereignis', silentDefault: false,
     instructions: [
       'Im Gebäude: Schutz unter stabilen Möbeln suchen.',
       'Von Fenstern und Fassaden fernhalten.',
@@ -133,7 +133,7 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['Personen geschützt', 'Gebäudeschäden erfasst', 'Evakuierung geprüft', 'Behördeninfos verfolgt'],
   },
   {
-    id: 'sc-unwetter', icon: '🌪️', title: 'Unwetter / Sturm', category: 'Naturereignis', silentDefault: false,
+    id: 'sc-unwetter', icon: 'cloud-lightning', title: 'Unwetter / Sturm', category: 'Naturereignis', silentDefault: false,
     instructions: [
       'Aufenthalt im Freien vermeiden.',
       'Fenster und Türen schliessen, Storen einfahren.',
@@ -143,7 +143,7 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['Aussenbereich gesichert', 'Mitarbeitende informiert', 'Gebäude gesichert', 'Lageupdates verfolgt'],
   },
   {
-    id: 'sc-pandemie', icon: '😷', title: 'Pandemie / Infektionsfall', category: 'Personen', silentDefault: false,
+    id: 'sc-pandemie', icon: 'stethoscope', title: 'Pandemie / Infektionsfall', category: 'Personen', silentDefault: false,
     instructions: [
       'Betroffene Person isolieren und betreuen.',
       'Hygienemassnahmen verschärfen.',
@@ -153,7 +153,7 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['Person isoliert', 'Kontakte informiert', 'Hygienekonzept aktiv', 'Homeoffice-Regelung kommuniziert'],
   },
   {
-    id: 'sc-vermisst', icon: '🔍', title: 'Vermisste Person', category: 'Personen', silentDefault: false,
+    id: 'sc-vermisst', icon: 'search', title: 'Vermisste Person', category: 'Personen', silentDefault: false,
     instructions: [
       'Letzten bekannten Aufenthaltsort ermitteln.',
       'Suchtrupps koordinieren, Gelände absuchen.',
@@ -163,7 +163,7 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['Suche organisiert', 'Polizei informiert', 'Angehörige betreut', 'Lagejournal geführt'],
   },
   {
-    id: 'sc-krise', icon: '📉', title: 'Krisenstab einberufen', category: 'Organisation', silentDefault: false,
+    id: 'sc-krise', icon: 'users', title: 'Krisenstab einberufen', category: 'Organisation', silentDefault: false,
     instructions: [
       'Krisenstab über alle Kanäle aufbieten (mit Quittierung).',
       'Krisenraum vorbereiten (Lagekarte, Kommunikation).',

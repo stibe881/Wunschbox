@@ -3,6 +3,7 @@ import { Pencil, Plus, Trash2, WifiOff } from 'lucide-react'
 import { uid, useStore } from '../store'
 import type { Scenario } from '../types'
 import { Badge, Button, Card, Field, Modal, Toggle, inputClass } from '../components/ui'
+import { SCENARIO_ICONS, ScenarioIcon } from '../components/ScenarioIcon'
 
 export default function Scenarios() {
   const { state, dispatch } = useStore()
@@ -10,7 +11,7 @@ export default function Scenarios() {
   const [viewing, setViewing] = useState<Scenario | null>(null)
 
   function newScenario(): Scenario {
-    return { id: uid('sc'), icon: '📋', title: '', category: 'Organisation', instructions: [''], checklist: [''], silentDefault: false, custom: true }
+    return { id: uid('sc'), icon: 'clipboard-list', title: '', category: 'Organisation', instructions: [''], checklist: [''], silentDefault: false, custom: true }
   }
 
   return (
@@ -35,7 +36,7 @@ export default function Scenarios() {
         {state.scenarios.map((s) => (
           <Card key={s.id} className="hover:shadow transition">
             <div className="flex items-start gap-3">
-              <span className="text-3xl">{s.icon}</span>
+              <ScenarioIcon name={s.icon} size={28} className="text-slate-500 shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-slate-800">{s.title}</div>
                 <div className="flex gap-1.5 mt-1 flex-wrap">
@@ -60,7 +61,7 @@ export default function Scenarios() {
       </div>
 
       {viewing && (
-        <Modal title={`${viewing.icon} ${viewing.title}`} onClose={() => setViewing(null)} wide>
+        <Modal title={viewing.title} onClose={() => setViewing(null)} wide>
           <div className="grid md:grid-cols-2 gap-6">
             <div>
               <h4 className="font-semibold text-slate-700 mb-2">Handlungsanweisungen</h4>
@@ -110,16 +111,26 @@ function ScenarioEditor({ scenario, onClose }: { scenario: Scenario; onClose: ()
 
   return (
     <Modal title={scenario.title ? `Szenario bearbeiten: ${scenario.title}` : 'Neues Szenario'} onClose={onClose} wide>
-      <div className="grid grid-cols-3 gap-4">
-        <Field label="Symbol (Emoji)">
-          <input className={inputClass} value={draft.icon} onChange={(e) => setDraft({ ...draft, icon: e.target.value })} />
-        </Field>
-        <div className="col-span-2">
-          <Field label="Titel">
-            <input className={inputClass} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
-          </Field>
+      <Field label="Titel">
+        <input className={inputClass} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
+      </Field>
+      <Field label="Symbol">
+        <div className="grid grid-cols-6 sm:grid-cols-9 gap-2">
+          {Object.entries(SCENARIO_ICONS).map(([key, { icon: Icon, label }]) => (
+            <button
+              key={key}
+              type="button"
+              title={label}
+              onClick={() => setDraft({ ...draft, icon: key })}
+              className={`flex items-center justify-center rounded-lg border p-2.5 transition ${
+                draft.icon === key ? 'border-brand-500 bg-brand-50 text-brand-600' : 'border-slate-200 text-slate-500 hover:border-slate-400'
+              }`}
+            >
+              <Icon size={20} />
+            </button>
+          ))}
         </div>
-      </div>
+      </Field>
       <Field label="Kategorie">
         <select className={inputClass} value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>
           {['Gebäude', 'Personen', 'Sicherheit', 'Technik', 'Naturereignis', 'Organisation'].map((c) => <option key={c}>{c}</option>)}

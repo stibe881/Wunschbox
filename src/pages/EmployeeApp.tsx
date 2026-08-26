@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { BellRing, BookOpen, ChevronLeft, Phone, Siren, WifiOff } from 'lucide-react'
+import { ArrowRight, BatteryFull, BellRing, BookOpen, Check, ChevronLeft, Phone, Signal, Siren, Volume2, WifiOff, X } from 'lucide-react'
 import { createAlarm, useStore } from '../store'
 import type { Scenario } from '../types'
 import { Badge, formatTime } from '../components/ui'
+import { ScenarioIcon } from '../components/ScenarioIcon'
 
 type Tab = 'home' | 'scenarios' | 'contacts'
 
@@ -48,7 +49,7 @@ export default function EmployeeApp() {
         <div className="w-[360px] shrink-0 rounded-[2.2rem] border-8 border-slate-900 bg-slate-50 shadow-xl overflow-hidden">
           <div className="bg-slate-900 text-white text-xs px-5 py-1.5 flex justify-between">
             <span>{formatTime(Date.now()).slice(0, 5)}</span>
-            <span className="flex items-center gap-1"><WifiOff size={11} /> offline-fähig · 📶 · 🔋</span>
+            <span className="flex items-center gap-1.5"><WifiOff size={11} /> offline-fähig <Signal size={11} /> <BatteryFull size={12} /></span>
           </div>
 
           <div className="bg-brand-600 text-white px-4 py-3">
@@ -62,7 +63,7 @@ export default function EmployeeApp() {
                 <button className="flex items-center gap-1 text-sm text-slate-500 mb-3" onClick={() => setOpenScenario(null)}>
                   <ChevronLeft size={14} /> Zurück
                 </button>
-                <div className="text-3xl mb-1">{openScenario.icon}</div>
+                <ScenarioIcon name={openScenario.icon} size={30} className="text-brand-600 mb-1" />
                 <h3 className="font-bold text-slate-800 text-lg mb-3">{openScenario.title}</h3>
                 <ol className="space-y-2.5 mb-5">
                   {openScenario.instructions.map((step, i) => (
@@ -96,29 +97,33 @@ export default function EmployeeApp() {
                         <div key={a.id} className={`rounded-xl border-2 p-3 ${a.silent ? 'border-violet-400 bg-violet-50' : 'border-brand-500 bg-brand-50 alarm-pulse'}`}>
                           <div className="flex items-center gap-2 font-bold text-slate-800">
                             <BellRing size={16} className={a.silent ? 'text-violet-600' : 'text-brand-600 animate-pulse'} />
-                            {scenario?.icon} {scenario?.title}
+                            <ScenarioIcon name={scenario?.icon ?? ''} size={16} className="text-slate-500" /> {scenario?.title}
                             {a.silent && <Badge color="violet">still</Badge>}
                           </div>
                           <p className="text-sm text-slate-700 mt-1">{a.message}</p>
-                          {!a.silent && <div className="text-[11px] text-slate-500 mt-1">🔊 Critical Alert – auch bei stummgeschaltetem Gerät hörbar</div>}
+                          {!a.silent && (
+                            <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
+                              <Volume2 size={12} /> Critical Alert – auch bei stummgeschaltetem Gerät hörbar
+                            </div>
+                          )}
                           {scenario && (
-                            <button className="mt-2 text-sm text-brand-700 underline" onClick={() => setOpenScenario(scenario)}>
-                              Handlungsanweisungen öffnen →
+                            <button className="mt-2 text-sm text-brand-700 underline inline-flex items-center gap-1" onClick={() => setOpenScenario(scenario)}>
+                              Handlungsanweisungen öffnen <ArrowRight size={13} />
                             </button>
                           )}
                           {a.requireAck && myAck === 'none' && (
                             <div className="flex gap-2 mt-3">
                               <button
-                                className="flex-1 bg-emerald-600 text-white rounded-lg py-2 text-sm font-semibold"
+                                className="flex-1 bg-emerald-600 text-white rounded-lg py-2 text-sm font-semibold flex items-center justify-center gap-1.5"
                                 onClick={() => dispatch({ type: 'ACK_ALARM', alarmId: a.id, userId: me.id, ack: 'acknowledged' })}
                               >
-                                ✓ Ich komme
+                                <Check size={15} /> Ich komme
                               </button>
                               <button
-                                className="flex-1 bg-slate-300 text-slate-700 rounded-lg py-2 text-sm font-semibold"
+                                className="flex-1 bg-slate-300 text-slate-700 rounded-lg py-2 text-sm font-semibold flex items-center justify-center gap-1.5"
                                 onClick={() => dispatch({ type: 'ACK_ALARM', alarmId: a.id, userId: me.id, ack: 'declined' })}
                               >
-                                ✗ Nicht verfügbar
+                                <X size={15} /> Nicht verfügbar
                               </button>
                             </div>
                           )}
@@ -144,7 +149,7 @@ export default function EmployeeApp() {
               <div className="grid grid-cols-2 gap-2">
                 {state.scenarios.map((s) => (
                   <button key={s.id} className="rounded-xl border border-slate-200 bg-white p-3 text-left" onClick={() => setOpenScenario(s)}>
-                    <div className="text-2xl">{s.icon}</div>
+                    <ScenarioIcon name={s.icon} size={22} className="text-brand-600" />
                     <div className="text-sm font-medium text-slate-800 leading-tight mt-1">{s.title}</div>
                   </button>
                 ))}
