@@ -43,7 +43,7 @@ export default function Dashboard() {
             rel="noopener"
             className="inline-flex items-center gap-2 rounded-xl bg-white border border-slate-300 text-slate-700 px-4 py-2.5 text-sm font-semibold hover:bg-slate-50 transition"
           >
-            <Smartphone size={16} /> Benutzeransicht
+            <Smartphone size={16} /> App-Vorschau
           </a>
         </div>
       </div>

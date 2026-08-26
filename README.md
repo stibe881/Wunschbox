@@ -19,7 +19,8 @@ Alarmserver, Multikanal-Alarmierung, Notfallszenarien mit Handlungsanweisungen u
 - **Alarmierungskanäle (simuliert):** Push mit Critical Alerts, SMS, E-Mail, Sprachanruf, Telefonkonferenz, Text-to-Speech-Durchsage, Microsoft Teams.
 - **Stiller Alarm** (z. B. Bedrohungslage) und **Aufgebot mit Quittierfunktion** («Ich komme» / «Nicht verfügbar»).
 - **Alarmzentrale:** Live-Monitoring mit Zustellstatus pro Empfänger und Kanal, Quittierungsübersicht, Alarmjournal, automatische Eskalationsstufen, Entwarnung.
-- **Benutzeransicht (Mitarbeiter-App):** eigenständige, bildschirmfüllende App-Ansicht mit SOS-Taste (Halte-Geste), aktiven Alarmen mit Quittierung, offline verfügbaren Szenarien/Checklisten, eigenem Alleinarbeits-Timer und Notrufkontakten (direkt anrufbar). Wer mit der Rolle «Mitarbeiter» angemeldet ist, sieht ausschliesslich diese Ansicht; Admin und Krisenstab wechseln über «Benutzeransicht (App)» bzw. «Zur Verwaltung» hin und her.
+- **Rollen & Portale:** Das Webportal (Verwaltung) ist Admin und Krisenstab vorbehalten – beide sehen alles und haben zusätzlich Zugriff auf die iOS-App (`mobile/`, plus Web-Vorschau über «App-Vorschau (iOS)»). Mitarbeitende haben ausschliesslich Zugriff auf die iOS-App; im Webportal sehen sie nur einen Hinweis-Bildschirm mit Verweis auf die App.
+- **App-Vorschau (iOS):** Web-Version der Mitarbeiter-App mit SOS-Taste (Halte-Geste), aktiven Alarmen mit Quittierung, offline verfügbaren Szenarien/Checklisten, eigenem Alleinarbeits-Timer und Notrufkontakten (direkt anrufbar) – öffnet in einem separaten Tab.
 
 ### 03 Alleinarbeiterschutz
 - **Timer-Funktion:** Überwachung mit Intervall, Lebenszeichen und automatischer Alarmauslösung bei Ablauf – wahlweise still.

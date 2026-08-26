@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import {
   AlertTriangle, BellRing, BookOpen, Building2, ClipboardList, ExternalLink, FileClock, LayoutDashboard,
-  Menu, Phone, Plug, Radio, Siren, Smartphone, Timer, Users, UsersRound, X,
+  Lock, Menu, Phone, Plug, Radio, Siren, Smartphone, Timer, Users, UsersRound, X,
 } from 'lucide-react'
 import { useStore } from './store'
 import Dashboard from './pages/Dashboard'
@@ -25,7 +25,7 @@ const NAV = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/alarm', label: 'Alarm auslösen', icon: Siren },
   { to: '/monitor', label: 'Alarmzentrale', icon: BellRing },
-  { to: '/app', label: 'Benutzeransicht (App)', icon: Smartphone, newTab: true },
+  { to: '/app', label: 'App-Vorschau (iOS)', icon: Smartphone, newTab: true },
   { section: 'Alleinarbeiterschutz' },
   { to: '/alleinarbeit', label: 'Alleinarbeit (Timer)', icon: Timer },
   { to: '/alarmknoepfe', label: 'Alarmknöpfe', icon: Radio },
@@ -40,6 +40,49 @@ const NAV = [
   { to: '/integrationen', label: 'Integrationen', icon: Plug },
   { to: '/protokoll', label: 'Ereignisprotokoll', icon: FileClock },
 ] as const
+
+/** Mitarbeitende haben keinen Webportal-Zugriff – Verweis auf die iOS-App */
+function NoWebAccess() {
+  const { state, dispatch } = useStore()
+  const currentUser = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
+      <div className="max-w-md w-full text-center">
+        <div className="w-16 h-16 rounded-2xl bg-slate-800 text-brand-500 flex items-center justify-center mx-auto mb-5">
+          <Lock size={28} />
+        </div>
+        <h1 className="text-xl font-bold text-white">Kein Zugriff auf das Webportal</h1>
+        <p className="text-sm text-slate-400 mt-2">
+          Hallo {currentUser.firstName} – das Webportal ist der Schulleitung (Admin) und dem Krisenstab vorbehalten.
+        </p>
+        <div className="mt-6 rounded-2xl bg-slate-800 p-5 text-left">
+          <div className="flex items-center gap-2.5 text-white font-semibold">
+            <Smartphone size={18} className="text-brand-500" /> Sonnenberg Notfall-App verwenden
+          </div>
+          <p className="text-sm text-slate-400 mt-2">
+            Als Mitarbeiter:in nutzen Sie die App auf dem iPhone: SOS-Alarm, Handlungsanweisungen zu allen
+            Notfallszenarien, Alleinarbeits-Timer und Notrufnummern – auch offline verfügbar.
+          </p>
+        </div>
+        <div className="mt-6 text-left">
+          <label className="block text-xs text-slate-500 mb-1.5">Demo: Benutzer wechseln</label>
+          <select
+            className="w-full bg-slate-800 text-slate-200 rounded-lg px-3 py-2 text-sm"
+            value={currentUser.id}
+            onChange={(e) => dispatch({ type: 'SET_CURRENT_USER', userId: e.target.value })}
+          >
+            {state.users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.firstName} {u.lastName} ({u.role})
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { state, dispatch } = useStore()
@@ -119,8 +162,12 @@ export default function App() {
   const activeAlarms = state.alarms.filter((a) => a.status === 'active')
   const currentUser = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
 
-  // Mitarbeitende sehen ausschliesslich die Benutzer-App; Admin/Krisenstab können sie via /app öffnen
-  if (currentUser.role === 'mitarbeiter' || location.pathname === '/app') {
+  // Zugriffslogik: Webportal nur für Admin und Krisenstab – Mitarbeitende nutzen die iOS-App
+  if (currentUser.role === 'mitarbeiter') {
+    return <NoWebAccess />
+  }
+  // App-Vorschau (Web-Version der iOS-App) für Admin/Krisenstab
+  if (location.pathname === '/app') {
     return <UserApp />
   }
 
