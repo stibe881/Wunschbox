@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ArrowRight, BatteryFull, BellRing, BookOpen, Check, ChevronLeft, Phone, Signal, Siren, Volume2, WifiOff, X } from 'lucide-react'
 import { createAlarm, useStore } from '../store'
 import type { Scenario } from '../types'
-import { Badge, formatTime } from '../components/ui'
+import { Badge, HoldButton, formatTime } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 
 type Tab = 'home' | 'scenarios' | 'contacts'
@@ -19,7 +19,6 @@ export default function EmployeeApp() {
   )
 
   function sos() {
-    if (!confirm('SOS-Alarm auslösen? Ersthelfer und Sicherheitsdienst werden sofort alarmiert.')) return
     const alarm = createAlarm(state, {
       scenarioId: 'sc-medizin',
       message: `SOS-Alarm von ${me.firstName} ${me.lastName} (App) – Standort: ${state.locations.find((l) => l.id === me.locationId)?.name ?? 'unbekannt'}`,
@@ -46,7 +45,7 @@ export default function EmployeeApp() {
       </div>
 
       <div className="flex gap-8 items-start flex-wrap">
-        <div className="w-[360px] shrink-0 rounded-[2.2rem] border-8 border-slate-900 bg-slate-50 shadow-xl overflow-hidden">
+        <div className="w-full max-w-[360px] mx-auto sm:mx-0 shrink-0 rounded-[2.2rem] border-8 border-slate-900 bg-slate-50 shadow-xl overflow-hidden">
           <div className="bg-slate-900 text-white text-xs px-5 py-1.5 flex justify-between">
             <span>{formatTime(Date.now()).slice(0, 5)}</span>
             <span className="flex items-center gap-1.5"><WifiOff size={11} /> offline-fähig <Signal size={11} /> <BatteryFull size={12} /></span>
@@ -163,9 +162,9 @@ export default function EmployeeApp() {
                 {myAlarms.length === 0 && (
                   <div className="text-center text-sm text-slate-400 py-4">Keine aktiven Alarme für Sie.</div>
                 )}
-                <button className="w-full rounded-2xl bg-brand-600 text-white py-6 font-bold text-lg shadow-lg active:scale-95 transition" onClick={sos}>
-                  <Siren className="inline mr-2" /> SOS – Alarm auslösen
-                </button>
+                <HoldButton onTrigger={sos} hint="Zum Auslösen gedrückt halten" className="w-full">
+                  <Siren size={22} /> SOS
+                </HoldButton>
                 <div className="text-xs text-center text-slate-400">
                   Interne Notfallnummer: {state.integrations.hotline.number}
                 </div>

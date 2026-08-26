@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 
 export function Card({ title, actions, children, className = '' }: { title?: React.ReactNode; actions?: React.ReactNode; children: React.ReactNode; className?: string }) {
@@ -77,6 +77,82 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
         <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${checked ? 'left-[18px]' : 'left-0.5'}`} />
       </span>
       {label}
+    </button>
+  )
+}
+
+/**
+ * Auslöse-Button mit Halte-Geste: verhindert versehentliche Alarme ohne zusätzlichen
+ * Bestätigungsdialog. Gedrückt halten füllt den Button, bei 100 % wird ausgelöst.
+ */
+export function HoldButton({
+  onTrigger, disabled = false, holdMs = 1200, children, hint = 'Gedrückt halten',
+  className = '',
+}: {
+  onTrigger: () => void
+  disabled?: boolean
+  holdMs?: number
+  children: React.ReactNode
+  hint?: string
+  className?: string
+}) {
+  const [progress, setProgress] = useState(0)
+  const raf = useRef<number | null>(null)
+  const startTs = useRef(0)
+  const fired = useRef(false)
+
+  function stop() {
+    if (raf.current !== null) cancelAnimationFrame(raf.current)
+    raf.current = null
+    setProgress(0)
+  }
+
+  function begin() {
+    if (disabled || fired.current) return
+    startTs.current = performance.now()
+    const tick = () => {
+      const p = Math.min(1, (performance.now() - startTs.current) / holdMs)
+      setProgress(p)
+      if (p >= 1) {
+        fired.current = true
+        stop()
+        onTrigger()
+        setTimeout(() => { fired.current = false }, 500)
+      } else {
+        raf.current = requestAnimationFrame(tick)
+      }
+    }
+    raf.current = requestAnimationFrame(tick)
+  }
+
+  useEffect(() => stop, [])
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onPointerDown={begin}
+      onPointerUp={stop}
+      onPointerLeave={stop}
+      onPointerCancel={stop}
+      onContextMenu={(e) => e.preventDefault()}
+      onKeyDown={(e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && !e.repeat && !disabled) {
+          e.preventDefault()
+          onTrigger()
+        }
+      }}
+      className={`relative overflow-hidden select-none touch-none rounded-2xl bg-brand-600 text-white font-bold shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    >
+      <span
+        className="absolute inset-y-0 left-0 bg-brand-700 transition-none"
+        style={{ width: `${progress * 100}%` }}
+        aria-hidden
+      />
+      <span className="relative z-10 flex flex-col items-center justify-center gap-0.5 px-6 py-4">
+        <span className="flex items-center gap-2 text-lg">{children}</span>
+        <span className="text-xs font-normal opacity-80">{progress > 0 ? 'Halten…' : hint}</span>
+      </span>
     </button>
   )
 }

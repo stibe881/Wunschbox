@@ -49,7 +49,7 @@ function AlarmCard({ alarm, collapsed = false }: { alarm: Alarm; collapsed?: boo
 
   return (
     <div className={`bg-white rounded-xl border shadow-sm ${alarm.status === 'active' ? 'border-brand-500' : 'border-slate-200'}`}>
-      <div className="px-5 py-4 flex items-center gap-3 cursor-pointer" onClick={() => setOpen(!open)}>
+      <div className="px-4 sm:px-5 py-4 flex flex-wrap items-center gap-3 cursor-pointer" onClick={() => setOpen(!open)}>
         {open ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
         <ScenarioIcon
           name={scenario?.icon ?? ''}

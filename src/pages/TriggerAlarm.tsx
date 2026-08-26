@@ -1,19 +1,21 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Siren } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronUp, Pencil, Siren, Users } from 'lucide-react'
 import { createAlarm, resolveRecipients, useStore } from '../store'
-import type { Channel } from '../types'
+import type { AlarmPlan, Channel, Scenario } from '../types'
 import { CHANNEL_LABELS } from '../types'
-import { Badge, Button, Card, Field, Toggle, inputClass } from '../components/ui'
+import { Badge, HoldButton, Toggle, inputClass } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 
 const ALL_CHANNELS: Channel[] = ['push', 'sms', 'email', 'voice', 'conference', 'tts', 'teams']
+
+const PRIORITY_COLOR = { hoch: 'red', mittel: 'amber', tief: 'slate' } as const
 
 export default function TriggerAlarm() {
   const { state, dispatch } = useStore()
   const navigate = useNavigate()
 
-  const [scenarioId, setScenarioId] = useState(state.scenarios[0]?.id ?? '')
+  const [scenarioId, setScenarioId] = useState('')
   const [planId, setPlanId] = useState('')
   const [message, setMessage] = useState('')
   const [channels, setChannels] = useState<Channel[]>(['push', 'sms'])
@@ -21,9 +23,21 @@ export default function TriggerAlarm() {
   const [locationIds, setLocationIds] = useState<string[]>([])
   const [silent, setSilent] = useState(false)
   const [requireAck, setRequireAck] = useState(false)
-  const [confirming, setConfirming] = useState(false)
+  const [adjustOpen, setAdjustOpen] = useState(false)
 
   const scenario = state.scenarios.find((s) => s.id === scenarioId)
+  const recipients = useMemo(() => resolveRecipients(state, groupIds, locationIds), [state, groupIds, locationIds])
+
+  function selectScenario(s: Scenario) {
+    setScenarioId(s.id)
+    setSilent(s.silentDefault)
+    setRequireAck(false)
+    if (s.defaultChannels.length > 0) setChannels(s.defaultChannels)
+    if (s.responsibleGroupIds.length > 0) setGroupIds(s.responsibleGroupIds)
+    setMessage('')
+    setAdjustOpen(false)
+    window.scrollTo({ top: 0 })
+  }
 
   function applyPlan(id: string) {
     setPlanId(id)
@@ -34,19 +48,22 @@ export default function TriggerAlarm() {
     setGroupIds(plan.groupIds)
     setLocationIds(plan.locationIds)
     setRequireAck(plan.requireAck)
+    const sc = state.scenarios.find((s) => s.id === plan.scenarioId)
+    if (sc) setSilent(sc.silentDefault)
+    setAdjustOpen(false)
+    window.scrollTo({ top: 0 })
   }
-
-  const recipients = useMemo(() => resolveRecipients(state, groupIds, locationIds), [state, groupIds, locationIds])
 
   function toggle<T>(list: T[], value: T, set: (v: T[]) => void) {
     set(list.includes(value) ? list.filter((v) => v !== value) : [...list, value])
   }
 
   function fire() {
-    const plan = state.plans.find((p) => p.id === planId)
+    if (!scenario) return
+    const plan: AlarmPlan | undefined = state.plans.find((p) => p.id === planId)
     const alarm = createAlarm(state, {
-      scenarioId,
-      message: message || `${scenario?.title}: Bitte Handlungsanweisungen in der App befolgen.`,
+      scenarioId: scenario.id,
+      message: message || `${scenario.title}: Bitte Handlungsanweisungen in der App befolgen.`,
       silent,
       requireAck,
       channels,
@@ -57,137 +74,185 @@ export default function TriggerAlarm() {
       planId: planId || undefined,
       escalation: plan?.escalation ?? [],
     })
-    dispatch({ type: 'TRIGGER_ALARM', alarm, audit: `Alarm ausgelöst: ${scenario?.title} (${recipients.length} Empfänger)` })
+    dispatch({ type: 'TRIGGER_ALARM', alarm, audit: `Alarm ausgelöst: ${scenario.title} (${recipients.length} Empfänger)` })
     navigate('/monitor')
   }
 
-  return (
-    <div className="space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">Alarm auslösen</h1>
-        <p className="text-sm text-slate-500">
-          Auslösung via Web-App · Alternativ: Smartphone-App, interne Notfallnummer {state.integrations.hotline.number}, Alarmknöpfe, Webhooks
-        </p>
-      </div>
+  // ---------- Schritt 1: Szenario wählen ----------
+  if (!scenario) {
+    return (
+      <div className="space-y-5 max-w-4xl mx-auto">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Alarm auslösen</h1>
+          <p className="text-sm text-slate-500">Szenario antippen – Empfänger und Kanäle werden automatisch vorbereitet.</p>
+        </div>
 
-      <Card title="1 · Szenario wählen">
-        <Field label="Alarmplan anwenden (optional – füllt Kanäle, Zielgruppen und Eskalation vor)">
-          <select className={inputClass} value={planId} onChange={(e) => applyPlan(e.target.value)}>
-            <option value="">Kein Plan – manuell konfigurieren</option>
-            {state.plans.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-        </Field>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <select className={inputClass} value={planId} onChange={(e) => applyPlan(e.target.value)}>
+          <option value="">Alarmplan anwenden (optional)…</option>
+          {state.plans.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {state.scenarios.map((s) => (
             <button
               key={s.id}
-              onClick={() => {
-                setScenarioId(s.id)
-                setSilent(s.silentDefault)
-                if (s.defaultChannels.length > 0) setChannels(s.defaultChannels)
-                if (s.responsibleGroupIds.length > 0) setGroupIds(s.responsibleGroupIds)
-              }}
-              className={`rounded-lg border p-3 text-left text-sm transition ${
-                s.id === scenarioId ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-400'
-              }`}
+              onClick={() => selectScenario(s)}
+              className="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition active:scale-[0.98] hover:border-brand-500"
             >
-              <ScenarioIcon name={s.icon} size={22} className={`mb-1 ${s.id === scenarioId ? 'text-brand-600' : 'text-slate-500'}`} />
-              <div className="font-medium text-slate-800 leading-tight">{s.title}</div>
-              <div className="text-xs text-slate-400 mt-0.5">{s.category}</div>
+              <div className="flex items-start justify-between">
+                <ScenarioIcon name={s.icon} size={26} className={s.priority === 'hoch' ? 'text-brand-600' : 'text-slate-500'} />
+                {s.silentDefault && <Badge color="violet">still</Badge>}
+              </div>
+              <div className="font-semibold text-slate-800 leading-tight mt-2">{s.title}</div>
+              <div className="text-xs text-slate-400 mt-1">{s.category}</div>
             </button>
           ))}
         </div>
-      </Card>
+      </div>
+    )
+  }
 
-      <Card title="2 · Zielgruppen (standort- und funktionsbezogen)">
-        <div className="grid md:grid-cols-2 gap-5">
-          <div>
-            <div className="text-sm font-medium text-slate-600 mb-2">Nutzergruppen</div>
-            {state.groups.map((g) => (
-              <label key={g.id} className="flex items-center gap-2 py-1 text-sm">
-                <input type="checkbox" checked={groupIds.includes(g.id)} onChange={() => toggle(groupIds, g.id, setGroupIds)} />
-                {g.name} {g.isCrisisTeam && <Badge color="violet">Krisenteam</Badge>}
-              </label>
-            ))}
+  // ---------- Schritt 2: Prüfen & auslösen ----------
+  return (
+    <div className="max-w-2xl mx-auto pb-40 lg:pb-6">
+      <button
+        className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-800 mb-3"
+        onClick={() => { setScenarioId(''); setPlanId('') }}
+      >
+        <ChevronLeft size={16} /> Anderes Szenario wählen
+      </button>
+
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+        <div className="flex items-start gap-3">
+          <div className="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+            <ScenarioIcon name={scenario.icon} size={26} />
           </div>
-          <div>
-            <div className="text-sm font-medium text-slate-600 mb-2">Standorte (leer = alle)</div>
-            {state.locations.map((l) => (
-              <label key={l.id} className="flex items-center gap-2 py-1 text-sm">
-                <input type="checkbox" checked={locationIds.includes(l.id)} onChange={() => toggle(locationIds, l.id, setLocationIds)} />
-                {l.name}
-                <span className="text-xs text-slate-400">({l.operatingHours.days} {l.operatingHours.open}–{l.operatingHours.close})</span>
-              </label>
-            ))}
-            <div className="text-xs text-slate-400 mt-2">
-              Abwesende Personen (Ferien) werden automatisch übersprungen.
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-slate-800 leading-tight">{scenario.title}</h1>
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              <Badge color={PRIORITY_COLOR[scenario.priority]}>Priorität {scenario.priority}</Badge>
+              {planId && <Badge color="blue">{state.plans.find((p) => p.id === planId)?.name}</Badge>}
             </div>
           </div>
         </div>
-      </Card>
 
-      <Card title="3 · Alarmierungskanäle">
-        <div className="grid md:grid-cols-2 gap-1">
-          {ALL_CHANNELS.map((c) => (
-            <label key={c} className="flex items-center gap-2 py-1 text-sm">
-              <input type="checkbox" checked={channels.includes(c)} onChange={() => toggle(channels, c, setChannels)} />
-              {CHANNEL_LABELS[c]}
-            </label>
-          ))}
+        <div className="mt-4 rounded-xl bg-slate-50 p-3.5 space-y-2 text-sm">
+          <div className="flex items-center gap-2 text-slate-800 font-semibold">
+            <Users size={15} />
+            {recipients.length} Empfänger werden alarmiert
+          </div>
+          <div className="text-slate-500">
+            {groupIds.map((g) => state.groups.find((x) => x.id === g)?.name).filter(Boolean).join(', ') || 'Alle Gruppen'}
+            {' · '}
+            {locationIds.length > 0
+              ? locationIds.map((l) => state.locations.find((x) => x.id === l)?.name).filter(Boolean).join(', ')
+              : 'alle Standorte'}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {channels.map((c) => <Badge key={c} color="blue">{CHANNEL_LABELS[c].split(' ')[0]}</Badge>)}
+            {silent && <Badge color="violet">stiller Alarm</Badge>}
+            {requireAck && <Badge color="green">mit Quittierung</Badge>}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-5 mt-4 pt-4 border-t border-slate-100">
-          <Toggle checked={silent} onChange={setSilent} label="Stiller Alarm (keine Signaltöne – z. B. Bedrohungslage)" />
-          <Toggle checked={requireAck} onChange={setRequireAck} label="Aufgebot mit Quittierfunktion" />
-        </div>
-      </Card>
 
-      <Card title="4 · Meldung">
-        <textarea
-          className={inputClass}
-          rows={3}
-          placeholder={`Standard: "${scenario?.title}: Bitte Handlungsanweisungen in der App befolgen."`}
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-        />
-        <div className="text-xs text-slate-400 mt-1">
-          Mehrsprachige Zustellung aktiv: Empfänger erhalten die Meldung gemäss ihrer App-Sprache (DE/EN/FR/IT).
-        </div>
-      </Card>
-
-      <div className="flex items-center gap-4">
-        <Button
-          variant="danger"
-          className="text-base px-6 py-3 alarm-pulse"
-          disabled={!scenarioId || channels.length === 0 || recipients.length === 0}
-          onClick={() => setConfirming(true)}
+        <button
+          className="mt-3 flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-900"
+          onClick={() => setAdjustOpen(!adjustOpen)}
         >
-          <Siren size={20} /> Alarm jetzt auslösen
-        </Button>
-        <span className="text-sm text-slate-500">
-          {recipients.length} Empfänger · {channels.length} Kanäle
-          {silent && ' · still'}
-        </span>
+          <Pencil size={14} /> Anpassen {adjustOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+
+        {adjustOpen && (
+          <div className="mt-3 space-y-5 border-t border-slate-100 pt-4">
+            <div>
+              <div className="text-sm font-semibold text-slate-700 mb-2">Zielgruppen</div>
+              <div className="grid sm:grid-cols-2 gap-1">
+                {state.groups.map((g) => (
+                  <label key={g.id} className="flex items-center gap-2 py-1 text-sm">
+                    <input type="checkbox" checked={groupIds.includes(g.id)} onChange={() => toggle(groupIds, g.id, setGroupIds)} />
+                    {g.name} {g.isCrisisTeam && <Badge color="violet">Krisenteam</Badge>}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-slate-700 mb-2">Standorte (keine Auswahl = alle)</div>
+              <div className="grid sm:grid-cols-2 gap-1">
+                {state.locations.map((l) => (
+                  <label key={l.id} className="flex items-center gap-2 py-1 text-sm">
+                    <input type="checkbox" checked={locationIds.includes(l.id)} onChange={() => toggle(locationIds, l.id, setLocationIds)} />
+                    {l.name}
+                  </label>
+                ))}
+              </div>
+              <div className="text-xs text-slate-400 mt-1">Abwesende Personen (Ferien) werden automatisch übersprungen.</div>
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-slate-700 mb-2">Alarmierungskanäle</div>
+              <div className="grid sm:grid-cols-2 gap-1">
+                {ALL_CHANNELS.map((c) => (
+                  <label key={c} className="flex items-center gap-2 py-1 text-sm">
+                    <input type="checkbox" checked={channels.includes(c)} onChange={() => toggle(channels, c, setChannels)} />
+                    {CHANNEL_LABELS[c]}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col gap-3">
+              <Toggle checked={silent} onChange={setSilent} label="Stiller Alarm (keine Signaltöne)" />
+              <Toggle checked={requireAck} onChange={setRequireAck} label="Aufgebot mit Quittierfunktion" />
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4">
+          <textarea
+            className={inputClass}
+            rows={2}
+            placeholder={`Meldung (Standard: "${scenario.title}: Bitte Handlungsanweisungen in der App befolgen.")`}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+          />
+        </div>
+
+        {scenario.instructions.length > 0 && (
+          <div className="mt-4 rounded-xl border border-slate-100 p-3.5">
+            <div className="text-sm font-semibold text-slate-700 mb-2">Sofortmassnahmen (werden mitgesendet)</div>
+            <ol className="space-y-1.5">
+              {scenario.instructions.slice(0, 3).map((step, i) => (
+                <li key={i} className="flex gap-2 text-sm text-slate-600">
+                  <span className="shrink-0 w-5 h-5 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-xs font-bold">{i + 1}</span>
+                  {step}
+                </li>
+              ))}
+            </ol>
+            {scenario.instructions.length > 3 && (
+              <div className="text-xs text-slate-400 mt-1.5">+ {scenario.instructions.length - 3} weitere Schritte in der App</div>
+            )}
+          </div>
+        )}
       </div>
 
-      {confirming && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <Siren className="text-brand-600" /> Alarm bestätigen
-            </h3>
-            <p className="text-sm text-slate-600 mt-2">
-              <strong>{scenario?.title}</strong> wird sofort an <strong>{recipients.length} Personen</strong> über{' '}
-              {channels.map((c) => CHANNEL_LABELS[c]).join(', ')} ausgelöst.
-            </p>
-            <div className="flex justify-end gap-2 mt-5">
-              <Button variant="secondary" onClick={() => setConfirming(false)}>Abbrechen</Button>
-              <Button variant="danger" onClick={fire}>Jetzt auslösen</Button>
+      {/* Auslöse-Leiste: mobil fix am unteren Rand, Desktop im Fluss */}
+      <div className="fixed lg:static inset-x-0 bottom-0 z-40 bg-white/95 backdrop-blur border-t lg:border-0 border-slate-200 p-4 lg:px-0 lg:mt-5">
+        <div className="max-w-2xl mx-auto">
+          <HoldButton
+            onTrigger={fire}
+            disabled={channels.length === 0 || recipients.length === 0}
+            hint="Zum Auslösen gedrückt halten"
+            className="w-full alarm-pulse"
+          >
+            <Siren size={22} /> Alarm auslösen
+          </HoldButton>
+          {(channels.length === 0 || recipients.length === 0) && (
+            <div className="text-center text-xs text-brand-600 mt-2">
+              {recipients.length === 0 ? 'Keine Empfänger in der aktuellen Auswahl.' : 'Mindestens einen Kanal wählen.'}
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   )
 }
