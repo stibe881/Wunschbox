@@ -1,9 +1,10 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import { BellRing, BookOpen, CheckCircle2, MapPin, Phone, Siren, Timer, User, WifiOff } from 'lucide-react-native'
 import { StoreProvider, useStore } from './src/store'
+import { ensurePermissions } from './src/notifications'
 import { SEED_LOCATIONS, SEED_USERS } from './src/seed'
 import type { Scenario } from './src/types'
 import { colors } from './src/ui'
@@ -22,6 +23,10 @@ const TABS: { key: Tab; label: string; icon: typeof Siren }[] = [
 function Root() {
   const { state, toasts, hydrated } = useStore()
   const [tab, setTab] = useState<Tab>('start')
+
+  useEffect(() => {
+    if (hydrated) ensurePermissions()
+  }, [hydrated])
   const [openScenario, setOpenScenario] = useState<Scenario | null>(null)
 
   const me = SEED_USERS.find((u) => u.id === state.currentUserId) ?? SEED_USERS[0]

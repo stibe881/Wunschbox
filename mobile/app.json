@@ -5,6 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "plugins": ["expo-notifications"],
     "userInterfaceStyle": "light",
     "backgroundColor": "#0f172a",
     "primaryColor": "#c81e1e",

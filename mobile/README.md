@@ -44,6 +44,31 @@ Die CLI zeigt danach einen Link/QR-Code. Wer mit demselben Expo-Konto (oder als 
 Teammitglied) in **Expo Go** eingeloggt ist, öffnet die publizierte App darüber – ganz ohne
 lokalen Server.
 
+## Push-Benachrichtigungen
+
+**Lokale Benachrichtigungen (funktionieren sofort in Expo Go):**
+
+- Beim ersten Start fragt die App nach der Mitteilungs-Berechtigung.
+- **Alleinarbeits-Timer:** 5 Minuten vor Ablauf kommt eine Warnung, bei Ablauf die Alarm-Meldung –
+  auch bei gesperrtem Bildschirm oder wenn die App im Hintergrund ist. «Lebenszeichen» und
+  «Arbeit sicher beendet» verschieben bzw. löschen die geplanten Meldungen.
+- **SOS/Alarme:** Beim Auslösen erscheint ein Benachrichtigungs-Banner (ausser bei stillen Alarmen).
+- Status und Berechtigung sind im **Profil-Tab** unter «Push-Benachrichtigungen» sichtbar.
+
+**Remote-Pushs (jemand anderes alarmiert → dein iPhone klingelt):**
+
+Expo Go unterstützt seit SDK 53 **keine** Remote-Pushs mehr – dafür braucht es einen eigenen Build:
+
+```bash
+eas login && eas init          # verknüpft das Projekt (projectId) – danach zeigt der Profil-Tab den Push-Token
+eas build --profile development --platform ios   # Development-Build (Apple-Developer-Konto nötig)
+```
+
+Nach der Installation des Builds zeigt der Profil-Tab den **Expo-Push-Token**; damit lässt sich unter
+[expo.dev/notifications](https://expo.dev/notifications) sofort ein Test-Push aufs Gerät schicken.
+Für den produktiven Versand ruft ein Backend die Expo-Push-API mit den Tokens der Empfänger auf.
+**Critical Alerts** (übersteuern die Stummschaltung) benötigen zusätzlich eine Sonderberechtigung von Apple.
+
 ## App-Store-Build (später)
 
 ```bash

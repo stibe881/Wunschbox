@@ -3,7 +3,8 @@ import { Vibration } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import type { Alarm, AlarmLogEntry, Channel, Delivery, EscalationLevel, LoneWorkSession, User } from './types'
 import { CHANNEL_LABELS } from './types'
-import { SEED_GROUPS, SEED_USERS } from './seed'
+import { SEED_GROUPS, SEED_SCENARIOS, SEED_USERS } from './seed'
+import { notifyNow } from './notifications'
 
 const STORAGE_KEY = 'sonnenberg-mobile-v1'
 
@@ -297,6 +298,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const dispatch = useCallback(
     (action: Action) => {
       rawDispatch(action)
+      if (action.type === 'TRIGGER_ALARM' && !action.alarm.silent) {
+        const scenario = SEED_SCENARIOS.find((s) => s.id === action.alarm.scenarioId)
+        notifyNow(scenario ? `Alarm: ${scenario.title}` : 'Alarm ausgelöst', action.alarm.message)
+      }
       const t = toastForAction(action)
       if (t) {
         if (typeof t === 'string') pushToast(t)

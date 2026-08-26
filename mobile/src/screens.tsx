@@ -6,6 +6,7 @@ import {
 } from 'lucide-react-native'
 import { createAlarm, uid, useStore } from './store'
 import { ScenarioIcon } from './ScenarioIcon'
+import { cancelScheduled, ensurePermissions, getPushToken, remotePushAvailability, scheduleAt } from './notifications'
 import { SEED_CONTACTS, SEED_LOCATIONS, SEED_SCENARIOS, SEED_USERS, SEED_GROUPS } from './seed'
 import type { LoneWorkSession, Scenario } from './types'
 import { Badge, Card, HoldButton, colors, formatDuration, formatRelative } from './ui'
@@ -244,6 +245,20 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
 
 // ---------- Alleinarbeit ----------
 
+// Geplante Timer-Benachrichtigungen pro Sitzung (überleben den App-Neustart als iOS-Planung;
+// die Zuordnung hier genügt für Verlängern/Beenden innerhalb der laufenden App)
+const loneWorkNotifIds = new Map<string, (string | null)[]>()
+
+async function scheduleLoneWorkNotifications(sessionId: string, activity: string, expiresAt: number) {
+  await cancelScheduled(loneWorkNotifIds.get(sessionId) ?? [])
+  const warnAt = expiresAt - 5 * 60_000
+  const ids = await Promise.all([
+    scheduleAt('Alleinarbeit: Timer läuft bald ab', `Noch 5 Minuten (${activity}) – Lebenszeichen geben, sonst wird alarmiert.`, warnAt),
+    scheduleAt('Alleinarbeit: Alarm ausgelöst', `Timer abgelaufen (${activity}) – Schulsanität und Hausdienst werden alarmiert.`, expiresAt),
+  ])
+  loneWorkNotifIds.set(sessionId, ids)
+}
+
 export function LoneWorkScreen() {
   const { state, dispatch } = useStore()
   const me = SEED_USERS.find((u) => u.id === state.currentUserId) ?? SEED_USERS[0]
@@ -273,6 +288,7 @@ export function LoneWorkScreen() {
       status: 'running',
     }
     dispatch({ type: 'START_LONE_WORK', session })
+    scheduleLoneWorkNotifications(session.id, session.activity, session.expiresAt)
     setActivity('')
   }
 
@@ -289,14 +305,21 @@ export function LoneWorkScreen() {
           </Text>
           <Pressable
             style={[styles.bigButton, { backgroundColor: colors.green }]}
-            onPress={() => dispatch({ type: 'EXTEND_LONE_WORK', sessionId: running.id, minutes: running.durationMin })}
+            onPress={() => {
+              dispatch({ type: 'EXTEND_LONE_WORK', sessionId: running.id, minutes: running.durationMin })
+              scheduleLoneWorkNotifications(running.id, running.activity, running.expiresAt + running.durationMin * 60_000)
+            }}
           >
             <Clock size={18} color="#fff" />
             <Text style={styles.bigButtonText}>Lebenszeichen (+{running.durationMin} Min.)</Text>
           </Pressable>
           <Pressable
             style={[styles.bigButton, { backgroundColor: colors.dark, marginTop: 8 }]}
-            onPress={() => dispatch({ type: 'COMPLETE_LONE_WORK', sessionId: running.id })}
+            onPress={() => {
+              dispatch({ type: 'COMPLETE_LONE_WORK', sessionId: running.id })
+              cancelScheduled(loneWorkNotifIds.get(running.id) ?? [])
+              loneWorkNotifIds.delete(running.id)
+            }}
           >
             <CheckCircle2 size={16} color="#fff" />
             <Text style={styles.bigButtonText}>Arbeit sicher beendet</Text>
@@ -387,6 +410,50 @@ export function ContactsScreen() {
 
 // ---------- Profil ----------
 
+function PushStatusCard() {
+  const [granted, setGranted] = useState<boolean | null>(null)
+  const [token, setToken] = useState<string | null>(null)
+  const remote = remotePushAvailability()
+
+  useEffect(() => {
+    ensurePermissions().then(setGranted)
+  }, [])
+
+  useEffect(() => {
+    if (granted && remote.ok) getPushToken().then(setToken)
+  }, [granted, remote.ok])
+
+  return (
+    <Card>
+      <View style={styles.row}>
+        <BellRing size={16} color={colors.muted} />
+        <Text style={[styles.cardTitle, { flex: 1 }]}>Push-Benachrichtigungen</Text>
+        <Badge
+          label={granted === null ? 'prüfe…' : granted ? 'aktiv' : 'nicht erlaubt'}
+          color={granted ? 'green' : 'amber'}
+        />
+      </View>
+      <Text style={[styles.faint, { marginTop: 6 }]}>
+        Lokale Benachrichtigungen (Alleinarbeits-Timer, SOS-Bestätigung) {granted ? 'sind aktiv – sie erscheinen auch bei gesperrtem Bildschirm.' : 'benötigen die Mitteilungs-Berechtigung (Einstellungen → Mitteilungen → Expo Go).'}
+      </Text>
+      {remote.ok ? (
+        token ? (
+          <>
+            <Text style={[styles.faint, { marginTop: 8 }]}>Expo-Push-Token (für Test unter expo.dev/notifications):</Text>
+            <Text selectable style={[styles.body, { fontSize: 12 }]}>{token}</Text>
+          </>
+        ) : (
+          <Text style={[styles.faint, { marginTop: 8 }]}>
+            Remote-Push bereit – Projekt mit «eas init» verknüpfen, dann erscheint hier der Push-Token.
+          </Text>
+        )
+      ) : (
+        <Text style={[styles.faint, { marginTop: 8 }]}>Remote-Push: {remote.reason}</Text>
+      )}
+    </Card>
+  )
+}
+
 export function ProfileScreen() {
   const { state, dispatch } = useStore()
   const me = SEED_USERS.find((u) => u.id === state.currentUserId) ?? SEED_USERS[0]
@@ -430,6 +497,8 @@ export function ProfileScreen() {
           </Pressable>
         ))}
       </Card>
+
+      <PushStatusCard />
 
       <Card>
         <View style={styles.row}>
