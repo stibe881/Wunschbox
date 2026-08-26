@@ -67,10 +67,14 @@ export interface TriggerOptions {
   triggeredByUserId: string
   triggeredVia: Alarm['triggeredVia']
   escalation?: EscalationLevel[]
+  /** Gezielte Empfänger (z. B. einzelnes Krisenteam-Mitglied) statt Gruppen-/Standortauflösung */
+  recipientUserIds?: string[]
 }
 
 export function createAlarm(opts: TriggerOptions): Alarm {
-  const recipients = resolveRecipients(opts.groupIds, opts.locationIds)
+  const recipients = opts.recipientUserIds
+    ? SEED_USERS.filter((u) => opts.recipientUserIds!.includes(u.id))
+    : resolveRecipients(opts.groupIds, opts.locationIds)
   const now = Date.now()
   return {
     id: uid('alarm'),

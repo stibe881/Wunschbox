@@ -190,55 +190,285 @@ export function ScenariosScreen({ onOpen }: { onOpen: (s: Scenario) => void }) {
 }
 
 export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario; onBack: () => void }) {
-  const [checked, setChecked] = useState<Record<number, boolean>>({})
+  const { state, dispatch } = useStore()
+  const [phase, setPhase] = useState<number | null>(null)
+  const [checkedSteps, setCheckedSteps] = useState<Record<number, boolean>>({})
+  const [checkedList, setCheckedList] = useState<Record<number, boolean>>({})
+  const [notifiedUserIds, setNotifiedUserIds] = useState<string[]>([])
+
+  const me = SEED_USERS.find((u) => u.id === state.currentUserId) ?? SEED_USERS[0]
+  const myLocation = SEED_LOCATIONS.find((l) => l.id === me.locationId)
   const contacts = SEED_CONTACTS.filter((c) => scenario.contactIds.includes(c.id))
+  const responsibleGroups = SEED_GROUPS.filter((g) => scenario.responsibleGroupIds.includes(g.id))
+  const crisisGroups = SEED_GROUPS.filter((g) => g.isCrisisTeam)
+  const crisisMembers = SEED_USERS.filter((u) => u.id !== me.id && u.groupIds.some((g) => crisisGroups.some((cg) => cg.id === g)))
+
+  const myScenarioAlarm = state.alarms.find(
+    (a) => a.status === 'active' && a.scenarioId === scenario.id && a.triggeredByUserId === me.id && !a.message.startsWith('Info an') && !a.message.startsWith('Krisenteam-Aufgebot'),
+  )
+  const myCrisisAlarm = state.alarms.find(
+    (a) => a.status === 'active' && a.triggeredByUserId === me.id && a.message.startsWith('Krisenteam-Aufgebot'),
+  )
+
+  const PHASES = [
+    { title: 'Alarmieren', hint: 'Notruf & interne Alarmierung' },
+    { title: 'Sofortmassnahmen', hint: `${scenario.instructions.length} Schritte` },
+    { title: 'Informieren', hint: 'Krisenteam aufbieten & benachrichtigen' },
+    { title: 'Weitere Massnahmen', hint: 'Nachbearbeitung & Checkliste' },
+  ]
+
+  function triggerGroupAlarm() {
+    const groupIds = responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.id) : ['gr-alle']
+    dispatch({
+      type: 'TRIGGER_ALARM',
+      alarm: createAlarm({
+        scenarioId: scenario.id,
+        message: `${scenario.title}: Alarm aus Handlungsanweisung von ${me.firstName} ${me.lastName} – Standort ${myLocation?.name ?? 'unbekannt'}.`,
+        silent: scenario.silentDefault,
+        requireAck: true,
+        channels: scenario.defaultChannels.length > 0 ? scenario.defaultChannels : ['push', 'sms'],
+        groupIds,
+        locationIds: [me.locationId],
+        triggeredByUserId: me.id,
+        triggeredVia: 'app',
+        escalation: [{ afterMinutes: 5, channels: ['voice'], groupIds: ['gr-krisenstab'], notifyEmergencyServices: false }],
+      }),
+    })
+  }
+
+  function triggerCrisisTeam() {
+    dispatch({
+      type: 'TRIGGER_ALARM',
+      alarm: createAlarm({
+        scenarioId: scenario.id,
+        message: `Krisenteam-Aufgebot (${scenario.title}) durch ${me.firstName} ${me.lastName} – bitte quittieren.`,
+        silent: false,
+        requireAck: true,
+        channels: ['push', 'sms', 'voice'],
+        groupIds: crisisGroups.map((g) => g.id),
+        locationIds: [],
+        triggeredByUserId: me.id,
+        triggeredVia: 'app',
+      }),
+    })
+  }
+
+  function notifyMember(userId: string) {
+    const user = SEED_USERS.find((u) => u.id === userId)
+    dispatch({
+      type: 'TRIGGER_ALARM',
+      alarm: createAlarm({
+        scenarioId: scenario.id,
+        message: `Info an ${user?.firstName} ${user?.lastName}: ${scenario.title} – bitte bei ${me.firstName} ${me.lastName} melden.`,
+        silent: true,
+        requireAck: true,
+        channels: ['push', 'sms'],
+        groupIds: [],
+        locationIds: [],
+        triggeredByUserId: me.id,
+        triggeredVia: 'app',
+        recipientUserIds: [userId],
+      }),
+    })
+    setNotifiedUserIds((ids) => [...ids, userId])
+  }
+
+  function AlarmStatus({ alarm }: { alarm: NonNullable<typeof myScenarioAlarm> }) {
+    const delivered = alarm.deliveries.filter((d) => d.status === 'delivered').length
+    const acked = [...new Set(alarm.deliveries.filter((d) => d.ack === 'acknowledged').map((d) => d.userId))].length
+    return (
+      <View style={{ borderWidth: 2, borderColor: colors.green, backgroundColor: colors.greenBg, borderRadius: 14, padding: 13 }}>
+        <View style={styles.row}>
+          <CheckCircle2 size={16} color={colors.green} />
+          <Text style={{ color: '#065f46', fontWeight: '700', fontSize: 14 }}>
+            Alarm ausgelöst <Text style={{ fontWeight: '400' }}>{formatRelative(alarm.triggeredAt)}</Text>
+          </Text>
+        </View>
+        <Text style={{ color: '#047857', fontSize: 13, marginTop: 4 }}>
+          {delivered}/{alarm.deliveries.length} zugestellt · {acked} quittiert – Live-Status auf dem Start-Tab.
+        </Text>
+      </View>
+    )
+  }
+
+  const header = (
+    <View style={[styles.row, { marginBottom: 12 }]}>
+      <View style={{ width: 46, height: 46, borderRadius: 12, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center' }}>
+        <ScenarioIcon name={scenario.icon} size={24} color={colors.brand} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.h1}>{scenario.title}</Text>
+        {phase !== null && <Text style={styles.faint}>Phase {phase + 1} von {PHASES.length} · {PHASES[phase].title}</Text>}
+      </View>
+    </View>
+  )
+
+  if (phase === null) {
+    return (
+      <ScrollView contentContainerStyle={styles.screen}>
+        <Pressable onPress={onBack} style={[styles.row, { marginBottom: 4 }]}>
+          <ChevronLeft size={18} color={colors.muted} />
+          <Text style={styles.muted}>Zurück</Text>
+        </Pressable>
+        {header}
+        {PHASES.map((p, i) => (
+          <Pressable
+            key={p.title}
+            style={[styles.row, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 15 }]}
+            onPress={() => setPhase(i)}
+          >
+            <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: colors.brandLight, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ color: '#fff', fontWeight: '800' }}>{i + 1}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.cardTitle}>{p.title}</Text>
+              <Text style={styles.faint}>{p.hint}</Text>
+            </View>
+            <ChevronLeft size={16} color={colors.faint} style={{ transform: [{ rotate: '180deg' }] }} />
+          </Pressable>
+        ))}
+        <Pressable style={[styles.bigButton, { backgroundColor: colors.dark }]} onPress={() => setPhase(0)}>
+          <Play size={16} color="#fff" />
+          <Text style={styles.bigButtonText}>Geführt starten</Text>
+        </Pressable>
+      </ScrollView>
+    )
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.screen}>
-      <Pressable onPress={onBack} style={[styles.row, { marginBottom: 4 }]}>
+      <Pressable onPress={() => setPhase(null)} style={[styles.row, { marginBottom: 4 }]}>
         <ChevronLeft size={18} color={colors.muted} />
-        <Text style={styles.muted}>Zurück</Text>
+        <Text style={styles.muted}>Übersicht</Text>
       </Pressable>
-      <Text style={styles.h1}>{scenario.title}</Text>
+      {header}
 
-      {contacts.map((c) => (
-        <Pressable key={c.id} style={styles.callButton} onPress={() => Linking.openURL(`tel:${c.number}`)}>
-          <Phone size={18} color="#fff" />
-          <Text style={styles.callButtonText}>{c.name} anrufen</Text>
-          <Text style={styles.callButtonNumber}>{c.number}</Text>
-        </Pressable>
-      ))}
-
-      <Text style={styles.sectionTitle}>Sofortmassnahmen</Text>
-      {scenario.instructions.map((step, i) => (
-        <View key={i} style={styles.stepRow}>
-          <View style={styles.stepNumber}>
-            <Text style={styles.stepNumberText}>{i + 1}</Text>
-          </View>
-          <Text style={[styles.body, { flex: 1, marginTop: 2 }]}>{step}</Text>
-        </View>
-      ))}
-
-      {scenario.followUp.length > 0 && (
+      {phase === 0 && (
         <>
-          <Text style={styles.sectionTitle}>Danach</Text>
-          {scenario.followUp.map((step, i) => (
-            <Text key={i} style={[styles.body, { marginBottom: 4 }]}>– {step}</Text>
+          {contacts.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>Bei unmittelbarer Gefahr zuerst den Notruf wählen:</Text>
+              {contacts.map((c) => (
+                <Pressable key={c.id} style={styles.callButton} onPress={() => Linking.openURL(`tel:${c.number}`)}>
+                  <Phone size={18} color="#fff" />
+                  <Text style={styles.callButtonText}>{c.name} anrufen</Text>
+                  <Text style={styles.callButtonNumber}>{c.number}</Text>
+                </Pressable>
+              ))}
+            </>
+          )}
+          <Text style={styles.sectionTitle}>Interne Alarmierung{scenario.silentDefault ? ' (still)' : ''}</Text>
+          <Text style={styles.faint}>
+            Alarmiert {responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(', ') : 'alle Mitarbeitenden'} an Ihrem Standort – mit Quittierung.
+          </Text>
+          {myScenarioAlarm ? (
+            <AlarmStatus alarm={myScenarioAlarm} />
+          ) : (
+            <HoldButton
+              label={`${responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(' & ') : 'Alle'} alarmieren`}
+              hint="Zum Alarmieren gedrückt halten"
+              onTrigger={triggerGroupAlarm}
+            />
+          )}
+        </>
+      )}
+
+      {phase === 1 && (
+        <>
+          <Text style={styles.faint}>Schritte antippen, wenn erledigt:</Text>
+          {scenario.instructions.map((step, i) => (
+            <Pressable key={i} style={styles.stepRow} onPress={() => setCheckedSteps({ ...checkedSteps, [i]: !checkedSteps[i] })}>
+              <View style={[styles.stepNumber, checkedSteps[i] && { backgroundColor: colors.green }]}>
+                {checkedSteps[i] ? <Check size={13} color="#fff" /> : <Text style={styles.stepNumberText}>{i + 1}</Text>}
+              </View>
+              <Text style={[styles.body, { flex: 1, marginTop: 2 }, checkedSteps[i] && { color: colors.faint, textDecorationLine: 'line-through' }]}>
+                {step}
+              </Text>
+            </Pressable>
           ))}
         </>
       )}
 
-      <Text style={styles.sectionTitle}>Checkliste</Text>
-      {scenario.checklist.map((item, i) => (
-        <Pressable key={i} style={styles.checkRow} onPress={() => setChecked({ ...checked, [i]: !checked[i] })}>
-          <View style={[styles.checkbox, checked[i] && { backgroundColor: colors.green, borderColor: colors.green }]}>
-            {checked[i] && <Check size={13} color="#fff" />}
-          </View>
-          <Text style={[styles.body, { flex: 1 }, checked[i] && { textDecorationLine: 'line-through', color: colors.faint }]}>
-            {item}
+      {phase === 2 && (
+        <>
+          {myCrisisAlarm ? (
+            <AlarmStatus alarm={myCrisisAlarm} />
+          ) : (
+            <HoldButton label="Krisenteam aufbieten" hint="Zum Aufbieten gedrückt halten" onTrigger={triggerCrisisTeam} />
+          )}
+          <Text style={styles.faint}>
+            Aufgebot per Push, SMS und Sprachanruf mit Quittierung – oder einzelne Mitglieder direkt kontaktieren:
           </Text>
+          {crisisMembers.map((u) => {
+            const memberGroups = SEED_GROUPS.filter((g) => g.isCrisisTeam && u.groupIds.includes(g.id))
+            const notified = notifiedUserIds.includes(u.id)
+            return (
+              <View key={u.id} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 12 }}>
+                <Text style={styles.cardTitle}>{u.firstName} {u.lastName}</Text>
+                <Text style={styles.faint}>{memberGroups.map((g) => g.name).join(', ')}</Text>
+                <View style={[styles.row, { marginTop: 8, gap: 8 }]}>
+                  <Pressable
+                    style={{ flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingVertical: 9 }}
+                    onPress={() => Linking.openURL(`tel:${u.phone.replace(/\s/g, '')}`)}
+                  >
+                    <Phone size={13} color={colors.text} />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text }}>Anrufen</Text>
+                  </Pressable>
+                  <Pressable
+                    style={{ flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 10, paddingVertical: 9, backgroundColor: notified ? colors.greenBg : colors.dark }}
+                    disabled={notified}
+                    onPress={() => notifyMember(u.id)}
+                  >
+                    {notified ? <Check size={13} color={colors.green} /> : <BellRing size={13} color="#fff" />}
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: notified ? colors.green : '#fff' }}>
+                      {notified ? 'Gesendet' : 'SMS & Push'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            )
+          })}
+        </>
+      )}
+
+      {phase === 3 && (
+        <>
+          {scenario.followUp.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>Nach der Akutphase</Text>
+              {scenario.followUp.map((step, i) => (
+                <Text key={i} style={[styles.body, { marginBottom: 4 }]}>– {step}</Text>
+              ))}
+            </>
+          )}
+          <Text style={styles.sectionTitle}>Checkliste</Text>
+          {scenario.checklist.map((item, i) => (
+            <Pressable key={i} style={styles.checkRow} onPress={() => setCheckedList({ ...checkedList, [i]: !checkedList[i] })}>
+              <View style={[styles.checkbox, checkedList[i] && { backgroundColor: colors.green, borderColor: colors.green }]}>
+                {checkedList[i] && <Check size={13} color="#fff" />}
+              </View>
+              <Text style={[styles.body, { flex: 1 }, checkedList[i] && { textDecorationLine: 'line-through', color: colors.faint }]}>
+                {item}
+              </Text>
+            </Pressable>
+          ))}
+        </>
+      )}
+
+      <View style={[styles.row, { gap: 8, marginTop: 8 }]}>
+        <Pressable
+          style={{ flex: 1, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, paddingVertical: 11, alignItems: 'center' }}
+          onPress={() => setPhase(phase === 0 ? null : phase - 1)}
+        >
+          <Text style={{ fontWeight: '700', color: colors.text, fontSize: 14 }}>Zurück</Text>
         </Pressable>
-      ))}
+        <Pressable
+          style={{ flex: 1, backgroundColor: colors.dark, borderRadius: 12, paddingVertical: 11, alignItems: 'center' }}
+          onPress={() => (phase === PHASES.length - 1 ? setPhase(null) : setPhase(phase + 1))}
+        >
+          <Text style={{ fontWeight: '700', color: '#fff', fontSize: 14 }}>{phase === PHASES.length - 1 ? 'Abschliessen' : 'Weiter'}</Text>
+        </Pressable>
+      </View>
     </ScrollView>
   )
 }

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowRight, BellRing, BookOpen, Check, CheckCircle2, ChevronLeft, Clock, LayoutDashboard,
-  MapPin, Phone, Play, Search, ShieldAlert, Siren, Timer, User, Volume2, WifiOff, X,
+  ArrowRight, BellRing, BookOpen, Check, CheckCircle2, ChevronLeft, ClipboardCheck, Clock, LayoutDashboard,
+  ListChecks, MapPin, Megaphone, Phone, PhoneCall, Play, Search, ShieldAlert, Siren, Timer, User, Users, Volume2, WifiOff, X,
 } from 'lucide-react'
 import { createAlarm, uid, useStore } from '../store'
-import type { LoneWorkSession, Scenario } from '../types'
+import type { Channel, LoneWorkSession, Scenario } from '../types'
+import { CHANNEL_LABELS } from '../types'
 import { Badge, HoldButton, Toggle, formatDuration, formatRelative, inputClass, useConfirm } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 
@@ -298,72 +299,283 @@ function ScenarioListTab({ onOpen }: { onOpen: (s: Scenario) => void }) {
 }
 
 function ScenarioView({ scenario, onBack }: { scenario: Scenario; onBack: () => void }) {
-  const { state } = useStore()
-  const [checked, setChecked] = useState<Record<number, boolean>>({})
-  const contacts = state.contacts.filter((c) => scenario.contactIds.includes(c.id))
+  const { state, dispatch } = useStore()
+  const [phase, setPhase] = useState<number | null>(null)
+  const [checkedSteps, setCheckedSteps] = useState<Record<number, boolean>>({})
+  const [checkedList, setCheckedList] = useState<Record<number, boolean>>({})
+  const [notifiedUserIds, setNotifiedUserIds] = useState<string[]>([])
 
+  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+  const myLocation = state.locations.find((l) => l.id === me.locationId)
+  const contacts = state.contacts.filter((c) => scenario.contactIds.includes(c.id))
+  const responsibleGroups = state.groups.filter((g) => scenario.responsibleGroupIds.includes(g.id))
+  const crisisGroups = state.groups.filter((g) => g.isCrisisTeam)
+  const crisisMembers = state.users.filter((u) => u.id !== me.id && u.groupIds.some((g) => crisisGroups.some((cg) => cg.id === g)))
+
+  const myScenarioAlarm = state.alarms.find(
+    (a) => a.status === 'active' && a.scenarioId === scenario.id && a.triggeredByUserId === me.id && !a.message.startsWith('Info an'),
+  )
+  const myCrisisAlarm = state.alarms.find(
+    (a) => a.status === 'active' && a.triggeredByUserId === me.id && a.message.startsWith('Krisenteam-Aufgebot'),
+  )
+
+  const PHASES = [
+    { title: 'Alarmieren', icon: PhoneCall, hint: 'Notruf & interne Alarmierung' },
+    { title: 'Sofortmassnahmen', icon: ListChecks, hint: `${scenario.instructions.length} Schritte` },
+    { title: 'Informieren', icon: Megaphone, hint: 'Krisenteam aufbieten & benachrichtigen' },
+    { title: 'Weitere Massnahmen', icon: ClipboardCheck, hint: 'Nachbearbeitung & Checkliste' },
+  ]
+
+  function triggerGroupAlarm() {
+    const groupIds = responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.id) : ['gr-alle']
+    const alarm = createAlarm(state, {
+      scenarioId: scenario.id,
+      message: `${scenario.title}: Alarm aus Handlungsanweisung von ${me.firstName} ${me.lastName} – Standort ${myLocation?.name ?? 'unbekannt'}.`,
+      silent: scenario.silentDefault,
+      requireAck: true,
+      channels: scenario.defaultChannels.length > 0 ? scenario.defaultChannels : ['push', 'sms'],
+      groupIds,
+      locationIds: [me.locationId],
+      triggeredByUserId: me.id,
+      triggeredVia: 'app',
+      escalation: [{ afterMinutes: 5, channels: ['voice'], groupIds: ['gr-krisenstab'], notifyEmergencyServices: false }],
+    })
+    dispatch({ type: 'TRIGGER_ALARM', alarm, audit: `Alarm aus Szenario «${scenario.title}» (App): ${me.firstName} ${me.lastName}` })
+  }
+
+  function triggerCrisisTeam() {
+    const alarm = createAlarm(state, {
+      scenarioId: scenario.id,
+      message: `Krisenteam-Aufgebot (${scenario.title}) durch ${me.firstName} ${me.lastName} – bitte quittieren.`,
+      silent: false,
+      requireAck: true,
+      channels: ['push', 'sms', 'voice'],
+      groupIds: crisisGroups.map((g) => g.id),
+      locationIds: [],
+      triggeredByUserId: me.id,
+      triggeredVia: 'app',
+    })
+    dispatch({ type: 'TRIGGER_ALARM', alarm, audit: `Krisenteam-Aufgebot aus Szenario «${scenario.title}»: ${me.firstName} ${me.lastName}` })
+  }
+
+  function notifyMember(userId: string) {
+    const user = state.users.find((u) => u.id === userId)
+    const alarm = createAlarm(state, {
+      scenarioId: scenario.id,
+      message: `Info an ${user?.firstName} ${user?.lastName}: ${scenario.title} – bitte bei ${me.firstName} ${me.lastName} melden.`,
+      silent: false,
+      requireAck: true,
+      channels: ['push', 'sms'],
+      groupIds: [],
+      locationIds: [],
+      triggeredByUserId: me.id,
+      triggeredVia: 'app',
+      recipientUserIds: [userId],
+    })
+    dispatch({ type: 'TRIGGER_ALARM', alarm, audit: `SMS & Push an ${user?.firstName} ${user?.lastName} (${scenario.title})` })
+    setNotifiedUserIds((ids) => [...ids, userId])
+  }
+
+  function alarmStatus(alarm: NonNullable<typeof myScenarioAlarm>) {
+    const delivered = alarm.deliveries.filter((d) => d.status === 'delivered').length
+    const acked = [...new Set(alarm.deliveries.filter((d) => d.ack === 'acknowledged').map((d) => d.userId))].length
+    return (
+      <div className="rounded-xl border-2 border-emerald-500 bg-emerald-50 p-3.5 text-sm">
+        <div className="flex items-center gap-2 font-semibold text-emerald-800">
+          <CheckCircle2 size={16} /> Alarm ausgelöst <span className="font-normal text-emerald-700">{formatRelative(alarm.triggeredAt)}</span>
+        </div>
+        <div className="text-emerald-700 mt-1">
+          {delivered}/{alarm.deliveries.length} zugestellt · {acked} quittiert – Live-Status auf dem Start-Tab.
+        </div>
+      </div>
+    )
+  }
+
+  const header = (
+    <div className="flex items-center gap-3 mb-4">
+      <div className="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+        <ScenarioIcon name={scenario.icon} size={26} />
+      </div>
+      <div className="min-w-0">
+        <h2 className="font-bold text-slate-800 text-xl leading-tight">{scenario.title}</h2>
+        {phase !== null && <div className="text-xs text-slate-400">Phase {phase + 1} von {PHASES.length} · {PHASES[phase].title}</div>}
+      </div>
+    </div>
+  )
+
+  // ---------- Phasen-Übersicht ----------
+  if (phase === null) {
+    return (
+      <div>
+        <button className="flex items-center gap-1 text-sm text-slate-500 mb-3" onClick={onBack}>
+          <ChevronLeft size={16} /> Zurück
+        </button>
+        {header}
+        <div className="space-y-2.5">
+          {PHASES.map((p, i) => (
+            <button
+              key={p.title}
+              className="w-full flex items-center gap-3 rounded-2xl bg-white border border-slate-200 p-4 text-left active:scale-[0.99] transition"
+              onClick={() => setPhase(i)}
+            >
+              <span className="w-9 h-9 rounded-full bg-brand-600 text-white flex items-center justify-center font-bold shrink-0">{i + 1}</span>
+              <span className="flex-1 min-w-0">
+                <span className="block font-semibold text-slate-800">{p.title}</span>
+                <span className="block text-xs text-slate-400">{p.hint}</span>
+              </span>
+              <p.icon size={18} className="text-slate-400 shrink-0" />
+            </button>
+          ))}
+        </div>
+        <button
+          className="mt-4 w-full rounded-2xl bg-slate-800 text-white py-3 font-semibold"
+          onClick={() => setPhase(0)}
+        >
+          Geführt starten
+        </button>
+      </div>
+    )
+  }
+
+  // ---------- Einzelne Phase ----------
   return (
     <div>
-      <button className="flex items-center gap-1 text-sm text-slate-500 mb-3" onClick={onBack}>
-        <ChevronLeft size={16} /> Zurück
+      <button className="flex items-center gap-1 text-sm text-slate-500 mb-3" onClick={() => setPhase(null)}>
+        <ChevronLeft size={16} /> Übersicht
       </button>
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
-          <ScenarioIcon name={scenario.icon} size={26} />
-        </div>
-        <h2 className="font-bold text-slate-800 text-xl leading-tight">{scenario.title}</h2>
-      </div>
+      {header}
 
-      {contacts.length > 0 && (
-        <div className="space-y-2 mb-4">
-          {contacts.map((c) => (
-            <a
-              key={c.id}
-              href={`tel:${c.number}`}
-              className="flex items-center gap-3 rounded-xl bg-brand-600 text-white px-4 py-3 active:scale-[0.99] transition"
+      {phase === 0 && (
+        <div className="space-y-3">
+          {contacts.length > 0 && (
+            <>
+              <div className="text-sm font-semibold text-slate-700">Bei unmittelbarer Gefahr zuerst den Notruf wählen:</div>
+              {contacts.map((c) => (
+                <a key={c.id} href={`tel:${c.number}`} className="flex items-center gap-3 rounded-xl bg-brand-600 text-white px-4 py-3 active:scale-[0.99] transition">
+                  <Phone size={18} />
+                  <span className="flex-1 font-semibold text-sm">{c.name} anrufen</span>
+                  <span className="font-bold text-lg">{c.number}</span>
+                </a>
+              ))}
+            </>
+          )}
+          <div className="text-sm font-semibold text-slate-700 pt-2">
+            Interne Alarmierung {scenario.silentDefault && <Badge color="violet">still</Badge>}
+          </div>
+          <div className="text-xs text-slate-500">
+            Alarmiert {responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(', ') : 'alle Mitarbeitenden'} an Ihrem Standort
+            per {(scenario.defaultChannels.length > 0 ? scenario.defaultChannels : (['push', 'sms'] as Channel[])).map((c) => CHANNEL_LABELS[c].split(' ')[0]).join(', ')} – mit Quittierung.
+          </div>
+          {myScenarioAlarm ? (
+            alarmStatus(myScenarioAlarm)
+          ) : (
+            <HoldButton onTrigger={triggerGroupAlarm} hint="Zum Alarmieren gedrückt halten" className="w-full">
+              <Siren size={20} /> {responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(' & ') : 'Alle'} alarmieren
+            </HoldButton>
+          )}
+        </div>
+      )}
+
+      {phase === 1 && (
+        <div className="space-y-2">
+          <div className="text-xs text-slate-400 mb-1">Schritte antippen, wenn erledigt:</div>
+          {scenario.instructions.map((step, i) => (
+            <button
+              key={i}
+              className="w-full flex gap-2.5 text-sm bg-white rounded-xl border border-slate-200 p-3 text-left"
+              onClick={() => setCheckedSteps({ ...checkedSteps, [i]: !checkedSteps[i] })}
             >
-              <Phone size={18} />
-              <span className="flex-1 font-semibold text-sm">{c.name} anrufen</span>
-              <span className="font-bold text-lg">{c.number}</span>
-            </a>
+              <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${checkedSteps[i] ? 'bg-emerald-500 text-white' : 'bg-brand-600 text-white'}`}>
+                {checkedSteps[i] ? <Check size={14} /> : i + 1}
+              </span>
+              <span className={`pt-0.5 ${checkedSteps[i] ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{step}</span>
+            </button>
           ))}
         </div>
       )}
 
-      <h3 className="font-semibold text-slate-700 text-sm mb-2">Sofortmassnahmen</h3>
-      <ol className="space-y-2.5 mb-5">
-        {scenario.instructions.map((step, i) => (
-          <li key={i} className="flex gap-2.5 text-sm bg-white rounded-xl border border-slate-200 p-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center text-xs font-bold">{i + 1}</span>
-            <span className="text-slate-700 pt-0.5">{step}</span>
-          </li>
-        ))}
-      </ol>
-
-      {scenario.followUp.length > 0 && (
-        <>
-          <h3 className="font-semibold text-slate-700 text-sm mb-2">Danach</h3>
-          <ul className="space-y-1.5 mb-5">
-            {scenario.followUp.map((step, i) => (
-              <li key={i} className="flex gap-2 text-sm text-slate-600">
-                <span className="text-slate-400 shrink-0">–</span> {step}
-              </li>
-            ))}
-          </ul>
-        </>
+      {phase === 2 && (
+        <div className="space-y-3">
+          {myCrisisAlarm ? (
+            alarmStatus(myCrisisAlarm)
+          ) : (
+            <HoldButton onTrigger={triggerCrisisTeam} hint="Zum Aufbieten gedrückt halten" className="w-full">
+              <Users size={20} /> Krisenteam aufbieten
+            </HoldButton>
+          )}
+          <div className="text-xs text-slate-500">
+            Aufgebot per Push, SMS und Sprachanruf mit Quittierung – oder einzelne Mitglieder direkt kontaktieren:
+          </div>
+          <div className="space-y-2">
+            {crisisMembers.map((u) => {
+              const groups = state.groups.filter((g) => g.isCrisisTeam && u.groupIds.includes(g.id))
+              const notified = notifiedUserIds.includes(u.id)
+              return (
+                <div key={u.id} className="rounded-xl bg-white border border-slate-200 p-3">
+                  <div className="text-sm font-semibold text-slate-800">{u.firstName} {u.lastName}</div>
+                  <div className="text-xs text-slate-400">{groups.map((g) => g.name).join(', ')}</div>
+                  <div className="flex gap-2 mt-2">
+                    <a
+                      href={`tel:${u.phone.replace(/\s/g, '')}`}
+                      className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 py-2 text-xs font-semibold text-slate-700"
+                    >
+                      <Phone size={13} /> Anrufen
+                    </a>
+                    <button
+                      className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold ${notified ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-800 text-white'}`}
+                      disabled={notified}
+                      onClick={() => notifyMember(u.id)}
+                    >
+                      {notified ? <><Check size={13} /> Gesendet</> : <><BellRing size={13} /> SMS & Push</>}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       )}
 
-      <h3 className="font-semibold text-slate-700 text-sm mb-2">Checkliste</h3>
-      <ul className="space-y-1.5">
-        {scenario.checklist.map((item, i) => (
-          <li key={i}>
-            <label className="flex items-center gap-2.5 text-sm text-slate-700 bg-white rounded-xl border border-slate-200 p-3">
-              <input type="checkbox" checked={checked[i] ?? false} onChange={() => setChecked({ ...checked, [i]: !checked[i] })} />
-              <span className={checked[i] ? 'line-through text-slate-400' : ''}>{item}</span>
-            </label>
-          </li>
-        ))}
-      </ul>
+      {phase === 3 && (
+        <div className="space-y-4">
+          {scenario.followUp.length > 0 && (
+            <div>
+              <div className="text-sm font-semibold text-slate-700 mb-2">Nach der Akutphase</div>
+              <ul className="space-y-1.5">
+                {scenario.followUp.map((step, i) => (
+                  <li key={i} className="flex gap-2 text-sm text-slate-700 bg-white rounded-xl border border-slate-200 p-3">
+                    <span className="text-slate-400 shrink-0">–</span> {step}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div>
+            <div className="text-sm font-semibold text-slate-700 mb-2">Checkliste</div>
+            {scenario.checklist.map((item, i) => (
+              <label key={i} className="flex items-center gap-2.5 text-sm text-slate-700 bg-white rounded-xl border border-slate-200 p-3 mb-1.5">
+                <input type="checkbox" checked={checkedList[i] ?? false} onChange={() => setCheckedList({ ...checkedList, [i]: !checkedList[i] })} />
+                <span className={checkedList[i] ? 'line-through text-slate-400' : ''}>{item}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-2 mt-5">
+        <button
+          className="flex-1 rounded-xl border border-slate-300 py-2.5 text-sm font-semibold text-slate-700"
+          onClick={() => setPhase(phase === 0 ? null : phase - 1)}
+        >
+          Zurück
+        </button>
+        <button
+          className="flex-1 rounded-xl bg-slate-800 text-white py-2.5 text-sm font-semibold"
+          onClick={() => (phase === PHASES.length - 1 ? setPhase(null) : setPhase(phase + 1))}
+        >
+          {phase === PHASES.length - 1 ? 'Abschliessen' : 'Weiter'}
+        </button>
+      </div>
     </div>
   )
 }
