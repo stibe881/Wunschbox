@@ -1,7 +1,7 @@
 {
-  "name": "Sonnenberg Notfall",
+  "name": "SONNENBERG Notfall",
   "short_name": "Notfall",
-  "description": "Notfall- und Krisenmanagement des Sonnenberg Kompetenzzentrums",
+  "description": "Notfall- und Krisenmanagement des SONNENBERG Kompetenzzentrums",
   "lang": "de",
   "start_url": ".",
   "display": "standalone",

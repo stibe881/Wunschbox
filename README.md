@@ -1,6 +1,6 @@
-# Sonnenberg Notfall- & Krisenmanagement
+# SONNENBERG Notfall- & Krisenmanagement
 
-Webapp für das Notfall- und Krisenmanagement des Sonnenberg Kompetenzzentrums (heilpädagogische Schule)
+Webapp für das Notfall- und Krisenmanagement des SONNENBERG Kompetenzzentrums (heilpädagogische Schule)
 mit den Standorten **Baar (Hauptsitz), Menzingen und Kloten** – inspiriert vom Funktionsumfang von e-mergency®:
 Alarmserver, Multikanal-Alarmierung, Notfallszenarien mit Handlungsanweisungen und Alleinarbeiterschutz.
 

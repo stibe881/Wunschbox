@@ -506,7 +506,7 @@ export function ProfileScreen() {
           <Text style={[styles.cardTitle, { flex: 1 }]}>Über diese App</Text>
         </View>
         <Text style={[styles.faint, { marginTop: 6 }]}>
-          Sonnenberg Notfall – Demo der Mitarbeiter-App (Expo). Der Alarmserver wird lokal simuliert:
+          SONNENBERG Notfall – Demo der Mitarbeiter-App (Expo). Der Alarmserver wird lokal simuliert:
           Zustellungen, Rückmeldungen der Einsatzkräfte und Eskalationen laufen auf dem Gerät.
           Es werden keine echten Benachrichtigungen versendet.
         </Text>

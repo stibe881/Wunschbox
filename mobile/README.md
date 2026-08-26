@@ -1,4 +1,4 @@
-# Sonnenberg Notfall – Mobile App (Expo)
+# SONNENBERG Notfall – Mobile App (Expo)
 
 Native React-Native-Version der Mitarbeiter-App (Expo SDK 54): SOS mit Halte-Geste und Live-Status,
 22 Notfallszenarien mit Sofortmassnahmen/Checklisten, Alleinarbeits-Timer mit automatischer

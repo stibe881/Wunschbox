@@ -48,7 +48,7 @@ export default function Scenarios() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Szenarien &amp; Checklisten</h1>
           <p className="text-sm text-slate-500">
-            {state.scenarios.length} Notfallszenarien für das Sonnenberg Kompetenzzentrum · Content-Management ohne technische
+            {state.scenarios.length} Notfallszenarien für das SONNENBERG Kompetenzzentrum · Content-Management ohne technische
             Vorkenntnisse · Änderungen werden sofort an alle Apps verteilt
           </p>
         </div>

@@ -1,6 +1,6 @@
 import type { AppState, Scenario, User, Group, Location, AlarmPlan, AlarmButton, EmergencyContact, IntegrationSettings } from '../types'
 
-// Vorkonfigurierte Notfallszenarien für das heilpädagogische Kompetenzzentrum Sonnenberg
+// Vorkonfigurierte Notfallszenarien für das heilpädagogische Kompetenzzentrum SONNENBERG
 export const SEED_SCENARIOS: Scenario[] = [
   {
     id: 'sc-brand', icon: 'flame', title: 'Brand / Feuer', category: 'Gebäude & Technik', priority: 'hoch', silentDefault: false,
@@ -385,7 +385,7 @@ export const SEED_SCENARIOS: Scenario[] = [
 
 export const SEED_LOCATIONS: Location[] = [
   {
-    id: 'loc-baar', name: 'Hauptsitz Baar', address: 'Sonnenberg Kompetenzzentrum, 6340 Baar',
+    id: 'loc-baar', name: 'Hauptsitz Baar', address: 'SONNENBERG Kompetenzzentrum, 6340 Baar',
     geofence: { lat: 47.1954, lng: 8.5289, radiusM: 400 },
     operatingHours: { days: 'Mo–So (inkl. Wohngruppen)', open: '00:00', close: '24:00' },
   },
@@ -554,7 +554,7 @@ export function createInitialState(): AppState {
     integrations: SEED_INTEGRATIONS,
     contacts: SEED_CONTACTS,
     audit: [
-      { id: 'a-1', ts: Date.now() - 3600_000, type: 'system', message: 'System initialisiert – Alarmserver für Sonnenberg Kompetenzzentrum betriebsbereit (Cloud-Hosting Schweiz).' },
+      { id: 'a-1', ts: Date.now() - 3600_000, type: 'system', message: 'System initialisiert – Alarmserver für SONNENBERG Kompetenzzentrum betriebsbereit (Cloud-Hosting Schweiz).' },
     ],
   }
 }

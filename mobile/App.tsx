@@ -43,7 +43,7 @@ function Root() {
       <View style={styles.header}>
         <Siren size={20} color={colors.brandLight} />
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Sonnenberg Notfall</Text>
+          <Text style={styles.headerTitle}>SONNENBERG Notfall</Text>
           <View style={styles.headerSubRow}>
             <Text style={styles.headerSub}>{me.firstName} {me.lastName} · </Text>
             <MapPin size={10} color="#94a3b8" />
