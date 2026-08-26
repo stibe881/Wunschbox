@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useReducer, u
 import { CheckCircle2, Siren } from 'lucide-react'
 import type { AppMode, AppState, Alarm, AlarmButton, AlarmPlan, Channel, Delivery, EscalationLevel, Group, Location, LoneWorkSession, Scenario, User, Webhook, AuditEntry } from './types'
 import { CHANNEL_LABELS } from './types'
-import { createInitialState, createLiveInitialState } from './data/seed'
+import { SCENARIO_CONTENT_VERSION, SEED_SCENARIOS, createInitialState, createLiveInitialState } from './data/seed'
 import { LEGACY_EMOJI_TO_ICON } from './components/ScenarioIcon'
 
 // Demo und Live haben getrennte Speicherstände; der Modus selbst wird separat gemerkt
@@ -507,6 +507,13 @@ function loadStateFor(mode: AppMode): AppState {
       const parsed = JSON.parse(raw) as AppState
       if (parsed.users && parsed.scenarios) {
         parsed.mode = mode
+        // Einmalige Inhalts-Aktualisierung: Standard-Szenarien auf neue Version heben,
+        // selbst erstellte Szenarien (custom) bleiben unverändert erhalten
+        if ((parsed.scenarioContentVersion ?? 1) < SCENARIO_CONTENT_VERSION) {
+          const customScenarios = parsed.scenarios.filter((sc) => sc.custom)
+          parsed.scenarios = [...SEED_SCENARIOS, ...customScenarios]
+          parsed.scenarioContentVersion = SCENARIO_CONTENT_VERSION
+        }
         // Migration: Emoji-Icons auf Icon-Schlüssel umstellen, fehlende Szenario-Felder auffüllen
         parsed.scenarios = parsed.scenarios.map((s) => ({
           ...s,

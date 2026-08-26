@@ -198,6 +198,8 @@ export interface AuditEntry {
 
 export interface AppState {
   mode: AppMode
+  /** Version der Standard-Szenarien-Inhalte – für einmalige Content-Updates beim Laden */
+  scenarioContentVersion?: number
   currentUserId: string
   users: User[]
   groups: Group[]
