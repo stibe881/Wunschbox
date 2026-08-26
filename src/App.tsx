@@ -41,6 +41,18 @@ const NAV = [
   { to: '/protokoll', label: 'Ereignisprotokoll', icon: FileClock },
 ] as const
 
+function ModeBadge({ mode }: { mode: 'demo' | 'live' }) {
+  return (
+    <span
+      className={`text-[10px] font-bold uppercase tracking-wider rounded px-1.5 py-0.5 ${
+        mode === 'live' ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-slate-900'
+      }`}
+    >
+      {mode === 'live' ? 'Live' : 'Demo'}
+    </span>
+  )
+}
+
 /** Mitarbeitende haben keinen Webportal-Zugriff – Verweis auf die iOS-App */
 function NoWebAccess() {
   const { state, dispatch } = useStore()
@@ -66,7 +78,7 @@ function NoWebAccess() {
           </p>
         </div>
         <div className="mt-6 text-left">
-          <label className="block text-xs text-slate-500 mb-1.5">Demo: Benutzer wechseln</label>
+          <label className="block text-xs text-slate-500 mb-1.5">{state.mode === 'demo' ? 'Demo: ' : ''}Benutzer wechseln</label>
           <select
             className="w-full bg-slate-800 text-slate-200 rounded-lg px-3 py-2 text-sm"
             value={currentUser.id}
@@ -95,6 +107,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         <div className="flex items-center gap-2 text-white font-bold text-lg">
           <AlertTriangle className="text-brand-500" size={22} />
           Sonnenberg Notfall
+          <ModeBadge mode={state.mode} />
         </div>
         <div className="text-xs text-slate-500 mt-0.5">Kompetenzzentrum Baar · Menzingen · Kloten</div>
       </div>
@@ -136,6 +149,32 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             </NavLink>
           ),
         )}
+
+        <div className="px-5 pt-5 pb-2">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Modus</div>
+          <div className="flex rounded-lg bg-slate-800 p-1">
+            {(['demo', 'live'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => dispatch({ type: 'SET_MODE', mode: m })}
+                className={`flex-1 rounded-md py-1.5 text-xs font-bold uppercase tracking-wide transition ${
+                  state.mode === m
+                    ? m === 'live'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-amber-500 text-slate-900'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {m === 'demo' ? 'Demo' : 'Live'}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-500 mt-2 leading-snug">
+            {state.mode === 'demo'
+              ? 'Beispieldaten, Zustellung wird simuliert. Beide Modi behalten ihre Daten.'
+              : 'Echter Datenbestand ohne Demo-Daten. Versand erfordert ein Gateway (Integrationen); ausgehende Webhooks werden real aufgerufen.'}
+          </p>
+        </div>
       </nav>
       <div className="px-5 py-4 border-t border-slate-800 text-xs">
         <div className="text-slate-500 mb-1">Angemeldet als</div>
@@ -200,7 +239,7 @@ export default function App() {
             <Menu size={22} />
           </button>
           <span className="font-bold flex items-center gap-1.5">
-            <AlertTriangle className="text-brand-500" size={18} /> Sonnenberg Notfall
+            <AlertTriangle className="text-brand-500" size={18} /> Sonnenberg Notfall <ModeBadge mode={state.mode} />
           </span>
           {activeAlarms.length > 0 && location.pathname !== '/monitor' && (
             <NavLink to="/monitor" className="ml-auto bg-brand-600 text-white text-xs font-semibold rounded-full px-2.5 py-1 alarm-pulse">

@@ -194,6 +194,11 @@ export default function TriggerAlarm() {
             {silent && <Badge color="violet">stiller Alarm</Badge>}
             {requireAck && <Badge color="green">mit Quittierung</Badge>}
           </div>
+          {state.mode === 'live' && !state.integrations.smsGateway.enabled && !state.integrations.voip.enabled && (
+            <div className="text-xs text-amber-700 pt-1">
+              Live-Modus ohne Versand-Gateway: Der Alarm wird erfasst und an Webhooks übergeben, aber nicht per SMS/Anruf versendet.
+            </div>
+          )}
         </div>
 
         <button

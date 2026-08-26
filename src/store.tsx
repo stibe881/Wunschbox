@@ -1,12 +1,16 @@
 import React, { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react'
 import { CheckCircle2, Siren } from 'lucide-react'
-import type { AppState, Alarm, AlarmButton, AlarmPlan, Channel, Delivery, EscalationLevel, Group, Location, LoneWorkSession, Scenario, User, Webhook, AuditEntry } from './types'
+import type { AppMode, AppState, Alarm, AlarmButton, AlarmPlan, Channel, Delivery, EscalationLevel, Group, Location, LoneWorkSession, Scenario, User, Webhook, AuditEntry } from './types'
 import { CHANNEL_LABELS } from './types'
-import { createInitialState } from './data/seed'
+import { createInitialState, createLiveInitialState } from './data/seed'
 import { LEGACY_EMOJI_TO_ICON } from './components/ScenarioIcon'
 
-// v2: Sonnenberg-Datensatz und erweitertes Szenario-Modell – alte Stände werden verworfen
-const STORAGE_KEY = 'e-mergency-state-v2'
+// Demo und Live haben getrennte Speicherstände; der Modus selbst wird separat gemerkt
+const MODE_KEY = 'e-mergency-mode'
+const DATA_KEYS: Record<AppMode, string> = {
+  demo: 'e-mergency-state-v2',
+  live: 'e-mergency-state-live-v1',
+}
 
 export function uid(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
@@ -43,6 +47,7 @@ export type Action =
   | { type: 'ADD_CONTACT'; contact: AppState['contacts'][number] }
   | { type: 'DELETE_CONTACT'; contactId: string }
   | { type: 'AUDIT'; entryType: string; message: string; userId?: string }
+  | { type: 'SET_MODE'; mode: AppMode }
   | { type: 'RESET_DEMO' }
 
 function audit(state: AppState, type: string, message: string, userId?: string): AuditEntry[] {
@@ -114,27 +119,31 @@ export function createAlarm(state: AppState, opts: TriggerOptions): Alarm {
   }
 }
 
-/** Simulation: Zustellstatus fortschreiben, Eskalationsstufen zünden, Alleinarbeits-Timer prüfen */
+/** Zustellsimulation (nur Demo), Eskalationsstufen, Alleinarbeits-Timer */
 function tick(state: AppState, now: number): AppState {
   let changed = false
+  const simulate = state.mode === 'demo'
 
-  // 1. Zustellungen fortschreiben (pending -> sent -> delivered, selten failed)
+  // 1. Zustellungen fortschreiben (pending -> sent -> delivered) – nur im Demo-Modus;
+  //    im Live-Modus bleiben Zustellungen offen, bis ein echtes Gateway angebunden ist
   const alarms = state.alarms.map((alarm) => {
     if (alarm.status !== 'active') return alarm
     let aChanged = false
-    const deliveries = alarm.deliveries.map((d) => {
-      const age = now - d.updatedAt
-      if (d.status === 'pending' && age > 1200 + Math.random() * 1500) {
-        aChanged = true
-        return { ...d, status: 'sent' as const, updatedAt: now }
-      }
-      if (d.status === 'sent' && age > 1500 + Math.random() * 2500) {
-        aChanged = true
-        const failed = Math.random() < 0.04
-        return { ...d, status: failed ? ('failed' as const) : ('delivered' as const), updatedAt: now }
-      }
-      return d
-    })
+    const deliveries = !simulate
+      ? alarm.deliveries
+      : alarm.deliveries.map((d) => {
+          const age = now - d.updatedAt
+          if (d.status === 'pending' && age > 1200 + Math.random() * 1500) {
+            aChanged = true
+            return { ...d, status: 'sent' as const, updatedAt: now }
+          }
+          if (d.status === 'sent' && age > 1500 + Math.random() * 2500) {
+            aChanged = true
+            const failed = Math.random() < 0.04
+            return { ...d, status: failed ? ('failed' as const) : ('delivered' as const), updatedAt: now }
+          }
+          return d
+        })
 
     // 2. Eskalation
     const log = [...alarm.log]
@@ -358,8 +367,10 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, contacts: state.contacts.filter((c) => c.id !== action.contactId), audit: audit(state, 'admin', 'Notfallkontakt gelöscht') }
     case 'AUDIT':
       return { ...state, audit: audit(state, action.entryType, action.message, action.userId) }
+    case 'SET_MODE':
+      return action.mode === state.mode ? state : loadStateFor(action.mode)
     case 'RESET_DEMO':
-      return createInitialState()
+      return state.mode === 'live' ? createLiveInitialState() : createInitialState()
     default:
       return state
   }
@@ -425,8 +436,12 @@ function toastForAction(action: Action): Toast['message'] | { message: string; k
       return 'Notfallkontakt gelöscht'
     case 'UPDATE_INTEGRATIONS':
       return 'Einstellungen gespeichert'
+    case 'SET_MODE':
+      return action.mode === 'live'
+        ? 'Live-Modus aktiv – eigener Datenbestand ohne Demo-Daten'
+        : 'Demo-Modus aktiv – Beispieldaten und simulierte Zustellung'
     case 'RESET_DEMO':
-      return 'Demo zurückgesetzt'
+      return 'Daten zurückgesetzt'
     default:
       return null
   }
@@ -451,16 +466,43 @@ function ToastHost({ toasts }: { toasts: Toast[] }) {
   )
 }
 
+/** Live-Modus: aktive ausgehende Webhooks bei Alarmauslösung tatsächlich aufrufen */
+function sendOutboundWebhooks(state: AppState, alarm: Alarm) {
+  const scenario = state.scenarios.find((s) => s.id === alarm.scenarioId)
+  const payload = JSON.stringify({
+    event: 'alarm.triggered',
+    alarmId: alarm.id,
+    scenario: scenario?.title ?? alarm.scenarioId,
+    message: alarm.message,
+    silent: alarm.silent,
+    triggeredAt: new Date(alarm.triggeredAt).toISOString(),
+    locations: alarm.locationIds,
+    groups: alarm.groupIds,
+    channels: alarm.channels,
+  })
+  for (const wh of state.integrations.webhooks.filter((w) => w.active && w.direction === 'outbound')) {
+    fetch(wh.url, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    }).catch(() => {
+      // Zielsystem nicht erreichbar – Alarm bleibt trotzdem erfasst
+    })
+  }
+}
+
 // ---------- Context / Provider ----------
 
 const StoreContext = createContext<{ state: AppState; dispatch: React.Dispatch<Action> } | null>(null)
 
-function loadState(): AppState {
+function loadStateFor(mode: AppMode): AppState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(DATA_KEYS[mode])
     if (raw) {
       const parsed = JSON.parse(raw) as AppState
       if (parsed.users && parsed.scenarios) {
+        parsed.mode = mode
         // Migration: Emoji-Icons auf Icon-Schlüssel umstellen, fehlende Szenario-Felder auffüllen
         parsed.scenarios = parsed.scenarios.map((s) => ({
           ...s,
@@ -477,7 +519,17 @@ function loadState(): AppState {
   } catch {
     // korrupte Daten -> Neustart mit Seed
   }
-  return createInitialState()
+  return mode === 'live' ? createLiveInitialState() : createInitialState()
+}
+
+function loadState(): AppState {
+  let mode: AppMode = 'demo'
+  try {
+    if (localStorage.getItem(MODE_KEY) === 'live') mode = 'live'
+  } catch {
+    // kein Storage verfügbar -> Demo
+  }
+  return loadStateFor(mode)
 }
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
@@ -495,9 +547,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500)
   }, [])
 
+  const stateRef = useRef(state)
+  stateRef.current = state
+
   const dispatch = useCallback(
     (action: Action) => {
       rawDispatch(action)
+      if (action.type === 'TRIGGER_ALARM' && stateRef.current.mode === 'live') {
+        sendOutboundWebhooks(stateRef.current, action.alarm)
+      }
       const t = toastForAction(action)
       if (t) {
         if (typeof t === 'string') pushToast(t)
@@ -509,7 +567,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+      localStorage.setItem(DATA_KEYS[state.mode], JSON.stringify(state))
+      localStorage.setItem(MODE_KEY, state.mode)
     } catch {
       // Speicher voll – Offline-Cache nicht kritisch
     }

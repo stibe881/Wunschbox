@@ -1,5 +1,8 @@
 export type Role = 'admin' | 'krisenstab' | 'mitarbeiter'
 
+/** Demo: Beispieldaten + simulierte Zustellung · Live: echter, leerer Datenbestand ohne Simulation */
+export type AppMode = 'demo' | 'live'
+
 export type Channel = 'push' | 'sms' | 'email' | 'voice' | 'conference' | 'tts' | 'teams'
 
 export const CHANNEL_LABELS: Record<Channel, string> = {
@@ -194,6 +197,7 @@ export interface AuditEntry {
 }
 
 export interface AppState {
+  mode: AppMode
   currentUserId: string
   users: User[]
   groups: Group[]

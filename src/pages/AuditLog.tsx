@@ -30,9 +30,17 @@ export default function AuditLog() {
         </div>
         <Button
           variant="secondary"
-          onClick={() => ask('Demo-Daten vollständig zurücksetzen? Alle Änderungen gehen verloren.', () => dispatch({ type: 'RESET_DEMO' }), 'Zurücksetzen')}
+          onClick={() =>
+            ask(
+              state.mode === 'live'
+                ? 'Live-Datenbestand vollständig zurücksetzen? Alle Benutzer, Gruppen und Einstellungen gehen verloren.'
+                : 'Demo-Daten vollständig zurücksetzen? Alle Änderungen gehen verloren.',
+              () => dispatch({ type: 'RESET_DEMO' }),
+              'Zurücksetzen',
+            )
+          }
         >
-          <RotateCcw size={14} /> Demo zurücksetzen
+          <RotateCcw size={14} /> {state.mode === 'live' ? 'Live-Daten zurücksetzen' : 'Demo zurücksetzen'}
         </Button>
       </div>
 

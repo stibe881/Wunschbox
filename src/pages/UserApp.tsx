@@ -555,7 +555,7 @@ function ProfileTab() {
       </div>
 
       <div className="rounded-2xl bg-white border border-slate-200 p-4">
-        <div className="text-sm font-semibold text-slate-700 mb-2">Demo: Benutzer wechseln</div>
+        <div className="text-sm font-semibold text-slate-700 mb-2">{state.mode === 'demo' ? 'Demo: ' : ''}Benutzer wechseln</div>
         <select
           className={inputClass}
           value={me.id}

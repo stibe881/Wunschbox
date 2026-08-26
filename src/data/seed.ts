@@ -541,6 +541,7 @@ export const SEED_INTEGRATIONS: IntegrationSettings = {
 
 export function createInitialState(): AppState {
   return {
+    mode: 'demo',
     currentUserId: 'u-admin',
     users: SEED_USERS,
     groups: SEED_GROUPS,
@@ -554,6 +555,48 @@ export function createInitialState(): AppState {
     contacts: SEED_CONTACTS,
     audit: [
       { id: 'a-1', ts: Date.now() - 3600_000, type: 'system', message: 'System initialisiert – Alarmserver für Sonnenberg Kompetenzzentrum betriebsbereit (Cloud-Hosting Schweiz).' },
+    ],
+  }
+}
+
+/**
+ * Live-Modus: echter Datenbestand ohne Mock-Daten.
+ * Behalten wird nur reale Grundkonfiguration (Szenarien, Standorte, Gruppenstruktur,
+ * Notrufnummern, Alarmplan-Vorlagen) plus ein Admin-Konto. Keine Beispiel-Benutzer,
+ * -Alarme, -Alarmknöpfe, -Webhooks oder -Zugangscodes; alle Integrationen deaktiviert.
+ */
+export function createLiveInitialState(): AppState {
+  return {
+    mode: 'live',
+    currentUserId: 'u-admin',
+    users: [
+      {
+        id: 'u-admin', firstName: 'Stefan', lastName: 'Gross', email: 'stefan.gross@sonnenberg-baar.ch',
+        phone: '', role: 'admin', groupIds: ['gr-krisenstab', 'gr-alle'], locationId: 'loc-baar', language: 'de',
+      },
+    ],
+    groups: SEED_GROUPS,
+    locations: SEED_LOCATIONS,
+    scenarios: SEED_SCENARIOS,
+    plans: SEED_PLANS,
+    alarms: [],
+    buttons: [],
+    loneWorkSessions: [],
+    integrations: {
+      smsGateway: { enabled: false, provider: '', senderId: 'SONNENBERG' },
+      voip: { enabled: false, sipServer: '' },
+      teams: { enabled: false, tenant: '' },
+      sso: { enabled: false, provider: 'Microsoft Entra ID / SAML 2.0', entityId: '' },
+      hrSync: { enabled: false, system: '' },
+      hotline: { enabled: false, number: '' },
+      multiLanguage: true,
+      geofencing: false,
+      webhooks: [],
+      accessCodes: [],
+    },
+    contacts: SEED_CONTACTS,
+    audit: [
+      { id: 'a-live-1', ts: Date.now(), type: 'system', message: 'Live-Modus initialisiert – Datenbestand ohne Demo-Daten. Versand-Gateways unter Integrationen anbinden.' },
     ],
   }
 }
