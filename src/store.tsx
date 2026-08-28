@@ -6,6 +6,9 @@ import { LIVE_INITIAL_PASSWORD, SCENARIO_CONTENT_VERSION, SEED_SCENARIOS, SEED_U
 import { hashPassword, randomSalt } from './lib/auth'
 import { LEGACY_EMOJI_TO_ICON } from './components/ScenarioIcon'
 
+/** Erhöhen, wenn gespeicherte Passwortdaten einmalig korrigiert werden müssen */
+const AUTH_MIGRATION_VERSION = 1
+
 // Demo und Live haben getrennte Speicherstände; der Modus selbst wird separat gemerkt
 const MODE_KEY = 'e-mergency-mode'
 const DATA_KEYS: Record<AppMode, string> = {
@@ -533,6 +536,22 @@ function ToastHost({ toasts }: { toasts: Toast[] }) {
  */
 function migrateAuth(parsed: AppState): AppState {
   const seedById = new Map(SEED_USERS.map((u) => [u.id, u]))
+
+  // Einmalige Korrektur: Eine frühere Fassung hat Live-Beständen die Demo-Passwörter
+  // zugewiesen. Diese werden entfernt, damit unten das Erstpasswort mit erzwungenem
+  // Wechsel greift. Selbst vergebene Passwörter sind nicht betroffen.
+  if (parsed.mode === 'live' && (parsed.authVersion ?? 0) < AUTH_MIGRATION_VERSION) {
+    const seedHashes = new Set(SEED_USERS.map((u) => u.passwordHash))
+    parsed = {
+      ...parsed,
+      users: parsed.users.map((u) =>
+        u.passwordHash && seedHashes.has(u.passwordHash)
+          ? { ...u, passwordSalt: undefined, passwordHash: undefined, mustChangePassword: undefined }
+          : u,
+      ),
+    }
+  }
+
   let users = parsed.users.map((u) => {
     if (u.passwordHash && u.passwordSalt) return u
     if (parsed.mode !== 'demo') return u
@@ -551,7 +570,7 @@ function migrateAuth(parsed: AppState): AppState {
     )
   }
 
-  return { ...parsed, users, session: parsed.session ?? null }
+  return { ...parsed, users, session: parsed.session ?? null, authVersion: AUTH_MIGRATION_VERSION }
 }
 
 /** Live-Modus: aktive ausgehende Webhooks bei Alarmauslösung tatsächlich aufrufen */

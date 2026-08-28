@@ -214,6 +214,8 @@ export interface AppState {
   session: Session | null
   /** Version der Standard-Szenarien-Inhalte – für einmalige Content-Updates beim Laden */
   scenarioContentVersion?: number
+  /** Version der Anmelde-Migration – für einmalige Korrekturen an Passwortdaten */
+  authVersion?: number
   currentUserId: string
   users: User[]
   groups: Group[]

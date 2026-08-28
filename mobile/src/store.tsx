@@ -9,6 +9,9 @@ import { notifyNow } from './notifications'
 
 export type AppMode = 'demo' | 'live'
 
+/** Erhöhen, wenn gespeicherte Passwortdaten einmalig korrigiert werden müssen */
+const AUTH_MIGRATION_VERSION = 1
+
 const MODE_KEY = 'sonnenberg-mobile-mode'
 const DATA_KEYS: Record<AppMode, string> = {
   demo: 'sonnenberg-mobile-v1',
@@ -21,6 +24,8 @@ export function uid(prefix: string): string {
 
 export interface MobileState {
   mode: AppMode
+  /** Version der Anmelde-Migration – für einmalige Korrekturen an Passwortdaten */
+  authVersion?: number
   /** Angemeldete Sitzung – null bedeutet: Anmeldemaske anzeigen */
   session: Session | null
   /** Benutzerverzeichnis des jeweiligen Modus (Demo: Beispielteam, Live: echte Konten) */
@@ -34,6 +39,7 @@ function initialState(mode: AppMode): MobileState {
   const users = mode === 'live' ? createLiveInitialState().users : SEED_USERS
   return {
     mode,
+    authVersion: AUTH_MIGRATION_VERSION,
     session: null,
     users,
     currentUserId: users[0].id,
@@ -345,7 +351,20 @@ function migrateAuth(parsed: MobileState, mode: AppMode): MobileState {
   const fallback = initialState(mode)
   const seedById = new Map(SEED_USERS.map((u) => [u.id, u]))
 
-  let users = (parsed.users?.length ? parsed.users : fallback.users).map((u) => {
+  // Einmalige Korrektur: Eine frühere Fassung hat Live-Beständen die Demo-Passwörter
+  // zugewiesen. Diese werden entfernt, damit unten das Erstpasswort mit erzwungenem
+  // Wechsel greift. Selbst vergebene Passwörter sind nicht betroffen.
+  let source = parsed.users?.length ? parsed.users : fallback.users
+  if (mode === 'live' && (parsed.authVersion ?? 0) < AUTH_MIGRATION_VERSION) {
+    const seedHashes = new Set(SEED_USERS.map((u) => u.passwordHash))
+    source = source.map((u) =>
+      u.passwordHash && seedHashes.has(u.passwordHash)
+        ? { ...u, passwordSalt: undefined, passwordHash: undefined, mustChangePassword: undefined }
+        : u,
+    )
+  }
+
+  let users = source.map((u) => {
     if (u.passwordHash && u.passwordSalt) return u
     if (mode !== 'demo') return u
     const seed = seedById.get(u.id)
@@ -365,6 +384,7 @@ function migrateAuth(parsed: MobileState, mode: AppMode): MobileState {
   return {
     ...parsed,
     mode,
+    authVersion: AUTH_MIGRATION_VERSION,
     users,
     session: session && users.some((u) => u.id === session.userId) ? session : null,
     currentUserId: users.some((u) => u.id === parsed.currentUserId) ? parsed.currentUserId : users[0].id,
