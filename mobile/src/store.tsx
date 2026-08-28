@@ -340,46 +340,53 @@ function toastForAction(action: Action): Toast['message'] | { message: string; k
 
 // ---------- Provider ----------
 
+/** Konto auf das Erstpasswort setzen, Änderung bei der nächsten Anmeldung erzwingen */
+function withInitialPassword(user: User): User {
+  const salt = randomSalt()
+  return { ...user, passwordSalt: salt, passwordHash: hashPassword(LIVE_INITIAL_PASSWORD, salt), mustChangePassword: true }
+}
+
+/**
+ * Sicherstellen, dass mindestens ein Konto anmeldefähig bleibt. Gibt es keines,
+ * erhalten alle Administratoren das Erstpasswort mit erzwungener Änderung; fehlt
+ * auch ein Administrator, wird das Konto aus der Grundkonfiguration wiederhergestellt.
+ */
+function ensureLoginPossible(users: User[]): User[] {
+  if (users.some((u) => u.passwordHash && u.passwordSalt)) return users
+  if (users.some((u) => u.role === 'admin')) {
+    return users.map((u) => (u.role === 'admin' ? withInitialPassword(u) : u))
+  }
+  const rescue = createLiveInitialState().users[0]
+  return [withInitialPassword(rescue), ...users.filter((u) => u.id !== rescue.id)]
+}
+
 /**
  * Gespeicherte Stände auf die Anmeldung umstellen. Ältere Stände kennen weder
  * Benutzerverzeichnis noch Sitzung; sie erhalten das Verzeichnis des Modus.
- * Demo-Passwörter werden nur im Demo-Modus übernommen; im Live-Modus bekommen
- * Administratoren das Erstpasswort mit erzwungener Änderung, sobald kein
- * anmeldefähiges Konto existiert.
+ * Demo-Passwörter gelten nur im Demo-Modus; Live-Bestände, denen eine frühere
+ * Fassung ein Demo-Passwort zugewiesen hat, werden auf das Erstpasswort gesetzt.
  */
 function migrateAuth(parsed: MobileState, mode: AppMode): MobileState {
   const fallback = initialState(mode)
   const seedById = new Map(SEED_USERS.map((u) => [u.id, u]))
+  let users = parsed.users?.length ? parsed.users : fallback.users
 
-  // Einmalige Korrektur: Eine frühere Fassung hat Live-Beständen die Demo-Passwörter
-  // zugewiesen. Diese werden entfernt, damit unten das Erstpasswort mit erzwungenem
-  // Wechsel greift. Selbst vergebene Passwörter sind nicht betroffen.
-  let source = parsed.users?.length ? parsed.users : fallback.users
+  if (mode === 'demo') {
+    users = users.map((u) => {
+      if (u.passwordHash && u.passwordSalt) return u
+      const seed = seedById.get(u.id)
+      return seed?.passwordHash && seed.passwordSalt
+        ? { ...u, passwordSalt: seed.passwordSalt, passwordHash: seed.passwordHash }
+        : u
+    })
+  }
+
   if (mode === 'live' && (parsed.authVersion ?? 0) < AUTH_MIGRATION_VERSION) {
     const seedHashes = new Set(SEED_USERS.map((u) => u.passwordHash))
-    source = source.map((u) =>
-      u.passwordHash && seedHashes.has(u.passwordHash)
-        ? { ...u, passwordSalt: undefined, passwordHash: undefined, mustChangePassword: undefined }
-        : u,
-    )
+    users = users.map((u) => (u.passwordHash && seedHashes.has(u.passwordHash) ? withInitialPassword(u) : u))
   }
 
-  let users = source.map((u) => {
-    if (u.passwordHash && u.passwordSalt) return u
-    if (mode !== 'demo') return u
-    const seed = seedById.get(u.id)
-    if (seed?.passwordHash && seed.passwordSalt) {
-      return { ...u, passwordSalt: seed.passwordSalt, passwordHash: seed.passwordHash }
-    }
-    return u
-  })
-
-  if (!users.some((u) => u.passwordHash && u.passwordSalt)) {
-    const salt = randomSalt()
-    const hash = hashPassword(LIVE_INITIAL_PASSWORD, salt)
-    users = users.map((u) => (u.role === 'admin' ? { ...u, passwordSalt: salt, passwordHash: hash, mustChangePassword: true } : u))
-  }
-
+  users = ensureLoginPossible(users)
   const session = parsed.session ?? null
   return {
     ...parsed,

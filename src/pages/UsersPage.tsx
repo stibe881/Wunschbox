@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { KeyRound, Pencil, Plus, Trash2, Upload } from 'lucide-react'
-import { uid, useStore } from '../store'
+import { isLastAdmin, uid, useStore } from '../store'
 import type { Role, User } from '../types'
 import { Badge, Button, Card, Field, Modal, inputClass, useConfirm } from '../components/ui'
 import { MIN_PASSWORD_LENGTH, hasPassword, passwordProblem } from '../lib/auth'
@@ -124,7 +124,12 @@ export default function UsersPage() {
                     </td>
                     <td className="py-2.5 text-right whitespace-nowrap">
                       <Button variant="ghost" onClick={() => setEditing(u)}><Pencil size={14} /></Button>
-                      <Button variant="ghost" onClick={() => ask(`${u.firstName} ${u.lastName} löschen?`, () => dispatch({ type: 'DELETE_USER', userId: u.id }))}>
+                      <Button
+                        variant="ghost"
+                        disabled={isLastAdmin(state, u.id)}
+                        title={isLastAdmin(state, u.id) ? 'Der letzte Administrator kann nicht gelöscht werden' : 'Benutzer löschen'}
+                        onClick={() => ask(`${u.firstName} ${u.lastName} löschen?`, () => dispatch({ type: 'DELETE_USER', userId: u.id }))}
+                      >
                         <Trash2 size={14} />
                       </Button>
                     </td>
@@ -153,8 +158,12 @@ function UserEditor({ user, onClose }: { user: User; onClose: () => void }) {
   const [password, setPassword] = useState('')
   const [mustChange, setMustChange] = useState(!hasPassword(user) || Boolean(user.mustChangePassword))
   const [passwordError, setPasswordError] = useState<string | null>(null)
+  const letzterAdmin = isLastAdmin(state, user.id)
 
   function save() {
+    if (letzterAdmin && draft.role !== 'admin') {
+      return setPasswordError('Dies ist der einzige Administrator – die Rolle kann nicht geändert werden. Legen Sie zuerst einen weiteren Administrator an.')
+    }
     if (password) {
       const problem = passwordProblem(password)
       if (problem) return setPasswordError(problem)
@@ -188,11 +197,19 @@ function UserEditor({ user, onClose }: { user: User; onClose: () => void }) {
           <input className={inputClass} value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
         </Field>
         <Field label="Rolle / Berechtigung">
-          <select className={inputClass} value={draft.role} onChange={(e) => setDraft({ ...draft, role: e.target.value as Role })}>
+          <select
+            className={inputClass} value={draft.role} disabled={letzterAdmin}
+            onChange={(e) => { setDraft({ ...draft, role: e.target.value as Role }); setPasswordError(null) }}
+          >
             <option value="mitarbeiter">Mitarbeiter</option>
             <option value="krisenstab">Krisenstab</option>
             <option value="admin">Administrator</option>
           </select>
+          {letzterAdmin && (
+            <span className="block text-xs text-slate-400 mt-1">
+              Einziger Administrator – die Rolle bleibt gesperrt, bis ein weiterer Administrator existiert.
+            </span>
+          )}
         </Field>
         <Field label="App-Sprache">
           <select className={inputClass} value={draft.language} onChange={(e) => setDraft({ ...draft, language: e.target.value as User['language'] })}>

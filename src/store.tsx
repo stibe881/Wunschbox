@@ -57,6 +57,12 @@ export type Action =
   | { type: 'SET_MODE'; mode: AppMode }
   | { type: 'RESET_DEMO' }
 
+/** Ist dieses Konto der einzige verbleibende Administrator? */
+export function isLastAdmin(state: AppState, userId: string): boolean {
+  const admins = state.users.filter((u) => u.role === 'admin')
+  return admins.length === 1 && admins[0].id === userId
+}
+
 function audit(state: AppState, type: string, message: string, userId?: string): AuditEntry[] {
   const entry: AuditEntry = { id: uid('audit'), ts: Date.now(), type, message, userId }
   return [entry, ...state.audit].slice(0, 300)
@@ -257,6 +263,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, currentUserId: action.userId }
     case 'UPSERT_USER': {
       const exists = state.users.some((u) => u.id === action.user.id)
+      // Der letzte Administrator darf sich nicht selbst die Rechte entziehen
+      if (exists && isLastAdmin(state, action.user.id) && action.user.role !== 'admin') return state
       return {
         ...state,
         users: exists ? state.users.map((u) => (u.id === action.user.id ? action.user : u)) : [...state.users, action.user],
@@ -264,6 +272,8 @@ function reducer(state: AppState, action: Action): AppState {
       }
     }
     case 'DELETE_USER':
+      // Ohne Administrator liesse sich der Datenbestand nicht mehr verwalten
+      if (isLastAdmin(state, action.userId)) return state
       return {
         ...state,
         users: state.users.filter((u) => u.id !== action.userId),
@@ -526,51 +536,64 @@ function ToastHost({ toasts }: { toasts: Toast[] }) {
   )
 }
 
+/** Konto auf das Erstpasswort setzen, Änderung bei der nächsten Anmeldung erzwingen */
+function withInitialPassword(user: User): User {
+  const salt = randomSalt()
+  return { ...user, passwordSalt: salt, passwordHash: hashPassword(LIVE_INITIAL_PASSWORD, salt), mustChangePassword: true }
+}
+
+/**
+ * Sicherstellen, dass mindestens ein Konto anmeldefähig bleibt. Gibt es keines,
+ * erhalten alle Administratoren das Erstpasswort mit erzwungener Änderung; fehlt
+ * auch ein Administrator, wird das Konto aus der Grundkonfiguration wiederhergestellt.
+ * Damit kann sich ein Datenbestand nie dauerhaft selbst aussperren.
+ */
+function ensureLoginPossible(users: User[]): User[] {
+  if (users.some((u) => u.passwordHash && u.passwordSalt)) return users
+  if (users.some((u) => u.role === 'admin')) {
+    return users.map((u) => (u.role === 'admin' ? withInitialPassword(u) : u))
+  }
+  const rescue = createLiveInitialState().users[0]
+  return [withInitialPassword(rescue), ...users.filter((u) => u.id !== rescue.id)]
+}
+
 /**
  * Bestehende Speicherstände auf die Anmeldung umstellen.
- * Im Demo-Modus erhalten Benutzer ohne Passwort das des gleichnamigen Beispielkontos,
+ * Im Demo-Modus erhalten Konten ohne Passwort das des gleichnamigen Beispielkontos,
  * damit die dokumentierten Demo-Zugänge auch für alte Stände gelten. Im Live-Modus
- * gilt das bewusst nicht – dort bekommen alle Administratoren das Erstpasswort mit
- * erzwungener Änderung, sobald kein anmeldefähiges Konto existiert. So ist niemand
- * ausgesperrt und ein echter Datenbestand trägt nie ein Demo-Passwort.
+ * gilt das bewusst nicht – ein echter Datenbestand trägt nie ein Demo-Passwort.
  */
 function migrateAuth(parsed: AppState): AppState {
   const seedById = new Map(SEED_USERS.map((u) => [u.id, u]))
+  let users = parsed.users ?? []
 
-  // Einmalige Korrektur: Eine frühere Fassung hat Live-Beständen die Demo-Passwörter
-  // zugewiesen. Diese werden entfernt, damit unten das Erstpasswort mit erzwungenem
-  // Wechsel greift. Selbst vergebene Passwörter sind nicht betroffen.
-  if (parsed.mode === 'live' && (parsed.authVersion ?? 0) < AUTH_MIGRATION_VERSION) {
-    const seedHashes = new Set(SEED_USERS.map((u) => u.passwordHash))
-    parsed = {
-      ...parsed,
-      users: parsed.users.map((u) =>
-        u.passwordHash && seedHashes.has(u.passwordHash)
-          ? { ...u, passwordSalt: undefined, passwordHash: undefined, mustChangePassword: undefined }
-          : u,
-      ),
-    }
+  // Im Demo-Modus gelten die dokumentierten Beispiel-Passwörter auch für alte Stände
+  if (parsed.mode === 'demo') {
+    users = users.map((u) => {
+      if (u.passwordHash && u.passwordSalt) return u
+      const seed = seedById.get(u.id)
+      return seed?.passwordHash && seed.passwordSalt
+        ? { ...u, passwordSalt: seed.passwordSalt, passwordHash: seed.passwordHash }
+        : u
+    })
   }
 
-  let users = parsed.users.map((u) => {
-    if (u.passwordHash && u.passwordSalt) return u
-    if (parsed.mode !== 'demo') return u
-    const seed = seedById.get(u.id)
-    if (seed?.passwordHash && seed.passwordSalt) {
-      return { ...u, passwordSalt: seed.passwordSalt, passwordHash: seed.passwordHash }
-    }
-    return u
-  })
-
-  if (!users.some((u) => u.passwordHash && u.passwordSalt)) {
-    const salt = randomSalt()
-    const hash = hashPassword(LIVE_INITIAL_PASSWORD, salt)
+  // Einmalige Korrektur: Eine frühere Fassung hat Live-Beständen die Demo-Passwörter
+  // zugewiesen. Betroffene Konten erhalten direkt das Erstpasswort mit erzwungenem
+  // Wechsel. Selbst vergebene Passwörter bleiben unberührt.
+  if (parsed.mode === 'live' && (parsed.authVersion ?? 0) < AUTH_MIGRATION_VERSION) {
+    const seedHashes = new Set(SEED_USERS.map((u) => u.passwordHash))
     users = users.map((u) =>
-      u.role === 'admin' ? { ...u, passwordSalt: salt, passwordHash: hash, mustChangePassword: true } : u,
+      u.passwordHash && seedHashes.has(u.passwordHash) ? withInitialPassword(u) : u,
     )
   }
 
-  return { ...parsed, users, session: parsed.session ?? null, authVersion: AUTH_MIGRATION_VERSION }
+  return {
+    ...parsed,
+    users: ensureLoginPossible(users),
+    session: parsed.session ?? null,
+    authVersion: AUTH_MIGRATION_VERSION,
+  }
 }
 
 /** Live-Modus: aktive ausgehende Webhooks bei Alarmauslösung tatsächlich aufrufen */

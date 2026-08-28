@@ -8,8 +8,8 @@ import type { User } from '../types'
 const fieldClass =
   'w-full rounded-xl border border-slate-700 bg-slate-800 text-white placeholder-slate-500 px-10 py-3 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/30 transition'
 
-function Shell({ children, subtitle }: { children: React.ReactNode; subtitle: string }) {
-  const { state } = useStore()
+function Shell({ children, subtitle, showModeSwitch = false }: { children: React.ReactNode; subtitle: string; showModeSwitch?: boolean }) {
+  const { state, dispatch } = useStore()
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-sm">
@@ -17,18 +17,30 @@ function Shell({ children, subtitle }: { children: React.ReactNode; subtitle: st
           <div className="w-16 h-16 rounded-2xl bg-slate-800 text-brand-500 flex items-center justify-center mx-auto mb-4">
             <AlertTriangle size={30} />
           </div>
-          <div className="flex items-center justify-center gap-2">
-            <h1 className="text-xl font-bold text-white">SOBE Notfall</h1>
-            <span
-              className={`text-[10px] font-bold uppercase tracking-wider rounded px-1.5 py-0.5 ${
-                state.mode === 'live' ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-slate-900'
-              }`}
-            >
-              {state.mode === 'live' ? 'Live' : 'Demo'}
-            </span>
-          </div>
+          <h1 className="text-xl font-bold text-white">SOBE Notfall</h1>
           <p className="text-sm text-slate-500 mt-1">{subtitle}</p>
         </div>
+
+        {/* Modus vor der Anmeldung wählbar – Demo und Live haben getrennte Konten */}
+        {showModeSwitch && (
+          <div className="flex rounded-xl bg-slate-800 p-1 mb-4">
+            {(['demo', 'live'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => dispatch({ type: 'SET_MODE', mode: m })}
+                className={`flex-1 rounded-lg py-2 text-xs font-bold uppercase tracking-wide transition ${
+                  state.mode === m
+                    ? m === 'live'
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-amber-500 text-slate-900'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {m === 'demo' ? 'Demo' : 'Live'}
+              </button>
+            ))}
+          </div>
+        )}
         {children}
       </div>
     </div>
@@ -60,7 +72,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <Shell subtitle="Kompetenzzentrum Baar · Menzingen · Kloten">
+    <Shell subtitle="Kompetenzzentrum Baar · Menzingen · Kloten" showModeSwitch>
       <form onSubmit={submit} className="rounded-2xl bg-slate-800/60 border border-slate-800 p-5 space-y-3.5">
         <label className="block">
           <span className="text-xs text-slate-400">E-Mail-Adresse</span>

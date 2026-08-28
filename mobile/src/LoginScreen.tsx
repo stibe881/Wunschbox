@@ -7,8 +7,8 @@ import { MIN_PASSWORD_LENGTH, authenticate, passwordProblem } from './auth'
 import type { User } from './types'
 import { colors } from './ui'
 
-function Shell({ subtitle, children }: { subtitle: string; children: React.ReactNode }) {
-  const { state } = useStore()
+function Shell({ subtitle, children, showModeSwitch = false }: { subtitle: string; children: React.ReactNode; showModeSwitch?: boolean }) {
+  const { state, switchMode } = useStore()
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.dark }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={s.screen} keyboardShouldPersistTaps="handled">
@@ -17,13 +17,28 @@ function Shell({ subtitle, children }: { subtitle: string; children: React.React
         </View>
         <View style={s.titleRow}>
           <Text style={s.title}>SOBE Notfall</Text>
-          <View style={[s.modeChip, { backgroundColor: state.mode === 'live' ? colors.green : '#f59e0b' }]}>
-            <Text style={[s.modeChipText, { color: state.mode === 'live' ? '#fff' : '#0f172a' }]}>
-              {state.mode === 'live' ? 'LIVE' : 'DEMO'}
-            </Text>
-          </View>
         </View>
         <Text style={s.subtitle}>{subtitle}</Text>
+
+        {/* Modus vor der Anmeldung wählbar – Demo und Live haben getrennte Konten */}
+        {showModeSwitch && (
+          <View style={s.modeSwitch}>
+            {(['demo', 'live'] as const).map((m) => {
+              const aktiv = state.mode === m
+              return (
+                <Pressable
+                  key={m}
+                  style={[s.modeOption, aktiv && { backgroundColor: m === 'live' ? colors.green : '#f59e0b' }]}
+                  onPress={() => switchMode(m)}
+                >
+                  <Text style={[s.modeOptionText, aktiv && { color: m === 'live' ? '#fff' : '#0f172a' }]}>
+                    {m === 'demo' ? 'DEMO' : 'LIVE'}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </View>
+        )}
         {children}
       </ScrollView>
     </KeyboardAvoidingView>
@@ -48,7 +63,7 @@ export default function LoginScreen() {
   }
 
   return (
-    <Shell subtitle="Kompetenzzentrum Baar · Menzingen · Kloten">
+    <Shell subtitle="Kompetenzzentrum Baar · Menzingen · Kloten" showModeSwitch>
       <View style={s.card}>
         <Text style={s.label}>E-Mail-Adresse</Text>
         <TextInput
@@ -180,8 +195,9 @@ const s = StyleSheet.create({
   logo: { width: 64, height: 64, borderRadius: 18, backgroundColor: '#1e293b', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 16 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   title: { color: '#fff', fontSize: 20, fontWeight: '800' },
-  modeChip: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
-  modeChipText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  modeSwitch: { flexDirection: 'row', backgroundColor: '#1e293b', borderRadius: 12, padding: 4, marginBottom: 16 },
+  modeOption: { flex: 1, borderRadius: 9, paddingVertical: 9, alignItems: 'center' },
+  modeOptionText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5, color: '#94a3b8' },
   subtitle: { color: '#64748b', fontSize: 13, textAlign: 'center', marginTop: 4, marginBottom: 22 },
   card: { backgroundColor: '#1e293b99', borderWidth: 1, borderColor: '#1e293b', borderRadius: 18, padding: 18 },
   label: { color: '#94a3b8', fontSize: 12, marginBottom: 6 },

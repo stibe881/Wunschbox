@@ -73,7 +73,13 @@ npm run preview  # Produktions-Build lokal testen
 | Live | `stefan.gross@sonnenberg-baar.ch` (einziges ausgeliefertes Konto) | `SOBE-Start2026!`, muss bei der ersten Anmeldung geändert werden |
 
 Die Demo-Zugänge stehen zum Hineinklicken auf der Anmeldemaske; im Live-Modus erscheinen sie nicht.
-Demo- und Live-Modus haben getrennte Datenbestände und damit auch getrennte Anmeldungen.
+Demo- und Live-Modus haben getrennte Datenbestände und damit auch getrennte Anmeldungen – der Modus lässt
+sich deshalb direkt auf der Anmeldemaske umschalten.
+
+Ein Datenbestand kann sich nicht dauerhaft aussperren: Existiert kein anmeldefähiges Konto, erhalten alle
+Administratoren das Erstpasswort mit erzwungener Änderung; fehlt auch ein Administrator, wird das Konto aus
+der Grundkonfiguration wiederhergestellt. Der letzte verbliebene Administrator kann weder gelöscht noch in
+eine andere Rolle versetzt werden.
 
 > Ohne Server werden die Passwort-Hashes lokal auf dem Gerät gespeichert. Das verhindert Klartext-Passwörter
 > und fremden Zugriff auf ein unbeaufsichtigtes Gerät, ersetzt aber keine serverseitige Authentifizierung –
