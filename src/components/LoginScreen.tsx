@@ -50,7 +50,7 @@ export default function LoginScreen() {
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
-    const result = authenticate(state, email, password)
+    const result = authenticate(state.users, email, password)
     if (!result.ok) {
       setError(result.error)
       return

@@ -1,5 +1,5 @@
-import type { User } from '../types'
-import { sha256Hex } from './sha256'
+import type { User } from './types'
+import { sha256Hex } from './lib/sha256'
 
 /**
  * Anmeldung mit E-Mail und Passwort.

@@ -5,10 +5,11 @@ import { StatusBar } from 'expo-status-bar'
 import { BellRing, BookOpen, CheckCircle2, MapPin, Phone, Siren, Timer, User, WifiOff } from 'lucide-react-native'
 import { StoreProvider, useStore } from './src/store'
 import { ensurePermissions } from './src/notifications'
-import { SEED_LOCATIONS, SEED_USERS } from './src/seed'
+import { SEED_LOCATIONS } from './src/seed'
 import type { Scenario } from './src/types'
 import { colors } from './src/ui'
 import { ContactsScreen, LoneWorkScreen, ProfileScreen, ScenarioDetailScreen, ScenariosScreen, StartScreen } from './src/screens'
+import LoginScreen, { ForcePasswordChange } from './src/LoginScreen'
 
 type Tab = 'start' | 'szenarien' | 'alleinarbeit' | 'notruf' | 'profil'
 
@@ -29,13 +30,17 @@ function Root() {
   }, [hydrated])
   const [openScenario, setOpenScenario] = useState<Scenario | null>(null)
 
-  const me = SEED_USERS.find((u) => u.id === state.currentUserId) ?? SEED_USERS[0]
+  const sessionUser = state.users.find((u) => u.id === state.session?.userId)
+  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
   const myLocation = SEED_LOCATIONS.find((l) => l.id === me.locationId)
   const myAlarms = state.alarms.filter(
     (a) => a.status === 'active' && (a.deliveries.some((d) => d.userId === me.id) || a.triggeredByUserId === me.id),
   )
 
   if (!hydrated) return <View style={{ flex: 1, backgroundColor: colors.dark }} />
+  // Ohne gültige Anmeldung ist die App gesperrt
+  if (!sessionUser) return <LoginScreen />
+  if (sessionUser.mustChangePassword) return <ForcePasswordChange user={sessionUser} />
 
   return (
     <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>

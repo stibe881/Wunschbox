@@ -1,21 +1,22 @@
 import React, { useEffect, useState } from 'react'
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
 import {
-  BellRing, Check, CheckCircle2, ChevronLeft, Clock, MapPin, Phone, Play, Search as SearchIcon,
+  BellRing, Check, CheckCircle2, ChevronLeft, Clock, KeyRound, LogOut, MapPin, Phone, Play, Search as SearchIcon,
   ShieldAlert, Siren, Timer, X,
 } from 'lucide-react-native'
 import { createAlarm, resolveRecipients, uid, useStore } from './store'
 import { ScenarioIcon } from './ScenarioIcon'
 import { cancelScheduled, ensurePermissions, getPushToken, remotePushAvailability, scheduleAt } from './notifications'
-import { SEED_CONTACTS, SEED_LOCATIONS, SEED_SCENARIOS, SEED_USERS, SEED_GROUPS } from './seed'
-import type { LoneWorkSession, Scenario } from './types'
+import { SEED_CONTACTS, SEED_LOCATIONS, SEED_SCENARIOS, SEED_GROUPS } from './seed'
+import type { LoneWorkSession, Scenario, User } from './types'
 import { Badge, Card, HoldButton, colors, formatDuration, formatRelative } from './ui'
+import { MIN_PASSWORD_LENGTH, passwordProblem, verifyPassword } from './auth'
 
 // ---------- Start: Alarme + SOS ----------
 
 export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario) => void }) {
   const { state, dispatch } = useStore()
-  const me = SEED_USERS.find((u) => u.id === state.currentUserId) ?? SEED_USERS[0]
+  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
   const mySos = state.alarms.filter((a) => a.status === 'active' && a.triggeredByUserId === me.id)
   const myAlarms = state.alarms.filter(
     (a) => a.status === 'active' && a.triggeredByUserId !== me.id && a.deliveries.some((d) => d.userId === me.id),
@@ -25,7 +26,7 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario) 
     const location = SEED_LOCATIONS.find((l) => l.id === me.locationId)
     dispatch({
       type: 'TRIGGER_ALARM',
-      alarm: createAlarm({
+      alarm: createAlarm(state.users, {
         scenarioId: 'sc-medizin',
         message: `SOS-Alarm von ${me.firstName} ${me.lastName} (App) – Standort: ${location?.name ?? 'unbekannt'}`,
         silent: false,
@@ -45,7 +46,7 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario) 
       {mySos.map((a) => {
         const delivered = a.deliveries.filter((d) => d.status === 'delivered').length
         const helpers = [...new Set(a.deliveries.filter((d) => d.ack === 'acknowledged').map((d) => d.userId))]
-          .map((id) => SEED_USERS.find((u) => u.id === id))
+          .map((id) => state.users.find((u) => u.id === id))
           .filter(Boolean)
         return (
           <Card key={a.id} style={{ borderColor: colors.brandLight, borderWidth: 2 }}>
@@ -196,14 +197,14 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
   const [checkedList, setCheckedList] = useState<Record<number, boolean>>({})
   const [notifiedUserIds, setNotifiedUserIds] = useState<string[]>([])
 
-  const me = SEED_USERS.find((u) => u.id === state.currentUserId) ?? SEED_USERS[0]
+  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
   const [alarmLocationIds, setAlarmLocationIds] = useState<string[]>([me.locationId])
   const contacts = SEED_CONTACTS.filter((c) => scenario.contactIds.includes(c.id))
   const responsibleGroups = SEED_GROUPS.filter((g) => scenario.responsibleGroupIds.includes(g.id))
   const alarmGroupIds = responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.id) : ['gr-alle']
-  const alarmRecipientCount = resolveRecipients(alarmGroupIds, alarmLocationIds).length
+  const alarmRecipientCount = resolveRecipients(state.users, alarmGroupIds, alarmLocationIds).length
   const crisisGroups = SEED_GROUPS.filter((g) => g.isCrisisTeam)
-  const crisisMembers = SEED_USERS.filter((u) => u.id !== me.id && u.groupIds.some((g) => crisisGroups.some((cg) => cg.id === g)))
+  const crisisMembers = state.users.filter((u) => u.id !== me.id && u.groupIds.some((g) => crisisGroups.some((cg) => cg.id === g)))
 
   const myScenarioAlarm = state.alarms.find(
     (a) => a.status === 'active' && a.scenarioId === scenario.id && a.triggeredByUserId === me.id && !a.message.startsWith('Info an') && !a.message.startsWith('Krisenteam-Aufgebot'),
@@ -226,7 +227,7 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
       .join(', ')
     dispatch({
       type: 'TRIGGER_ALARM',
-      alarm: createAlarm({
+      alarm: createAlarm(state.users, {
         scenarioId: scenario.id,
         message: `${scenario.title} – Standort ${locationNames || 'alle Standorte'}. Ausgelöst von ${me.firstName} ${me.lastName}, bitte Handlungsanweisungen in der App befolgen.`,
         silent: scenario.silentDefault,
@@ -244,7 +245,7 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
   function triggerCrisisTeam() {
     dispatch({
       type: 'TRIGGER_ALARM',
-      alarm: createAlarm({
+      alarm: createAlarm(state.users, {
         scenarioId: scenario.id,
         message: `Krisenteam-Aufgebot (${scenario.title}) durch ${me.firstName} ${me.lastName} – bitte quittieren.`,
         silent: false,
@@ -259,10 +260,10 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
   }
 
   function notifyMember(userId: string) {
-    const user = SEED_USERS.find((u) => u.id === userId)
+    const user = state.users.find((u) => u.id === userId)
     dispatch({
       type: 'TRIGGER_ALARM',
-      alarm: createAlarm({
+      alarm: createAlarm(state.users, {
         scenarioId: scenario.id,
         message: `Info an ${user?.firstName} ${user?.lastName}: ${scenario.title} – bitte bei ${me.firstName} ${me.lastName} melden.`,
         silent: true,
@@ -527,7 +528,7 @@ async function scheduleLoneWorkNotifications(sessionId: string, activity: string
 
 export function LoneWorkScreen() {
   const { state, dispatch } = useStore()
-  const me = SEED_USERS.find((u) => u.id === state.currentUserId) ?? SEED_USERS[0]
+  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
   const [activity, setActivity] = useState('')
   const [durationMin, setDurationMin] = useState(30)
   const [silent, setSilent] = useState(false)
@@ -763,7 +764,7 @@ function PushStatusCard() {
 
 export function ProfileScreen() {
   const { state, dispatch } = useStore()
-  const me = SEED_USERS.find((u) => u.id === state.currentUserId) ?? SEED_USERS[0]
+  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
   const myLocation = SEED_LOCATIONS.find((l) => l.id === me.locationId)
   const myGroups = SEED_GROUPS.filter((g) => me.groupIds.includes(g.id))
 
@@ -788,9 +789,12 @@ export function ProfileScreen() {
         </View>
       </Card>
 
+      <PasswordCard user={me} />
+
+      {state.mode === 'demo' && (
       <Card>
-        <Text style={[styles.cardTitle, { marginBottom: 8 }]}>Demo: Benutzer wechseln</Text>
-        {SEED_USERS.map((u) => (
+        <Text style={[styles.cardTitle, { marginBottom: 8 }]}>Demo: Ansicht als andere Person</Text>
+        {state.users.map((u) => (
           <Pressable
             key={u.id}
             style={[styles.row, { paddingVertical: 7 }]}
@@ -804,6 +808,7 @@ export function ProfileScreen() {
           </Pressable>
         ))}
       </Card>
+      )}
 
       {me.role === 'admin' && <ModeCard />}
 
@@ -831,7 +836,73 @@ export function ProfileScreen() {
           <Text style={styles.outlineButtonText}>Demo zurücksetzen</Text>
         </Pressable>
       </Card>
+
+      <Pressable style={styles.outlineButton} onPress={() => dispatch({ type: 'LOGOUT' })}>
+        <View style={styles.row}>
+          <LogOut size={15} color={colors.text} />
+          <Text style={styles.outlineButtonText}>Abmelden</Text>
+        </View>
+      </Pressable>
     </ScrollView>
+  )
+}
+
+/** Eigenes Passwort ändern */
+function PasswordCard({ user }: { user: User }) {
+  const { dispatch } = useStore()
+  const [open, setOpen] = useState(false)
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [repeat, setRepeat] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  function save() {
+    if (!verifyPassword(user, current)) return setError('Das aktuelle Passwort ist falsch.')
+    const problem = passwordProblem(next)
+    if (problem) return setError(problem)
+    if (next !== repeat) return setError('Die beiden neuen Passwörter stimmen nicht überein.')
+    dispatch({ type: 'SET_PASSWORD', userId: user.id, password: next })
+    setOpen(false)
+    setCurrent(''); setNext(''); setRepeat(''); setError(null)
+  }
+
+  if (!open) {
+    return (
+      <Pressable style={[styles.outlineButton, { marginTop: 0 }]} onPress={() => setOpen(true)}>
+        <View style={styles.row}>
+          <KeyRound size={15} color={colors.text} />
+          <Text style={styles.outlineButtonText}>Passwort ändern</Text>
+        </View>
+      </Pressable>
+    )
+  }
+
+  return (
+    <Card>
+      <Text style={[styles.cardTitle, { marginBottom: 10 }]}>Passwort ändern</Text>
+      <TextInput
+        style={[styles.input, { marginBottom: 8 }]} placeholder="Aktuelles Passwort" placeholderTextColor={colors.faint}
+        secureTextEntry autoCapitalize="none" value={current} onChangeText={(t) => { setCurrent(t); setError(null) }}
+      />
+      <TextInput
+        style={[styles.input, { marginBottom: 8 }]}
+        placeholder={`Neues Passwort (mind. ${MIN_PASSWORD_LENGTH} Zeichen, mit Ziffer)`} placeholderTextColor={colors.faint}
+        secureTextEntry autoCapitalize="none" value={next} onChangeText={(t) => { setNext(t); setError(null) }}
+      />
+      <TextInput
+        style={styles.input} placeholder="Neues Passwort wiederholen" placeholderTextColor={colors.faint}
+        secureTextEntry autoCapitalize="none" value={repeat} onChangeText={(t) => { setRepeat(t); setError(null) }}
+      />
+      {error && <Text style={[styles.faint, { color: colors.brand, marginTop: 8 }]}>{error}</Text>}
+      <View style={[styles.row, { marginTop: 12 }]}>
+        <Pressable style={[styles.outlineButton, { flex: 1, marginTop: 0 }]} onPress={() => { setOpen(false); setError(null) }}>
+          <Text style={styles.outlineButtonText}>Abbrechen</Text>
+        </Pressable>
+        <Pressable style={[styles.darkButton, { flex: 1, marginTop: 0, backgroundColor: colors.brand }]} onPress={save}>
+          <Text style={styles.darkButtonText}>Speichern</Text>
+        </Pressable>
+      </View>
+    </Card>
   )
 }
 

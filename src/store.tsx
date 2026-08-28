@@ -416,8 +416,14 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, audit: audit(state, action.entryType, action.message, action.userId) }
     case 'SET_MODE':
       return action.mode === state.mode ? state : loadStateFor(action.mode)
-    case 'RESET_DEMO':
-      return state.mode === 'live' ? createLiveInitialState() : createInitialState()
+    case 'RESET_DEMO': {
+      const fresh = state.mode === 'live' ? createLiveInitialState() : createInitialState()
+      // Angemeldet bleiben, sofern das eigene Konto im frischen Bestand existiert
+      const keep = fresh.users.some((u) => u.id === state.session?.userId)
+      return keep
+        ? { ...fresh, session: state.session, currentUserId: state.session!.userId }
+        : fresh
+    }
     default:
       return state
   }

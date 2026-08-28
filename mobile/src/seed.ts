@@ -442,16 +442,16 @@ export const SEED_GROUPS: Group[] = [
 ]
 
 export const SEED_USERS: User[] = [
-  { id: 'u-admin', firstName: 'Stefan', lastName: 'Gross', email: 'stefan.gross@sonnenberg-baar.ch', phone: '+41 79 100 10 01', role: 'admin', groupIds: ['gr-krisenstab', 'gr-alle'], locationId: 'loc-baar', language: 'de' },
-  { id: 'u-mueller', firstName: 'Anna', lastName: 'Müller', email: 'anna.mueller@sonnenberg-baar.ch', phone: '+41 79 100 10 02', role: 'krisenstab', groupIds: ['gr-krisenstab', 'gr-alle'], locationId: 'loc-baar', language: 'de' },
-  { id: 'u-rossi', firstName: 'Marco', lastName: 'Rossi', email: 'marco.rossi@sonnenberg-baar.ch', phone: '+41 79 100 10 03', role: 'krisenstab', groupIds: ['gr-krisenstab', 'gr-paed', 'gr-alle'], locationId: 'loc-menzingen', language: 'it' },
-  { id: 'u-weber', firstName: 'Lea', lastName: 'Weber', email: 'lea.weber@sonnenberg-baar.ch', phone: '+41 79 100 10 04', role: 'mitarbeiter', groupIds: ['gr-ersthelfer', 'gr-alle'], locationId: 'loc-baar', language: 'de' },
-  { id: 'u-favre', firstName: 'Julien', lastName: 'Favre', email: 'julien.favre@sonnenberg-baar.ch', phone: '+41 79 100 10 05', role: 'mitarbeiter', groupIds: ['gr-paed', 'gr-evak', 'gr-alle'], locationId: 'loc-menzingen', language: 'fr' },
-  { id: 'u-keller', firstName: 'Sandra', lastName: 'Keller', email: 'sandra.keller@sonnenberg-baar.ch', phone: '+41 79 100 10 06', role: 'mitarbeiter', groupIds: ['gr-it', 'gr-alle'], locationId: 'loc-baar', language: 'de', partTimeNote: '60 %, Mo–Mi' },
-  { id: 'u-huber', firstName: 'Thomas', lastName: 'Huber', email: 'thomas.huber@sonnenberg-baar.ch', phone: '+41 79 100 10 07', role: 'mitarbeiter', groupIds: ['gr-sicherheit', 'gr-alle'], locationId: 'loc-baar', language: 'de' },
-  { id: 'u-brunner', firstName: 'Nicole', lastName: 'Brunner', email: 'nicole.brunner@sonnenberg-baar.ch', phone: '+41 79 100 10 08', role: 'mitarbeiter', groupIds: ['gr-alle'], locationId: 'loc-kloten', language: 'de', absence: { from: '2026-08-10', to: '2026-08-24' } },
-  { id: 'u-meier', firstName: 'David', lastName: 'Meier', email: 'david.meier@sonnenberg-baar.ch', phone: '+41 79 100 10 09', role: 'mitarbeiter', groupIds: ['gr-evak', 'gr-alle'], locationId: 'loc-kloten', language: 'en' },
-  { id: 'u-schmid', firstName: 'Petra', lastName: 'Schmid', email: 'petra.schmid@sonnenberg-baar.ch', phone: '+41 79 100 10 10', role: 'mitarbeiter', groupIds: ['gr-ersthelfer', 'gr-paed', 'gr-alle'], locationId: 'loc-baar', language: 'de' },
+  { id: 'u-admin', firstName: 'Stefan', lastName: 'Gross', email: 'stefan.gross@sonnenberg-baar.ch', phone: '+41 79 100 10 01', role: 'admin', groupIds: ['gr-krisenstab', 'gr-alle'], locationId: 'loc-baar', language: 'de', passwordSalt: '8abffbd4978a8235', passwordHash: '2aef5f18d380585a2f435fbcf32d667d5e6c3daed5c75228afe384cf3af939be' },
+  { id: 'u-mueller', firstName: 'Anna', lastName: 'Müller', email: 'anna.mueller@sonnenberg-baar.ch', phone: '+41 79 100 10 02', role: 'krisenstab', groupIds: ['gr-krisenstab', 'gr-alle'], locationId: 'loc-baar', language: 'de', passwordSalt: '08ca19311fbba160', passwordHash: '1f249d4fa8084561a881d109953a4148b0631f1952c1ae0a7bd17e72318eede6' },
+  { id: 'u-rossi', firstName: 'Marco', lastName: 'Rossi', email: 'marco.rossi@sonnenberg-baar.ch', phone: '+41 79 100 10 03', role: 'krisenstab', groupIds: ['gr-krisenstab', 'gr-paed', 'gr-alle'], locationId: 'loc-menzingen', language: 'it', passwordSalt: '63935256684aec74', passwordHash: 'da7d1cc5f05082f5ee540b9b63587b4a76234464ef88948271e0cacd146ef09d' },
+  { id: 'u-weber', firstName: 'Lea', lastName: 'Weber', email: 'lea.weber@sonnenberg-baar.ch', phone: '+41 79 100 10 04', role: 'mitarbeiter', groupIds: ['gr-ersthelfer', 'gr-alle'], locationId: 'loc-baar', language: 'de', passwordSalt: 'e3cb7f472098396c', passwordHash: 'a33c1a168115f31884c38eb2dfc728b05deca3b301c084d5f25efe12296f2624' },
+  { id: 'u-favre', firstName: 'Julien', lastName: 'Favre', email: 'julien.favre@sonnenberg-baar.ch', phone: '+41 79 100 10 05', role: 'mitarbeiter', groupIds: ['gr-paed', 'gr-evak', 'gr-alle'], locationId: 'loc-menzingen', language: 'fr', passwordSalt: '6a1f035f943f9969', passwordHash: '16aee1329273914e79457809669bef28557feb072f67a02995ca0dc8f26865a1' },
+  { id: 'u-keller', firstName: 'Sandra', lastName: 'Keller', email: 'sandra.keller@sonnenberg-baar.ch', phone: '+41 79 100 10 06', role: 'mitarbeiter', groupIds: ['gr-it', 'gr-alle'], locationId: 'loc-baar', language: 'de', passwordSalt: '916b5b0c6272a02f', passwordHash: '241b34a7a7f0ef73cc09437c50c53fa427c223454fe30c78e653d36498cf2c25', partTimeNote: '60 %, Mo–Mi' },
+  { id: 'u-huber', firstName: 'Thomas', lastName: 'Huber', email: 'thomas.huber@sonnenberg-baar.ch', phone: '+41 79 100 10 07', role: 'mitarbeiter', groupIds: ['gr-sicherheit', 'gr-alle'], locationId: 'loc-baar', language: 'de', passwordSalt: '571aa5c023c79f4b', passwordHash: 'f16d42e7e1ebb76b0493e452c32cf567a8deaab1936751ea3f6f1b442d8f5cfc' },
+  { id: 'u-brunner', firstName: 'Nicole', lastName: 'Brunner', email: 'nicole.brunner@sonnenberg-baar.ch', phone: '+41 79 100 10 08', role: 'mitarbeiter', groupIds: ['gr-alle'], locationId: 'loc-kloten', language: 'de', passwordSalt: 'c5eab44e91ba1412', passwordHash: '59c866dd4db245f31ed66d843bafa5675d2a6baf2439c90c0a786421f8abcfb5', absence: { from: '2026-08-10', to: '2026-08-24' } },
+  { id: 'u-meier', firstName: 'David', lastName: 'Meier', email: 'david.meier@sonnenberg-baar.ch', phone: '+41 79 100 10 09', role: 'mitarbeiter', groupIds: ['gr-evak', 'gr-alle'], locationId: 'loc-kloten', language: 'en', passwordSalt: 'b0b416586e60b270', passwordHash: '5acb228842607b28bcbe39ffe523fae0b9685222ef39e3b24321747cd18bcd58' },
+  { id: 'u-schmid', firstName: 'Petra', lastName: 'Schmid', email: 'petra.schmid@sonnenberg-baar.ch', phone: '+41 79 100 10 10', role: 'mitarbeiter', groupIds: ['gr-ersthelfer', 'gr-paed', 'gr-alle'], locationId: 'loc-baar', language: 'de', passwordSalt: 'eb6195c97f3f50c0', passwordHash: 'b2d27876d188ceee4574c5bae3360554ee4982fd3d966c28d743db31b5a49f75' },
 ]
 
 export const SEED_PLANS: AlarmPlan[] = [
@@ -569,9 +569,16 @@ export const SEED_INTEGRATIONS: IntegrationSettings = {
   ],
 }
 
+/** Passwort aller Demo-Benutzer – wird auf der Anmeldemaske im Demo-Modus angezeigt */
+export const DEMO_PASSWORD = 'sobe2026'
+
+/** Erstpasswort des Live-Administrators; muss bei der ersten Anmeldung geändert werden */
+export const LIVE_INITIAL_PASSWORD = 'SOBE-Start2026!'
+
 export function createInitialState(): AppState {
   return {
     mode: 'demo',
+    session: null,
     scenarioContentVersion: SCENARIO_CONTENT_VERSION,
     currentUserId: 'u-admin',
     users: SEED_USERS,
@@ -599,12 +606,14 @@ export function createInitialState(): AppState {
 export function createLiveInitialState(): AppState {
   return {
     mode: 'live',
+    session: null,
     scenarioContentVersion: SCENARIO_CONTENT_VERSION,
     currentUserId: 'u-admin',
     users: [
       {
         id: 'u-admin', firstName: 'Stefan', lastName: 'Gross', email: 'stefan.gross@sonnenberg-baar.ch',
         phone: '', role: 'admin', groupIds: ['gr-krisenstab', 'gr-alle'], locationId: 'loc-baar', language: 'de',
+        passwordSalt: 'bd631b09890e1d5d', passwordHash: '04b1c430ab36995b316131aef36a319b105b37a521680291dc490c387ff135c4', mustChangePassword: true,
       },
     ],
     groups: SEED_GROUPS,

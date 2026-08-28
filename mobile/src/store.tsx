@@ -1,9 +1,10 @@
 import React, { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react'
 import { Vibration } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import type { Alarm, AlarmLogEntry, Channel, Delivery, EscalationLevel, LoneWorkSession, User } from './types'
+import type { Alarm, AlarmLogEntry, Channel, Delivery, EscalationLevel, LoneWorkSession, Session, User } from './types'
 import { CHANNEL_LABELS } from './types'
-import { SEED_GROUPS, SEED_SCENARIOS, SEED_USERS } from './seed'
+import { LIVE_INITIAL_PASSWORD, SEED_GROUPS, SEED_SCENARIOS, SEED_USERS, createLiveInitialState } from './seed'
+import { hashPassword, randomSalt } from './auth'
 import { notifyNow } from './notifications'
 
 export type AppMode = 'demo' | 'live'
@@ -20,15 +21,22 @@ export function uid(prefix: string): string {
 
 export interface MobileState {
   mode: AppMode
+  /** Angemeldete Sitzung – null bedeutet: Anmeldemaske anzeigen */
+  session: Session | null
+  /** Benutzerverzeichnis des jeweiligen Modus (Demo: Beispielteam, Live: echte Konten) */
+  users: User[]
   currentUserId: string
   alarms: Alarm[]
   loneWorkSessions: LoneWorkSession[]
 }
 
 function initialState(mode: AppMode): MobileState {
+  const users = mode === 'live' ? createLiveInitialState().users : SEED_USERS
   return {
     mode,
-    currentUserId: 'u-weber',
+    session: null,
+    users,
+    currentUserId: users[0].id,
     alarms: [],
     loneWorkSessions: [],
   }
@@ -36,9 +44,9 @@ function initialState(mode: AppMode): MobileState {
 
 // ---------- Alarm-Logik (identisch zur Web-App, Alarmserver wird lokal simuliert) ----------
 
-export function resolveRecipients(groupIds: string[], locationIds: string[]): User[] {
+export function resolveRecipients(users: User[], groupIds: string[], locationIds: string[]): User[] {
   const today = new Date().toISOString().slice(0, 10)
-  return SEED_USERS.filter((u) => {
+  return users.filter((u) => {
     const inGroup = groupIds.length === 0 || u.groupIds.some((g) => groupIds.includes(g))
     const inLocation = locationIds.length === 0 || locationIds.includes(u.locationId)
     const absent = u.absence && u.absence.from <= today && today <= u.absence.to
@@ -71,10 +79,10 @@ export interface TriggerOptions {
   recipientUserIds?: string[]
 }
 
-export function createAlarm(opts: TriggerOptions): Alarm {
+export function createAlarm(users: User[], opts: TriggerOptions): Alarm {
   const recipients = opts.recipientUserIds
-    ? SEED_USERS.filter((u) => opts.recipientUserIds!.includes(u.id))
-    : resolveRecipients(opts.groupIds, opts.locationIds)
+    ? users.filter((u) => opts.recipientUserIds!.includes(u.id))
+    : resolveRecipients(users, opts.groupIds, opts.locationIds)
   const now = Date.now()
   return {
     id: uid('alarm'),
@@ -99,6 +107,9 @@ export function createAlarm(opts: TriggerOptions): Alarm {
 }
 
 export type Action =
+  | { type: 'LOGIN'; userId: string }
+  | { type: 'LOGOUT' }
+  | { type: 'SET_PASSWORD'; userId: string; password: string; mustChange?: boolean }
   | { type: 'SET_USER'; userId: string }
   | { type: 'TRIGGER_ALARM'; alarm: Alarm }
   | { type: 'END_ALARM'; alarmId: string }
@@ -147,7 +158,7 @@ function tick(state: MobileState, now: number): MobileState {
         if (Math.random() < 0.06) {
           const ack = Math.random() < 0.85 ? ('acknowledged' as const) : ('declined' as const)
           deliveries = deliveries.map((d) => (d.userId === userId ? { ...d, ack } : d))
-          const user = SEED_USERS.find((u) => u.id === userId)
+          const user = state.users.find((u) => u.id === userId)
           log.push({
             ts: now,
             message: `${user ? `${user.firstName} ${user.lastName}` : userId} hat ${ack === 'acknowledged' ? 'quittiert (kommt)' : 'abgelehnt (nicht verfügbar)'}`,
@@ -163,7 +174,7 @@ function tick(state: MobileState, now: number): MobileState {
     const anyAck = deliveries.some((d) => d.ack === 'acknowledged')
     if (nextLevel && !anyAck && now - alarm.triggeredAt > nextLevel.afterMinutes * 60_000) {
       escalationStage += 1
-      const recipients = resolveRecipients(nextLevel.groupIds, alarm.locationIds)
+      const recipients = resolveRecipients(state.users, nextLevel.groupIds, alarm.locationIds)
       deliveries = [...deliveries, ...buildDeliveries(recipients, nextLevel.channels)]
       log.push({
         ts: now,
@@ -187,9 +198,9 @@ function tick(state: MobileState, now: number): MobileState {
       expired.some((e) => e.id === s.id) ? { ...s, status: 'alarm' as const } : s,
     )
     for (const session of expired) {
-      const user = SEED_USERS.find((u) => u.id === session.userId)
+      const user = state.users.find((u) => u.id === session.userId)
       newAlarms = [
-        createAlarm({
+        createAlarm(state.users, {
           scenarioId: 'sc-medizin',
           message: `ALLEINARBEIT: Timer von ${user ? `${user.firstName} ${user.lastName}` : '?'} abgelaufen (${session.activity}). Keine Rückmeldung – bitte sofort prüfen!`,
           silent: session.silent,
@@ -213,6 +224,30 @@ function tick(state: MobileState, now: number): MobileState {
 
 function reducer(state: MobileState, action: Action): MobileState {
   switch (action.type) {
+    case 'LOGIN': {
+      const user = state.users.find((u) => u.id === action.userId)
+      if (!user) return state
+      return {
+        ...state,
+        session: { userId: user.id, loginAt: Date.now() },
+        currentUserId: user.id,
+        users: state.users.map((u) => (u.id === user.id ? { ...u, lastLoginAt: Date.now() } : u)),
+      }
+    }
+    case 'LOGOUT':
+      return { ...state, session: null }
+    case 'SET_PASSWORD': {
+      const salt = randomSalt()
+      const hash = hashPassword(action.password, salt)
+      return {
+        ...state,
+        users: state.users.map((u) =>
+          u.id === action.userId
+            ? { ...u, passwordSalt: salt, passwordHash: hash, mustChangePassword: action.mustChange ?? false }
+            : u,
+        ),
+      }
+    }
     case 'SET_USER':
       return { ...state, currentUserId: action.userId }
     case 'TRIGGER_ALARM':
@@ -253,8 +288,12 @@ function reducer(state: MobileState, action: Action): MobileState {
       }
     case 'HYDRATE':
       return action.state
-    case 'RESET':
-      return initialState(state.mode)
+    case 'RESET': {
+      const fresh = initialState(state.mode)
+      // Angemeldet bleiben, sofern das eigene Konto im frischen Bestand existiert
+      const keep = fresh.users.some((u) => u.id === state.session?.userId)
+      return keep ? { ...fresh, session: state.session, currentUserId: state.session!.userId } : fresh
+    }
     default:
       return state
   }
@@ -276,6 +315,10 @@ function toastForAction(action: Action): Toast['message'] | { message: string; k
       return 'Alarm beendet – Entwarnung versendet'
     case 'ACK_ALARM':
       return action.ack === 'acknowledged' ? 'Quittiert – Sie nehmen teil' : 'Als nicht verfügbar gemeldet'
+    case 'LOGOUT':
+      return 'Abgemeldet'
+    case 'SET_PASSWORD':
+      return 'Passwort gespeichert'
     case 'START_LONE_WORK':
       return 'Alleinarbeits-Timer gestartet'
     case 'EXTEND_LONE_WORK':
@@ -291,15 +334,46 @@ function toastForAction(action: Action): Toast['message'] | { message: string; k
 
 // ---------- Provider ----------
 
+/**
+ * Gespeicherte Stände auf die Anmeldung umstellen. Ältere Stände kennen weder
+ * Benutzerverzeichnis noch Sitzung; sie erhalten das Verzeichnis des Modus und
+ * – falls kein anmeldefähiges Konto existiert – ein Erstpasswort für Admins.
+ */
+function migrateAuth(parsed: MobileState, mode: AppMode): MobileState {
+  const fallback = initialState(mode)
+  const seedById = new Map(SEED_USERS.map((u) => [u.id, u]))
+
+  let users = (parsed.users?.length ? parsed.users : fallback.users).map((u) => {
+    if (u.passwordHash && u.passwordSalt) return u
+    const seed = seedById.get(u.id)
+    if (seed?.passwordHash && seed.passwordSalt) {
+      return { ...u, passwordSalt: seed.passwordSalt, passwordHash: seed.passwordHash }
+    }
+    return u
+  })
+
+  if (!users.some((u) => u.passwordHash && u.passwordSalt)) {
+    const salt = randomSalt()
+    const hash = hashPassword(LIVE_INITIAL_PASSWORD, salt)
+    users = users.map((u) => (u.role === 'admin' ? { ...u, passwordSalt: salt, passwordHash: hash, mustChangePassword: true } : u))
+  }
+
+  const session = parsed.session ?? null
+  return {
+    ...parsed,
+    mode,
+    users,
+    session: session && users.some((u) => u.id === session.userId) ? session : null,
+    currentUserId: users.some((u) => u.id === parsed.currentUserId) ? parsed.currentUserId : users[0].id,
+  }
+}
+
 async function loadStateForMode(mode: AppMode): Promise<MobileState> {
   try {
     const raw = await AsyncStorage.getItem(DATA_KEYS[mode])
     if (raw) {
       const parsed = JSON.parse(raw) as MobileState
-      if (parsed.currentUserId) {
-        parsed.mode = mode
-        return parsed
-      }
+      if (parsed.currentUserId) return migrateAuth(parsed, mode)
     }
   } catch {
     // korrupte Daten -> Ausgangszustand
