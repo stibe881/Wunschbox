@@ -19,6 +19,7 @@ Alarmserver, Multikanal-Alarmierung, Notfallszenarien mit Handlungsanweisungen u
 - **Alarmierungskanäle (simuliert):** Push mit Critical Alerts, SMS, E-Mail, Sprachanruf, Telefonkonferenz, Text-to-Speech-Durchsage, Microsoft Teams.
 - **Stiller Alarm** (z. B. Bedrohungslage) und **Aufgebot mit Quittierfunktion** («Ich komme» / «Nicht verfügbar»).
 - **Alarmzentrale:** Live-Monitoring mit Zustellstatus pro Empfänger und Kanal, Quittierungsübersicht, Alarmjournal, automatische Eskalationsstufen, Entwarnung.
+- **Anmeldung:** E-Mail und Passwort, im Webportal wie in der App. Passwörter werden gesalzen und als SHA-256-Hash gespeichert; Administratoren vergeben und setzen Passwörter in der Benutzerverwaltung zurück, jede Person ändert ihr Passwort im Profil. Ein Erstpasswort kann mit erzwungenem Wechsel bei der nächsten Anmeldung vergeben werden. Die Prüfung der Anmeldedaten liegt vollständig in `src/lib/auth.ts` – für eine spätere SSO- oder Backend-Anbindung muss nur `authenticate()` ersetzt werden.
 - **Rollen & Portale:** Das Webportal (Verwaltung) ist Admin und Krisenstab vorbehalten – beide sehen alles und haben zusätzlich Zugriff auf die iOS-App (`mobile/`, plus Web-Vorschau über «App-Vorschau (iOS)»). Mitarbeitende haben ausschliesslich Zugriff auf die iOS-App; im Webportal sehen sie nur einen Hinweis-Bildschirm mit Verweis auf die App.
 - **App-Vorschau (iOS):** Web-Version der Mitarbeiter-App mit SOS-Taste (Halte-Geste), aktiven Alarmen mit Quittierung, offline verfügbaren Szenarien/Checklisten, eigenem Alleinarbeits-Timer und Notrufkontakten (direkt anrufbar) – öffnet in einem separaten Tab.
 
@@ -64,10 +65,24 @@ npm run build    # Produktions-Build nach dist/
 npm run preview  # Produktions-Build lokal testen
 ```
 
+## Anmeldung
+
+| Modus | Konto | Passwort |
+| --- | --- | --- |
+| Demo | alle zehn Beispielkonten, z. B. `stefan.gross@sonnenberg-baar.ch` (Admin), `anna.mueller@sonnenberg-baar.ch` (Krisenstab), `lea.weber@sonnenberg-baar.ch` (Mitarbeiterin) | `sobe2026` |
+| Live | `stefan.gross@sonnenberg-baar.ch` (einziges ausgeliefertes Konto) | `SOBE-Start2026!`, muss bei der ersten Anmeldung geändert werden |
+
+Die Demo-Zugänge stehen zum Hineinklicken auf der Anmeldemaske; im Live-Modus erscheinen sie nicht.
+Demo- und Live-Modus haben getrennte Datenbestände und damit auch getrennte Anmeldungen.
+
+> Ohne Server werden die Passwort-Hashes lokal auf dem Gerät gespeichert. Das verhindert Klartext-Passwörter
+> und fremden Zugriff auf ein unbeaufsichtigtes Gerät, ersetzt aber keine serverseitige Authentifizierung –
+> dafür braucht es die SSO- bzw. Backend-Anbindung.
+
 ## Bedienung (Schnellstart)
 
 1. **Alarm auslösen** → Szenario wählen (Kanäle und zuständige Gruppen werden automatisch vorbefüllt) → prüfen → auslösen.
 2. In der **Alarmzentrale** den Live-Zustellstatus und das Alarmjournal beobachten.
-3. In der **Benutzeransicht (App)** über Profil → «Demo: Benutzer wechseln» einen Mitarbeiter wählen und den Alarm quittieren.
+3. In der **Benutzeransicht (App)** über Profil → «Demo: Ansicht als andere Person» einen Mitarbeiter wählen und den Alarm quittieren.
 4. Unter **Alleinarbeit** einen kurzen Timer (1 Min.) starten und ablaufen lassen – der automatische Alarm erscheint in der Alarmzentrale.
 5. Über **Ereignisprotokoll → Demo zurücksetzen** lässt sich der Ausgangszustand wiederherstellen.
