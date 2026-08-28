@@ -2,8 +2,9 @@ import React, { useState } from 'react'
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { AlertTriangle, Eye, EyeOff, LogIn, ShieldCheck } from 'lucide-react-native'
 import { useStore } from './store'
-import { DEMO_PASSWORD, LIVE_INITIAL_PASSWORD } from './seed'
-import { MIN_PASSWORD_LENGTH, authenticate, passwordProblem } from './auth'
+import { DEMO_PASSWORD } from './seed'
+import { MIN_PASSWORD_LENGTH, passwordProblem } from './auth'
+import { serverUrl, setServerUrl } from './api'
 import type { User } from './types'
 import { colors } from './ui'
 
@@ -47,19 +48,21 @@ function Shell({ subtitle, children, showModeSwitch = false }: { subtitle: strin
 
 /** Anmeldung mit E-Mail und Passwort */
 export default function LoginScreen() {
-  const { state, dispatch } = useStore()
+  const { state, login, serverStatus } = useStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [show, setShow] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [serverBearbeiten, setServerBearbeiten] = useState(false)
+  const [adresse, setAdresse] = useState(serverUrl())
 
-  const liveFirstRun = state.mode === 'live' && state.users.length === 1 && state.users[0].mustChangePassword === true
-
-  function submit() {
-    const result = authenticate(state.users, email, password)
-    if (!result.ok) return setError(result.error)
+  async function submit() {
+    setBusy(true)
     setError(null)
-    dispatch({ type: 'LOGIN', userId: result.user.id })
+    const ergebnis = await login(email, password)
+    setBusy(false)
+    if (!ergebnis.ok) setError(ergebnis.error)
   }
 
   return (
@@ -104,9 +107,9 @@ export default function LoginScreen() {
           </View>
         )}
 
-        <Pressable style={s.primary} onPress={submit}>
+        <Pressable style={[s.primary, busy && { opacity: 0.6 }]} onPress={submit} disabled={busy}>
           <LogIn size={16} color="#fff" />
-          <Text style={s.primaryText}>Anmelden</Text>
+          <Text style={s.primaryText}>{busy ? 'Anmelden …' : 'Anmelden'}</Text>
         </Pressable>
       </View>
 
@@ -122,34 +125,67 @@ export default function LoginScreen() {
         </View>
       )}
 
-      {liveFirstRun && (
-        <View style={[s.hint, { borderColor: '#065f46' }]}>
-          <View style={s.hintRow}>
-            <ShieldCheck size={14} color={colors.green} />
-            <Text style={[s.hintTitle, { color: colors.green }]}>Erstzugang Live-Betrieb</Text>
-          </View>
-          <Text style={s.hintText}>
-            {state.users[0].email} mit dem Erstpasswort {LIVE_INITIAL_PASSWORD}. Das Passwort muss bei der ersten
-            Anmeldung geändert werden.
-          </Text>
+      {state.mode === 'live' && (
+        <View style={s.hint}>
+          {serverBearbeiten ? (
+            <>
+              <Text style={s.hintTitle}>Adresse des Alarmservers</Text>
+              <TextInput
+                style={[s.input, { marginBottom: 8 }]}
+                value={adresse}
+                onChangeText={setAdresse}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                placeholder="http://192.168.1.42:3001"
+                placeholderTextColor="#64748b"
+              />
+              <Text style={s.hintText}>
+                Die IP-Adresse des Rechners im Schulnetz, auf dem der Alarmserver läuft.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Pressable style={[s.kleinerKnopf, { backgroundColor: '#334155' }]} onPress={() => setServerBearbeiten(false)}>
+                  <Text style={s.kleinerKnopfText}>Abbrechen</Text>
+                </Pressable>
+                <Pressable
+                  style={[s.kleinerKnopf, { backgroundColor: colors.brand }]}
+                  onPress={async () => { await setServerUrl(adresse); setServerBearbeiten(false); setError(null) }}
+                >
+                  <Text style={s.kleinerKnopfText}>Übernehmen</Text>
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            <Pressable onPress={() => { setAdresse(serverUrl()); setServerBearbeiten(true) }}>
+              <Text style={s.hintTitle}>Alarmserver</Text>
+              <Text style={s.hintText}>
+                {serverUrl()}
+                {serverStatus === 'getrennt' ? ' – nicht erreichbar' : ''}
+              </Text>
+              <Text style={[s.hintText, { marginBottom: 0 }]}>Zum Ändern tippen.</Text>
+            </Pressable>
+          )}
         </View>
       )}
+
     </Shell>
   )
 }
 
 /** Erzwungene Passwortänderung nach der ersten Anmeldung */
 export function ForcePasswordChange({ user }: { user: User }) {
-  const { dispatch } = useStore()
+  const { changePassword, logout, knownPassword } = useStore()
+  const [aktuell, setAktuell] = useState('')
   const [password, setPassword] = useState('')
   const [repeat, setRepeat] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  function submit() {
+  async function submit() {
     const problem = passwordProblem(password)
     if (problem) return setError(problem)
     if (password !== repeat) return setError('Die beiden Passwörter stimmen nicht überein.')
-    dispatch({ type: 'SET_PASSWORD', userId: user.id, password })
+    const ergebnis = await changePassword(knownPassword ?? aktuell, password)
+    if (!ergebnis.ok) setError(ergebnis.error)
   }
 
   return (
@@ -159,6 +195,17 @@ export function ForcePasswordChange({ user }: { user: User }) {
           <ShieldCheck size={15} color="#fcd34d" />
           <Text style={s.noticeText}>Bitte vergeben Sie ein eigenes Passwort, bevor Sie fortfahren.</Text>
         </View>
+
+        {/* Nach einem Neustart ist das Anmeldepasswort nicht mehr bekannt */}
+        {!knownPassword && (
+          <>
+            <Text style={s.label}>Bisheriges Passwort</Text>
+            <TextInput
+              style={[s.input, { marginBottom: 14 }]} secureTextEntry autoCapitalize="none"
+              value={aktuell} onChangeText={(t) => { setAktuell(t); setError(null) }}
+            />
+          </>
+        )}
 
         <Text style={s.label}>Neues Passwort (mind. {MIN_PASSWORD_LENGTH} Zeichen, mit Ziffer)</Text>
         <TextInput
@@ -182,7 +229,7 @@ export function ForcePasswordChange({ user }: { user: User }) {
         <Pressable style={s.primary} onPress={submit}>
           <Text style={s.primaryText}>Passwort speichern</Text>
         </Pressable>
-        <Pressable onPress={() => dispatch({ type: 'LOGOUT' })}>
+        <Pressable onPress={logout}>
           <Text style={s.link}>Abmelden</Text>
         </Pressable>
       </View>
@@ -215,4 +262,6 @@ const s = StyleSheet.create({
   hintTitle: { color: '#cbd5e1', fontSize: 13, fontWeight: '700', marginBottom: 6 },
   hintText: { color: '#94a3b8', fontSize: 12, marginBottom: 8, lineHeight: 17 },
   hintLink: { color: '#cbd5e1', fontSize: 12, paddingVertical: 3 },
+  kleinerKnopf: { flex: 1, borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
+  kleinerKnopfText: { color: '#fff', fontWeight: '700', fontSize: 12 },
 })

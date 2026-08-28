@@ -1,11 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react'
 import { Vibration } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import type { Alarm, AlarmLogEntry, Channel, Delivery, EscalationLevel, LoneWorkSession, Session, User } from './types'
+import type { Alarm, AlarmLogEntry, Channel, Delivery, EmergencyContact, EscalationLevel, Group, Location, LoneWorkSession, Scenario, Session, User } from './types'
 import { CHANNEL_LABELS } from './types'
-import { LIVE_INITIAL_PASSWORD, SEED_GROUPS, SEED_SCENARIOS, SEED_USERS, createLiveInitialState } from './seed'
+import { LIVE_INITIAL_PASSWORD, SEED_CONTACTS, SEED_GROUPS, SEED_LOCATIONS, SEED_SCENARIOS, SEED_USERS } from './seed'
 import { hashPassword, randomSalt } from './auth'
-import { notifyNow } from './notifications'
+import { getPushToken, notifyNow } from './notifications'
+import { ApiError, api, authToken, loadApiSettings, setAuthToken, type ServerData } from './api'
+import { authenticate, passwordProblem, verifyPassword } from './auth'
 
 export type AppMode = 'demo' | 'live'
 
@@ -28,21 +30,34 @@ export interface MobileState {
   authVersion?: number
   /** Angemeldete Sitzung – null bedeutet: Anmeldemaske anzeigen */
   session: Session | null
-  /** Benutzerverzeichnis des jeweiligen Modus (Demo: Beispielteam, Live: echte Konten) */
+  /**
+   * Datenbestand. Im Demo-Modus die mitgelieferten Beispieldaten, im Live-Modus
+   * der Stand des Alarmservers – damit App und Webportal dasselbe sehen.
+   */
   users: User[]
+  groups: Group[]
+  locations: Location[]
+  scenarios: Scenario[]
+  contacts: EmergencyContact[]
   currentUserId: string
   alarms: Alarm[]
   loneWorkSessions: LoneWorkSession[]
 }
 
 function initialState(mode: AppMode): MobileState {
-  const users = mode === 'live' ? createLiveInitialState().users : SEED_USERS
+  // Im Live-Modus füllt der Server den Bestand; bis dahin bleibt er leer
+  const live = mode === 'live'
+  const users = live ? [] : SEED_USERS
   return {
     mode,
     authVersion: AUTH_MIGRATION_VERSION,
     session: null,
     users,
-    currentUserId: users[0].id,
+    groups: live ? [] : SEED_GROUPS,
+    locations: live ? [] : SEED_LOCATIONS,
+    scenarios: live ? [] : SEED_SCENARIOS,
+    contacts: live ? [] : SEED_CONTACTS,
+    currentUserId: users[0]?.id ?? '',
     alarms: [],
     loneWorkSessions: [],
   }
@@ -125,6 +140,7 @@ export type Action =
   | { type: 'EXTEND_LONE_WORK'; sessionId: string; minutes: number }
   | { type: 'COMPLETE_LONE_WORK'; sessionId: string }
   | { type: 'HYDRATE'; state: MobileState }
+  | { type: 'ADOPT_SERVER'; data: ServerData; session: Session | null }
   | { type: 'RESET' }
 
 /** Zustellsimulation (nur Demo), Eskalation, Alleinarbeits-Timer */
@@ -292,6 +308,23 @@ function reducer(state: MobileState, action: Action): MobileState {
         ...state,
         loneWorkSessions: state.loneWorkSessions.map((s) => (s.id === action.sessionId ? { ...s, status: 'completed' as const } : s)),
       }
+    case 'ADOPT_SERVER': {
+      // Im Live-Modus ist der Server die Wahrheit; Modus und Anmeldung bleiben lokal
+      const session = action.session
+      return {
+        ...state,
+        users: action.data.users,
+        groups: action.data.groups,
+        locations: action.data.locations,
+        scenarios: action.data.scenarios,
+        contacts: action.data.contacts,
+        alarms: action.data.alarms,
+        loneWorkSessions: action.data.loneWorkSessions,
+        mode: 'live',
+        session,
+        currentUserId: session?.userId ?? state.currentUserId,
+      }
+    }
     case 'HYDRATE':
       return action.state
     case 'RESET': {
@@ -356,8 +389,9 @@ function ensureLoginPossible(users: User[]): User[] {
   if (users.some((u) => u.role === 'admin')) {
     return users.map((u) => (u.role === 'admin' ? withInitialPassword(u) : u))
   }
-  const rescue = createLiveInitialState().users[0]
-  return [withInitialPassword(rescue), ...users.filter((u) => u.id !== rescue.id)]
+  const rescue = SEED_USERS.find((u) => u.role === 'admin')
+  if (!rescue) return users
+  return [withInitialPassword({ ...rescue, passwordHash: undefined, passwordSalt: undefined }), ...users.filter((u) => u.id !== rescue.id)]
 }
 
 /**
@@ -386,7 +420,8 @@ function migrateAuth(parsed: MobileState, mode: AppMode): MobileState {
     users = users.map((u) => (u.passwordHash && seedHashes.has(u.passwordHash) ? withInitialPassword(u) : u))
   }
 
-  users = ensureLoginPossible(users)
+  // Im Live-Modus liefert der Server die Konten – lokal wird nichts erzeugt
+  users = mode === 'demo' ? ensureLoginPossible(users) : users
   const session = parsed.session ?? null
   return {
     ...parsed,
@@ -411,15 +446,63 @@ async function loadStateForMode(mode: AppMode): Promise<MobileState> {
   return initialState(mode)
 }
 
+export type ServerStatus = 'lokal' | 'verbindet' | 'verbunden' | 'getrennt'
+
 interface StoreCtx {
   state: MobileState
   dispatch: React.Dispatch<Action>
   switchMode: (mode: AppMode) => void
+  /** Anmelden – im Demo-Modus lokal, im Live-Modus über den Alarmserver */
+  login: (email: string, password: string) => Promise<{ ok: true } | { ok: false; error: string }>
+  logout: () => void
+  changePassword: (aktuell: string, neu: string) => Promise<{ ok: true } | { ok: false; error: string }>
+  serverStatus: ServerStatus
+  /** Bei der Anmeldung eingegebenes Passwort – nur im Arbeitsspeicher */
+  knownPassword: string | null
+  refresh: () => void
   toasts: Toast[]
   hydrated: boolean
 }
 
 const StoreContext = createContext<StoreCtx | null>(null)
+
+/**
+ * Eine Aktion im Live-Modus auf dem Server ausführen. Der Server ist dort die
+ * einzige Wahrheit; der neue Stand kommt anschliessend über /state zurück.
+ */
+async function serverEffekt(action: Action): Promise<boolean> {
+  switch (action.type) {
+    case 'TRIGGER_ALARM': {
+      const a = action.alarm
+      await api.triggerAlarm({
+        scenarioId: a.scenarioId, message: a.message, silent: a.silent, requireAck: a.requireAck,
+        channels: a.channels, groupIds: a.groupIds, locationIds: a.locationIds,
+        triggeredVia: 'app', escalation: a.escalation,
+        recipientUserIds: [...new Set(a.deliveries.map((d) => d.userId))],
+      })
+      return true
+    }
+    case 'END_ALARM':
+      await api.endAlarm(action.alarmId)
+      return true
+    case 'ACK_ALARM':
+      await api.ackAlarm(action.alarmId, action.ack)
+      return true
+    case 'START_LONE_WORK': {
+      const s = action.session
+      await api.startLoneWork({ activity: s.activity, durationMin: s.durationMin, locationId: s.locationId, silent: s.silent })
+      return true
+    }
+    case 'EXTEND_LONE_WORK':
+      await api.extendLoneWork(action.sessionId, action.minutes)
+      return true
+    case 'COMPLETE_LONE_WORK':
+      await api.completeLoneWork(action.sessionId)
+      return true
+    default:
+      return false
+  }
+}
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, rawDispatch] = useReducer(reducer, undefined, () => initialState('demo'))
@@ -428,6 +511,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
   const toastId = useRef(0)
+  const [serverStatus, setServerStatus] = useState<ServerStatus>('lokal')
+  const [knownPassword, setKnownPassword] = useState<string | null>(null)
 
   const pushToast = useCallback((message: string, kind: Toast['kind'] = 'success') => {
     const id = ++toastId.current
@@ -435,11 +520,130 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500)
   }, [])
 
+  /** Datenbestand vom Alarmserver holen */
+  const refresh = useCallback(async () => {
+    if (stateRef.current.mode !== 'live') return
+    if (!authToken()) {
+      setServerStatus('getrennt')
+      return
+    }
+    try {
+      const [{ user }, daten] = await Promise.all([api.me(), api.state()])
+      rawDispatch({ type: 'ADOPT_SERVER', data: daten, session: { userId: user.id, loginAt: Date.now() } })
+      setServerStatus('verbunden')
+    } catch (fehler) {
+      if (fehler instanceof ApiError && fehler.status === 401) {
+        await setAuthToken(null)
+        rawDispatch({ type: 'LOGOUT' })
+        setServerStatus('verbunden')
+      } else {
+        setServerStatus('getrennt')
+      }
+    }
+  }, [])
+
+  /** Push-Token dieses Geräts beim Alarmserver hinterlegen */
+  const registerPush = useCallback(async () => {
+    try {
+      const pushToken = await getPushToken()
+      if (pushToken) await api.registerPush(pushToken)
+    } catch {
+      // Push ist eine Zusatzfunktion, keine Voraussetzung
+    }
+  }, [])
+
+  const login = useCallback<StoreCtx['login']>(async (email, password) => {
+    if (stateRef.current.mode === 'demo') {
+      const ergebnis = authenticate(stateRef.current.users, email, password)
+      if (!ergebnis.ok) return { ok: false, error: ergebnis.error }
+      setKnownPassword(password)
+      rawDispatch({ type: 'LOGIN', userId: ergebnis.user.id })
+      return { ok: true }
+    }
+    try {
+      const { token } = await api.login(email, password)
+      await setAuthToken(token)
+      setKnownPassword(password)
+      await refresh()
+      // Gerät für echte Push-Nachrichten anmelden; scheitert es, bleibt die
+      // Anmeldung trotzdem gültig – Alarme erscheinen dann nur in der App
+      void registerPush()
+      return { ok: true }
+    } catch (fehler) {
+      return { ok: false, error: fehler instanceof ApiError ? fehler.message : 'Anmeldung fehlgeschlagen.' }
+    }
+  }, [refresh, registerPush])
+
+  const logout = useCallback(() => {
+    if (stateRef.current.mode === 'live') {
+      void getPushToken().then((t) => (t ? api.unregisterPush(t) : undefined)).catch(() => undefined)
+      api.logout().catch(() => {
+        // Server nicht erreichbar – lokal trotzdem abmelden
+      })
+      void setAuthToken(null)
+    }
+    setKnownPassword(null)
+    rawDispatch({ type: 'LOGOUT' })
+    pushToast('Abgemeldet')
+  }, [pushToast])
+
+  const changePassword = useCallback<StoreCtx['changePassword']>(async (aktuell, neu) => {
+    const eigen = stateRef.current.users.find((u) => u.id === stateRef.current.session?.userId)
+    if (!eigen) return { ok: false, error: 'Nicht angemeldet.' }
+
+    if (stateRef.current.mode === 'demo') {
+      if (!verifyPassword(eigen, aktuell)) return { ok: false, error: 'Das aktuelle Passwort ist falsch.' }
+      const problem = passwordProblem(neu)
+      if (problem) return { ok: false, error: problem }
+      rawDispatch({ type: 'SET_PASSWORD', userId: eigen.id, password: neu })
+      setKnownPassword(neu)
+      pushToast('Passwort gespeichert')
+      return { ok: true }
+    }
+    try {
+      await api.changePassword(aktuell, neu)
+      setKnownPassword(neu)
+      await refresh()
+      pushToast('Passwort gespeichert')
+      return { ok: true }
+    } catch (fehler) {
+      return { ok: false, error: fehler instanceof ApiError ? fehler.message : 'Passwort konnte nicht geändert werden.' }
+    }
+  }, [pushToast, refresh])
+
   const dispatch = useCallback(
     (action: Action) => {
+      if (stateRef.current.mode === 'live') {
+        if (action.type === 'LOGIN' || action.type === 'LOGOUT') {
+          rawDispatch(action)
+          return
+        }
+        serverEffekt(action)
+          .then((behandelt) => {
+            if (!behandelt) {
+              rawDispatch(action)
+              return
+            }
+            if (action.type === 'TRIGGER_ALARM' && !action.alarm.silent) {
+              const scenario = stateRef.current.scenarios.find((s) => s.id === action.alarm.scenarioId)
+              notifyNow(scenario ? `Alarm: ${scenario.title}` : 'Alarm ausgelöst', action.alarm.message)
+            }
+            const t = toastForAction(action)
+            if (t) {
+              if (typeof t === 'string') pushToast(t)
+              else pushToast(t.message, t.kind)
+            }
+            return refresh()
+          })
+          .catch((fehler) => {
+            pushToast(fehler instanceof ApiError ? fehler.message : 'Der Alarmserver hat die Aktion abgelehnt.', 'alarm')
+          })
+        return
+      }
+
       rawDispatch(action)
       if (action.type === 'TRIGGER_ALARM' && !action.alarm.silent) {
-        const scenario = SEED_SCENARIOS.find((s) => s.id === action.alarm.scenarioId)
+        const scenario = stateRef.current.scenarios.find((s) => s.id === action.alarm.scenarioId)
         notifyNow(scenario ? `Alarm: ${scenario.title}` : 'Alarm ausgelöst', action.alarm.message)
       }
       const t = toastForAction(action)
@@ -448,11 +652,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         else pushToast(t.message, t.kind)
       }
     },
-    [pushToast],
+    [pushToast, refresh],
   )
 
   useEffect(() => {
-    AsyncStorage.getItem(MODE_KEY)
+    loadApiSettings()
+      .then(() => AsyncStorage.getItem(MODE_KEY))
       .then((stored) => loadStateForMode(stored === 'live' ? 'live' : 'demo'))
       .then((loaded) => rawDispatch({ type: 'HYDRATE', state: loaded }))
       .catch(() => {
@@ -463,7 +668,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return
-    AsyncStorage.setItem(DATA_KEYS[state.mode], JSON.stringify(state)).catch(() => {})
+    // Live-Daten gehören dem Server; lokal wird nur der Modus gemerkt
+    if (state.mode === 'demo') AsyncStorage.setItem(DATA_KEYS.demo, JSON.stringify(state)).catch(() => {})
     AsyncStorage.setItem(MODE_KEY, state.mode).catch(() => {})
   }, [state, hydrated])
 
@@ -474,7 +680,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         rawDispatch({ type: 'HYDRATE', state: loaded })
         pushToast(
           mode === 'live'
-            ? 'Live-Modus aktiv – keine Simulation, eigener Datenbestand'
+            ? 'Live-Modus aktiv – Daten vom Alarmserver'
             : 'Demo-Modus aktiv – Zustellung wird simuliert',
         )
       })
@@ -482,12 +688,34 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [pushToast],
   )
 
+  // Im Live-Modus regelmässig abgleichen. React Native kennt kein EventSource,
+  // deshalb wird abgefragt statt abonniert – im Vordergrund alle fünf Sekunden.
   useEffect(() => {
+    if (!hydrated || state.mode !== 'live') {
+      setServerStatus('lokal')
+      return
+    }
+    setServerStatus('verbindet')
+    void refresh()
+    if (!state.session) return
+    const interval = setInterval(() => void refresh(), 5000)
+    return () => clearInterval(interval)
+  }, [hydrated, state.mode, state.session?.userId, refresh])
+
+  // Simulation nur im Demo-Modus; im Live-Betrieb rechnet der Server
+  useEffect(() => {
+    if (state.mode !== 'demo') return
     const interval = setInterval(() => rawDispatch({ type: 'TICK', now: Date.now() }), 1000)
     return () => clearInterval(interval)
-  }, [])
+  }, [state.mode])
 
-  return <StoreContext.Provider value={{ state, dispatch, switchMode, toasts, hydrated }}>{children}</StoreContext.Provider>
+  return (
+    <StoreContext.Provider
+      value={{ state, dispatch, switchMode, login, logout, changePassword, serverStatus, knownPassword, refresh: () => void refresh(), toasts, hydrated }}
+    >
+      {children}
+    </StoreContext.Provider>
+  )
 }
 
 export function useStore() {

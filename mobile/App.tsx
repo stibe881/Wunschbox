@@ -5,7 +5,6 @@ import { StatusBar } from 'expo-status-bar'
 import { BellRing, BookOpen, CheckCircle2, MapPin, Phone, Siren, Timer, User, WifiOff } from 'lucide-react-native'
 import { StoreProvider, useStore } from './src/store'
 import { ensurePermissions } from './src/notifications'
-import { SEED_LOCATIONS } from './src/seed'
 import type { Scenario } from './src/types'
 import { colors } from './src/ui'
 import { ContactsScreen, LoneWorkScreen, ProfileScreen, ScenarioDetailScreen, ScenariosScreen, StartScreen } from './src/screens'
@@ -32,7 +31,7 @@ function Root() {
 
   const sessionUser = state.users.find((u) => u.id === state.session?.userId)
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
-  const myLocation = SEED_LOCATIONS.find((l) => l.id === me.locationId)
+  const myLocation = state.locations.find((l) => l.id === me.locationId)
   const myAlarms = state.alarms.filter(
     (a) => a.status === 'active' && (a.deliveries.some((d) => d.userId === me.id) || a.triggeredByUserId === me.id),
   )

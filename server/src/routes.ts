@@ -13,7 +13,7 @@ import {
   findStoredUserByEmail, fullState, saveAlarm, saveIntegrations, uid, upsertDoc, upsertGroup,
   upsertLocation, upsertUser,
 } from './store.js'
-import type { Alarm, Role, StoredUser } from './types.js'
+import type { AckStatus, Alarm, Role, StoredUser } from './types.js'
 
 export const router = Router()
 
@@ -352,16 +352,28 @@ router.post('/alarms/:id/ack', auth, (req: AuthRequest, res) => {
     res.status(404).json({ error: 'Alarm nicht gefunden.' })
     return
   }
-  const ack = req.body?.ack === 'declined' ? 'declined' : 'acknowledged'
+  const ack: AckStatus = req.body?.ack === 'declined' ? 'declined' : 'acknowledged'
   const person = req.user!
+  const jetzt = Date.now()
+  const warEmpfaenger = alarm.deliveries.some((d) => d.userId === person.id)
+  // Wer den Alarm gesehen hat, aber nicht zur alarmierten Gruppe gehört, wird
+  // trotzdem erfasst – sonst behauptet das Journal eine Quittierung ohne Beleg
+  const deliveries = warEmpfaenger
+    ? alarm.deliveries.map((d) => (d.userId === person.id ? { ...d, ack, updatedAt: jetzt } : d))
+    : [
+        ...alarm.deliveries,
+        { id: uid('dlv'), userId: person.id, channel: alarm.channels[0] ?? 'push', status: 'delivered' as const, ack, updatedAt: jetzt },
+      ]
   const aktualisiert: Alarm = {
     ...alarm,
-    deliveries: alarm.deliveries.map((d) => (d.userId === person.id ? { ...d, ack, updatedAt: Date.now() } : d)),
+    deliveries,
     log: [
       ...alarm.log,
       {
-        ts: Date.now(),
-        message: `${person.firstName} ${person.lastName} hat ${ack === 'acknowledged' ? 'quittiert (kommt)' : 'abgelehnt (nicht verfügbar)'}`,
+        ts: jetzt,
+        message: `${person.firstName} ${person.lastName} hat ${ack === 'acknowledged' ? 'quittiert (kommt)' : 'abgelehnt (nicht verfügbar)'}${
+          warEmpfaenger ? '' : ' – war nicht Teil der Alarmierung'
+        }`,
       },
     ],
   }

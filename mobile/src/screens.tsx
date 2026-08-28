@@ -7,10 +7,9 @@ import {
 import { createAlarm, resolveRecipients, uid, useStore } from './store'
 import { ScenarioIcon } from './ScenarioIcon'
 import { cancelScheduled, ensurePermissions, getPushToken, remotePushAvailability, scheduleAt } from './notifications'
-import { SEED_CONTACTS, SEED_LOCATIONS, SEED_SCENARIOS, SEED_GROUPS } from './seed'
 import type { LoneWorkSession, Scenario, User } from './types'
 import { Badge, Card, HoldButton, colors, formatDuration, formatRelative } from './ui'
-import { MIN_PASSWORD_LENGTH, passwordProblem, verifyPassword } from './auth'
+import { MIN_PASSWORD_LENGTH, passwordProblem } from './auth'
 
 // ---------- Start: Alarme + SOS ----------
 
@@ -23,7 +22,7 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario) 
   )
 
   function sos() {
-    const location = SEED_LOCATIONS.find((l) => l.id === me.locationId)
+    const location = state.locations.find((l) => l.id === me.locationId)
     dispatch({
       type: 'TRIGGER_ALARM',
       alarm: createAlarm(state.users, {
@@ -85,7 +84,7 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario) 
       })}
 
       {myAlarms.map((a) => {
-        const scenario = SEED_SCENARIOS.find((s) => s.id === a.scenarioId)
+        const scenario = state.scenarios.find((s) => s.id === a.scenarioId)
         const myAck = a.deliveries.find((d) => d.userId === me.id)?.ack ?? 'none'
         return (
           <Card key={a.id} style={{ borderColor: a.silent ? colors.violet : colors.brandLight, borderWidth: 2 }}>
@@ -162,8 +161,9 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario) 
 // ---------- Szenarien ----------
 
 export function ScenariosScreen({ onOpen }: { onOpen: (s: Scenario) => void }) {
+  const { state } = useStore()
   const [search, setSearch] = useState('')
-  const filtered = SEED_SCENARIOS.filter((s) => !search || s.title.toLowerCase().includes(search.toLowerCase()))
+  const filtered = state.scenarios.filter((s) => !search || s.title.toLowerCase().includes(search.toLowerCase()))
 
   return (
     <ScrollView contentContainerStyle={styles.screen}>
@@ -199,11 +199,11 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
 
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
   const [alarmLocationIds, setAlarmLocationIds] = useState<string[]>([me.locationId])
-  const contacts = SEED_CONTACTS.filter((c) => scenario.contactIds.includes(c.id))
-  const responsibleGroups = SEED_GROUPS.filter((g) => scenario.responsibleGroupIds.includes(g.id))
+  const contacts = state.contacts.filter((c) => scenario.contactIds.includes(c.id))
+  const responsibleGroups = state.groups.filter((g) => scenario.responsibleGroupIds.includes(g.id))
   const alarmGroupIds = responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.id) : ['gr-alle']
   const alarmRecipientCount = resolveRecipients(state.users, alarmGroupIds, alarmLocationIds).length
-  const crisisGroups = SEED_GROUPS.filter((g) => g.isCrisisTeam)
+  const crisisGroups = state.groups.filter((g) => g.isCrisisTeam)
   const crisisMembers = state.users.filter((u) => u.id !== me.id && u.groupIds.some((g) => crisisGroups.some((cg) => cg.id === g)))
 
   const myScenarioAlarm = state.alarms.find(
@@ -222,7 +222,7 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
 
   function triggerGroupAlarm() {
     const locationNames = alarmLocationIds
-      .map((id) => SEED_LOCATIONS.find((l) => l.id === id)?.name)
+      .map((id) => state.locations.find((l) => l.id === id)?.name)
       .filter(Boolean)
       .join(', ')
     dispatch({
@@ -366,7 +366,7 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
           <Text style={styles.sectionTitle}>Interne Alarmierung{scenario.silentDefault ? ' (still)' : ''}</Text>
           <Text style={[styles.body, { fontWeight: '600', marginTop: 0 }]}>Betroffener Standort wählen:</Text>
           <View style={[styles.row, { flexWrap: 'wrap', gap: 8 }]}>
-            {SEED_LOCATIONS.map((l) => {
+            {state.locations.map((l) => {
               const selected = alarmLocationIds.includes(l.id)
               return (
                 <Pressable
@@ -437,7 +437,7 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
             Aufgebot per Push, SMS und Sprachanruf mit Quittierung – oder einzelne Mitglieder direkt kontaktieren:
           </Text>
           {crisisMembers.map((u) => {
-            const memberGroups = SEED_GROUPS.filter((g) => g.isCrisisTeam && u.groupIds.includes(g.id))
+            const memberGroups = state.groups.filter((g) => g.isCrisisTeam && u.groupIds.includes(g.id))
             const notified = notifiedUserIds.includes(u.id)
             return (
               <View key={u.id} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 14, padding: 12 }}>
@@ -656,9 +656,10 @@ export function LoneWorkScreen() {
 // ---------- Notruf ----------
 
 export function ContactsScreen() {
+  const { state } = useStore()
   return (
     <ScrollView contentContainerStyle={styles.screen}>
-      {SEED_CONTACTS.map((c) => (
+      {state.contacts.map((c) => (
         <Pressable key={c.id} style={styles.contactRow} onPress={() => Linking.openURL(`tel:${c.number}`)}>
           <View style={styles.contactIcon}>
             <Phone size={17} color={colors.brand} />
@@ -763,10 +764,10 @@ function PushStatusCard() {
 }
 
 export function ProfileScreen() {
-  const { state, dispatch } = useStore()
+  const { state, dispatch, logout, serverStatus } = useStore()
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
-  const myLocation = SEED_LOCATIONS.find((l) => l.id === me.locationId)
-  const myGroups = SEED_GROUPS.filter((g) => me.groupIds.includes(g.id))
+  const myLocation = state.locations.find((l) => l.id === me.locationId)
+  const myGroups = state.groups.filter((g) => me.groupIds.includes(g.id))
 
   return (
     <ScrollView contentContainerStyle={styles.screen}>
@@ -789,7 +790,7 @@ export function ProfileScreen() {
         </View>
       </Card>
 
-      <PasswordCard user={me} />
+      <PasswordCard />
 
       {state.mode === 'demo' && (
       <Card>
@@ -808,6 +809,29 @@ export function ProfileScreen() {
           </Pressable>
         ))}
       </Card>
+      )}
+
+      {state.mode === 'live' && (
+        <Card>
+          <View style={styles.row}>
+            <View
+              style={{
+                width: 8, height: 8, borderRadius: 4,
+                backgroundColor: serverStatus === 'verbunden' ? colors.green : serverStatus === 'getrennt' ? colors.brand : '#f59e0b',
+              }}
+            />
+            <Text style={[styles.cardTitle, { flex: 1 }]}>
+              {serverStatus === 'verbunden'
+                ? 'Mit Alarmserver verbunden'
+                : serverStatus === 'getrennt'
+                  ? 'Alarmserver nicht erreichbar'
+                  : 'Verbinde mit Alarmserver …'}
+            </Text>
+          </View>
+          <Text style={[styles.faint, { marginTop: 6 }]}>
+            Benutzer, Szenarien und Alarme kommen vom Server – dieselben Daten wie im Webportal.
+          </Text>
+        </Card>
       )}
 
       {me.role === 'admin' && <ModeCard />}
@@ -837,7 +861,7 @@ export function ProfileScreen() {
         </Pressable>
       </Card>
 
-      <Pressable style={styles.outlineButton} onPress={() => dispatch({ type: 'LOGOUT' })}>
+      <Pressable style={styles.outlineButton} onPress={logout}>
         <View style={styles.row}>
           <LogOut size={15} color={colors.text} />
           <Text style={styles.outlineButtonText}>Abmelden</Text>
@@ -848,20 +872,20 @@ export function ProfileScreen() {
 }
 
 /** Eigenes Passwort ändern */
-function PasswordCard({ user }: { user: User }) {
-  const { dispatch } = useStore()
+function PasswordCard() {
+  const { changePassword } = useStore()
   const [open, setOpen] = useState(false)
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [repeat, setRepeat] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  function save() {
-    if (!verifyPassword(user, current)) return setError('Das aktuelle Passwort ist falsch.')
+  async function save() {
     const problem = passwordProblem(next)
     if (problem) return setError(problem)
     if (next !== repeat) return setError('Die beiden neuen Passwörter stimmen nicht überein.')
-    dispatch({ type: 'SET_PASSWORD', userId: user.id, password: next })
+    const ergebnis = await changePassword(current, next)
+    if (!ergebnis.ok) return setError(ergebnis.error)
     setOpen(false)
     setCurrent(''); setNext(''); setRepeat(''); setError(null)
   }
