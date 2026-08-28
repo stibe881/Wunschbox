@@ -525,15 +525,17 @@ function ToastHost({ toasts }: { toasts: Toast[] }) {
 
 /**
  * Bestehende Speicherstände auf die Anmeldung umstellen.
- * Benutzer ohne Passwort erhalten – wo möglich – das Passwort des gleichnamigen
- * Seed-Kontos. Bleibt danach kein anmeldefähiges Konto übrig, bekommen alle
- * Administratoren das Erstpasswort mit erzwungener Änderung, damit niemand
- * aus seinem eigenen Datenbestand ausgesperrt wird.
+ * Im Demo-Modus erhalten Benutzer ohne Passwort das des gleichnamigen Beispielkontos,
+ * damit die dokumentierten Demo-Zugänge auch für alte Stände gelten. Im Live-Modus
+ * gilt das bewusst nicht – dort bekommen alle Administratoren das Erstpasswort mit
+ * erzwungener Änderung, sobald kein anmeldefähiges Konto existiert. So ist niemand
+ * ausgesperrt und ein echter Datenbestand trägt nie ein Demo-Passwort.
  */
 function migrateAuth(parsed: AppState): AppState {
   const seedById = new Map(SEED_USERS.map((u) => [u.id, u]))
   let users = parsed.users.map((u) => {
     if (u.passwordHash && u.passwordSalt) return u
+    if (parsed.mode !== 'demo') return u
     const seed = seedById.get(u.id)
     if (seed?.passwordHash && seed.passwordSalt) {
       return { ...u, passwordSalt: seed.passwordSalt, passwordHash: seed.passwordHash }

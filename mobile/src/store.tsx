@@ -336,8 +336,10 @@ function toastForAction(action: Action): Toast['message'] | { message: string; k
 
 /**
  * Gespeicherte Stände auf die Anmeldung umstellen. Ältere Stände kennen weder
- * Benutzerverzeichnis noch Sitzung; sie erhalten das Verzeichnis des Modus und
- * – falls kein anmeldefähiges Konto existiert – ein Erstpasswort für Admins.
+ * Benutzerverzeichnis noch Sitzung; sie erhalten das Verzeichnis des Modus.
+ * Demo-Passwörter werden nur im Demo-Modus übernommen; im Live-Modus bekommen
+ * Administratoren das Erstpasswort mit erzwungener Änderung, sobald kein
+ * anmeldefähiges Konto existiert.
  */
 function migrateAuth(parsed: MobileState, mode: AppMode): MobileState {
   const fallback = initialState(mode)
@@ -345,6 +347,7 @@ function migrateAuth(parsed: MobileState, mode: AppMode): MobileState {
 
   let users = (parsed.users?.length ? parsed.users : fallback.users).map((u) => {
     if (u.passwordHash && u.passwordSalt) return u
+    if (mode !== 'demo') return u
     const seed = seedById.get(u.id)
     if (seed?.passwordHash && seed.passwordSalt) {
       return { ...u, passwordSalt: seed.passwordSalt, passwordHash: seed.passwordHash }
