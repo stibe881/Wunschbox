@@ -77,6 +77,12 @@ function NoWebAccess() {
             Als Mitarbeiter:in nutzen Sie die App auf dem iPhone: SOS-Alarm, Handlungsanweisungen zu allen
             Notfallszenarien, Alleinarbeits-Timer und Notrufnummern – auch offline verfügbar.
           </p>
+          <NavLink
+            to="/app"
+            className="mt-4 w-full flex items-center justify-center gap-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold py-3 transition"
+          >
+            <Smartphone size={16} /> App jetzt öffnen
+          </NavLink>
         </div>
         <button
           onClick={() => dispatch({ type: 'LOGOUT' })}
@@ -220,13 +226,13 @@ export default function App() {
 
   const currentUser = state.users.find((u) => u.id === state.currentUserId) ?? sessionUser
 
-  // Zugriffslogik: Webportal nur für Admin und Krisenstab – Mitarbeitende nutzen die iOS-App
-  if (sessionUser.role === 'mitarbeiter') {
-    return <NoWebAccess />
-  }
-  // App-Vorschau (Web-Version der iOS-App) für Admin/Krisenstab
+  // Die App-Ansicht steht allen Rollen offen – sie ist die Oberfläche der Mitarbeitenden
   if (location.pathname === '/app') {
     return <UserApp />
+  }
+  // Das Verwaltungsportal bleibt Admin und Krisenstab vorbehalten
+  if (sessionUser.role === 'mitarbeiter') {
+    return <NoWebAccess />
   }
 
   return (

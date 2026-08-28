@@ -55,6 +55,7 @@ export type Action =
   | { type: 'DELETE_CONTACT'; contactId: string }
   | { type: 'AUDIT'; entryType: string; message: string; userId?: string }
   | { type: 'SET_MODE'; mode: AppMode }
+  | { type: 'ADOPT_EXTERNAL'; state: AppState }
   | { type: 'RESET_DEMO' }
 
 /** Ist dieses Konto der einzige verbleibende Administrator? */
@@ -429,6 +430,22 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, audit: audit(state, action.entryType, action.message, action.userId) }
     case 'SET_MODE':
       return action.mode === state.mode ? state : loadStateFor(action.mode)
+    case 'ADOPT_EXTERNAL': {
+      // Änderungen aus einem anderen Browser-Tab übernehmen. Die Anmeldung dieses
+      // Tabs bleibt bestehen, solange das Konto im übernommenen Bestand existiert –
+      // so kann das Portal als Administrator und die App-Vorschau als Mitarbeitende
+      // parallel offen sein.
+      const incoming = action.state
+      const sessionGiltNoch = state.session && incoming.users.some((u) => u.id === state.session!.userId)
+      return {
+        ...incoming,
+        mode: state.mode,
+        session: sessionGiltNoch ? state.session : incoming.session,
+        currentUserId: incoming.users.some((u) => u.id === state.currentUserId)
+          ? state.currentUserId
+          : incoming.currentUserId,
+      }
+    }
     case 'RESET_DEMO': {
       const fresh = state.mode === 'live' ? createLiveInitialState() : createInitialState()
       // Angemeldet bleiben, sofern das eigene Konto im frischen Bestand existiert
@@ -686,6 +703,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const stateRef = useRef(state)
   stateRef.current = state
+  /** markiert einen Zustand, der aus einem anderen Tab stammt */
+  const adopted = useRef(false)
 
   const dispatch = useCallback(
     (action: Action) => {
@@ -703,6 +722,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   )
 
   useEffect(() => {
+    // Ein von aussen übernommener Zustand wird nicht zurückgeschrieben,
+    // sonst schaukeln sich zwei Tabs gegenseitig hoch
+    if (adopted.current) {
+      adopted.current = false
+      return
+    }
     try {
       localStorage.setItem(DATA_KEYS[state.mode], JSON.stringify(state))
       localStorage.setItem(MODE_KEY, state.mode)
@@ -710,6 +735,25 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       // Speicher voll – Offline-Cache nicht kritisch
     }
   }, [state])
+
+  // Portal und App-Vorschau laufen in getrennten Tabs auf demselben Speicher.
+  // Ohne diesen Abgleich arbeitet jeder Tab auf einem veralteten Stand und
+  // überschreibt beim nächsten Schreiben die Änderungen des anderen.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== DATA_KEYS[stateRef.current.mode] || !e.newValue) return
+      try {
+        const incoming = JSON.parse(e.newValue) as AppState
+        if (!incoming.users || !incoming.scenarios) return
+        adopted.current = true
+        rawDispatch({ type: 'ADOPT_EXTERNAL', state: incoming })
+      } catch {
+        // unlesbarer Fremdstand -> eigenen Zustand behalten
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   useEffect(() => {
     const interval = setInterval(() => rawDispatch({ type: 'TICK', now: Date.now() }), 1000)
