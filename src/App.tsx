@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import {
   AlertTriangle, BellRing, BookOpen, Building2, ClipboardList, ExternalLink, FileClock, LayoutDashboard,
-  Lock, Menu, Phone, Plug, Radio, Siren, Smartphone, Timer, Users, UsersRound, X,
+  Lock, LogOut, Menu, Phone, Plug, Radio, Siren, Smartphone, Timer, Users, UsersRound, X,
 } from 'lucide-react'
 import { useStore } from './store'
 import Dashboard from './pages/Dashboard'
@@ -19,6 +19,7 @@ import Integrations from './pages/Integrations'
 import Contacts from './pages/Contacts'
 import AuditLog from './pages/AuditLog'
 import UserApp from './pages/UserApp'
+import LoginScreen, { ForcePasswordChange } from './components/LoginScreen'
 
 const NAV = [
   { section: 'Gefahrenabwehr' },
@@ -77,20 +78,12 @@ function NoWebAccess() {
             Notfallszenarien, Alleinarbeits-Timer und Notrufnummern – auch offline verfügbar.
           </p>
         </div>
-        <div className="mt-6 text-left">
-          <label className="block text-xs text-slate-500 mb-1.5">{state.mode === 'demo' ? 'Demo: ' : ''}Benutzer wechseln</label>
-          <select
-            className="w-full bg-slate-800 text-slate-200 rounded-lg px-3 py-2 text-sm"
-            value={currentUser.id}
-            onChange={(e) => dispatch({ type: 'SET_CURRENT_USER', userId: e.target.value })}
-          >
-            {state.users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.firstName} {u.lastName} ({u.role})
-              </option>
-            ))}
-          </select>
-        </div>
+        <button
+          onClick={() => dispatch({ type: 'LOGOUT' })}
+          className="mt-6 w-full flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium py-3 transition"
+        >
+          <LogOut size={16} /> Abmelden
+        </button>
       </div>
     </div>
   )
@@ -178,17 +171,36 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
       <div className="px-5 py-4 border-t border-slate-800 text-xs">
         <div className="text-slate-500 mb-1">Angemeldet als</div>
-        <select
-          className="w-full bg-slate-800 text-slate-200 rounded-lg px-2 py-1.5 text-sm"
-          value={currentUser.id}
-          onChange={(e) => dispatch({ type: 'SET_CURRENT_USER', userId: e.target.value })}
-        >
-          {state.users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.firstName} {u.lastName} ({u.role})
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="text-slate-200 text-sm font-medium truncate">
+              {currentUser.firstName} {currentUser.lastName}
+            </div>
+            <div className="text-slate-500 truncate">{currentUser.email}</div>
+          </div>
+          <button
+            onClick={() => dispatch({ type: 'LOGOUT' })}
+            className="shrink-0 p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            title="Abmelden"
+            aria-label="Abmelden"
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
+        {state.mode === 'demo' && (
+          <select
+            className="mt-2.5 w-full bg-slate-800 text-slate-200 rounded-lg px-2 py-1.5 text-sm"
+            value={currentUser.id}
+            onChange={(e) => dispatch({ type: 'SET_CURRENT_USER', userId: e.target.value })}
+            aria-label="Demo: Benutzer wechseln"
+          >
+            {state.users.map((u) => (
+              <option key={u.id} value={u.id}>
+                Demo-Ansicht: {u.firstName} {u.lastName} ({u.role})
+              </option>
+            ))}
+          </select>
+        )}
       </div>
     </div>
   )
@@ -199,10 +211,17 @@ export default function App() {
   const [navOpen, setNavOpen] = useState(false)
   const location = useLocation()
   const activeAlarms = state.alarms.filter((a) => a.status === 'active')
-  const currentUser = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+  const sessionUser = state.users.find((u) => u.id === state.session?.userId)
+
+  // Ohne gültige Anmeldung ist nichts erreichbar
+  if (!sessionUser) return <LoginScreen />
+  // Erstpasswort muss geändert werden, bevor es weitergeht
+  if (sessionUser.mustChangePassword) return <ForcePasswordChange user={sessionUser} />
+
+  const currentUser = state.users.find((u) => u.id === state.currentUserId) ?? sessionUser
 
   // Zugriffslogik: Webportal nur für Admin und Krisenstab – Mitarbeitende nutzen die iOS-App
-  if (currentUser.role === 'mitarbeiter') {
+  if (sessionUser.role === 'mitarbeiter') {
     return <NoWebAccess />
   }
   // App-Vorschau (Web-Version der iOS-App) für Admin/Krisenstab

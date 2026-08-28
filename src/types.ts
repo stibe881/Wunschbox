@@ -27,6 +27,12 @@ export interface User {
   language: 'de' | 'en' | 'fr' | 'it'
   absence?: { from: string; to: string }
   partTimeNote?: string
+  /** Anmeldung: Salt und Hash des Passworts (siehe src/lib/auth.ts) */
+  passwordSalt?: string
+  passwordHash?: string
+  /** Erzwingt eine Passwortänderung bei der nächsten Anmeldung */
+  mustChangePassword?: boolean
+  lastLoginAt?: number
 }
 
 export interface Group {
@@ -196,8 +202,16 @@ export interface AuditEntry {
   userId?: string
 }
 
+/** Angemeldete Sitzung – null bedeutet: Anmeldemaske anzeigen */
+export interface Session {
+  userId: string
+  loginAt: number
+}
+
 export interface AppState {
   mode: AppMode
+  /** Aktuelle Anmeldung (pro Modus getrennt gespeichert) */
+  session: Session | null
   /** Version der Standard-Szenarien-Inhalte – für einmalige Content-Updates beim Laden */
   scenarioContentVersion?: number
   currentUserId: string

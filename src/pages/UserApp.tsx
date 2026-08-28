@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowRight, BellRing, BookOpen, Check, CheckCircle2, ChevronLeft, ClipboardCheck, Clock, LayoutDashboard,
-  ListChecks, MapPin, Megaphone, Phone, PhoneCall, Play, Search, ShieldAlert, Siren, Timer, User, Users, Volume2, WifiOff, X,
+  ArrowRight, BellRing, BookOpen, Check, CheckCircle2, ChevronLeft, ClipboardCheck, Clock, KeyRound, LayoutDashboard,
+  ListChecks, LogOut, MapPin, Megaphone, Phone, PhoneCall, Play, Search, ShieldAlert, Siren, Timer, User, Users, Volume2, WifiOff, X,
 } from 'lucide-react'
 import { createAlarm, resolveRecipients, uid, useStore } from '../store'
-import type { Channel, LoneWorkSession, Scenario } from '../types'
+import type { Channel, LoneWorkSession, Scenario, User as AppUser } from '../types'
 import { CHANNEL_LABELS } from '../types'
 import { Badge, HoldButton, Toggle, formatDuration, formatRelative, inputClass, useConfirm } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
+import { MIN_PASSWORD_LENGTH, passwordProblem, verifyPassword } from '../lib/auth'
 
 type Tab = 'start' | 'szenarien' | 'alleinarbeit' | 'notruf' | 'profil'
 
@@ -830,17 +831,81 @@ function ProfileTab() {
         </div>
       </div>
 
-      <div className="rounded-2xl bg-white border border-slate-200 p-4">
-        <div className="text-sm font-semibold text-slate-700 mb-2">{state.mode === 'demo' ? 'Demo: ' : ''}Benutzer wechseln</div>
-        <select
-          className={inputClass}
-          value={me.id}
-          onChange={(e) => dispatch({ type: 'SET_CURRENT_USER', userId: e.target.value })}
-        >
-          {state.users.map((u) => (
-            <option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.role})</option>
-          ))}
-        </select>
+      <PasswordCard user={me} />
+
+      {state.mode === 'demo' && (
+        <div className="rounded-2xl bg-white border border-slate-200 p-4">
+          <div className="text-sm font-semibold text-slate-700 mb-2">Demo: Ansicht als andere Person</div>
+          <select
+            className={inputClass}
+            value={me.id}
+            onChange={(e) => dispatch({ type: 'SET_CURRENT_USER', userId: e.target.value })}
+          >
+            {state.users.map((u) => (
+              <option key={u.id} value={u.id}>{u.firstName} {u.lastName} ({u.role})</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <button
+        className="w-full rounded-2xl border border-slate-200 bg-white text-slate-600 py-3 font-semibold flex items-center justify-center gap-2 hover:bg-slate-50 transition"
+        onClick={() => dispatch({ type: 'LOGOUT' })}
+      >
+        <LogOut size={16} /> Abmelden
+      </button>
+    </div>
+  )
+}
+
+/** Eigenes Passwort ändern */
+function PasswordCard({ user }: { user: AppUser }) {
+  const { dispatch } = useStore()
+  const [open, setOpen] = useState(false)
+  const [current, setCurrent] = useState('')
+  const [next, setNext] = useState('')
+  const [repeat, setRepeat] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  function save() {
+    if (!verifyPassword(user, current)) return setError('Das aktuelle Passwort ist falsch.')
+    const problem = passwordProblem(next)
+    if (problem) return setError(problem)
+    if (next !== repeat) return setError('Die beiden neuen Passwörter stimmen nicht überein.')
+    dispatch({ type: 'SET_PASSWORD', userId: user.id, password: next })
+    setOpen(false)
+    setCurrent(''); setNext(''); setRepeat(''); setError(null)
+  }
+
+  if (!open) {
+    return (
+      <button
+        className="w-full rounded-2xl bg-white border border-slate-200 py-3 font-semibold text-slate-700 flex items-center justify-center gap-2 hover:bg-slate-50 transition"
+        onClick={() => setOpen(true)}
+      >
+        <KeyRound size={16} /> Passwort ändern
+      </button>
+    )
+  }
+
+  return (
+    <div className="rounded-2xl bg-white border border-slate-200 p-4 space-y-2.5">
+      <div className="text-sm font-semibold text-slate-700">Passwort ändern</div>
+      <input type="password" autoComplete="current-password" className={inputClass} placeholder="Aktuelles Passwort"
+        value={current} onChange={(e) => { setCurrent(e.target.value); setError(null) }} />
+      <input type="password" autoComplete="new-password" className={inputClass}
+        placeholder={`Neues Passwort (mind. ${MIN_PASSWORD_LENGTH} Zeichen, mit Ziffer)`}
+        value={next} onChange={(e) => { setNext(e.target.value); setError(null) }} />
+      <input type="password" autoComplete="new-password" className={inputClass} placeholder="Neues Passwort wiederholen"
+        value={repeat} onChange={(e) => { setRepeat(e.target.value); setError(null) }} />
+      {error && <div className="text-xs text-brand-600">{error}</div>}
+      <div className="flex gap-2 pt-1">
+        <button className="flex-1 rounded-xl bg-slate-100 text-slate-600 py-2.5 text-sm font-semibold" onClick={() => { setOpen(false); setError(null) }}>
+          Abbrechen
+        </button>
+        <button className="flex-1 rounded-xl bg-brand-600 text-white py-2.5 text-sm font-semibold" onClick={save}>
+          Speichern
+        </button>
       </div>
     </div>
   )

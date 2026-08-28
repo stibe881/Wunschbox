@@ -2,7 +2,8 @@ import React, { createContext, useCallback, useContext, useEffect, useReducer, u
 import { CheckCircle2, Siren } from 'lucide-react'
 import type { AppMode, AppState, Alarm, AlarmButton, AlarmPlan, Channel, Delivery, EscalationLevel, Group, Location, LoneWorkSession, Scenario, User, Webhook, AuditEntry } from './types'
 import { CHANNEL_LABELS } from './types'
-import { SCENARIO_CONTENT_VERSION, SEED_SCENARIOS, createInitialState, createLiveInitialState } from './data/seed'
+import { LIVE_INITIAL_PASSWORD, SCENARIO_CONTENT_VERSION, SEED_SCENARIOS, SEED_USERS, createInitialState, createLiveInitialState } from './data/seed'
+import { hashPassword, randomSalt } from './lib/auth'
 import { LEGACY_EMOJI_TO_ICON } from './components/ScenarioIcon'
 
 // Demo und Live haben getrennte Speicherstände; der Modus selbst wird separat gemerkt
@@ -19,6 +20,9 @@ export function uid(prefix: string): string {
 // ---------- Actions ----------
 
 export type Action =
+  | { type: 'LOGIN'; userId: string }
+  | { type: 'LOGOUT' }
+  | { type: 'SET_PASSWORD'; userId: string; password: string; mustChange?: boolean }
   | { type: 'SET_CURRENT_USER'; userId: string }
   | { type: 'UPSERT_USER'; user: User }
   | { type: 'DELETE_USER'; userId: string }
@@ -213,6 +217,39 @@ function uniqueUserIds(deliveries: Delivery[]): string[] {
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
+    case 'LOGIN': {
+      const user = state.users.find((u) => u.id === action.userId)
+      if (!user) return state
+      return {
+        ...state,
+        session: { userId: user.id, loginAt: Date.now() },
+        currentUserId: user.id,
+        users: state.users.map((u) => (u.id === user.id ? { ...u, lastLoginAt: Date.now() } : u)),
+        audit: audit(state, 'anmeldung', `Anmeldung im Webportal: ${user.firstName} ${user.lastName} (${user.email})`, user.id),
+      }
+    }
+    case 'LOGOUT': {
+      const user = state.users.find((u) => u.id === state.session?.userId)
+      return {
+        ...state,
+        session: null,
+        audit: user ? audit(state, 'anmeldung', `Abmeldung: ${user.firstName} ${user.lastName}`, user.id) : state.audit,
+      }
+    }
+    case 'SET_PASSWORD': {
+      const user = state.users.find((u) => u.id === action.userId)
+      if (!user) return state
+      const salt = randomSalt()
+      return {
+        ...state,
+        users: state.users.map((u) =>
+          u.id === action.userId
+            ? { ...u, passwordSalt: salt, passwordHash: hashPassword(action.password, salt), mustChangePassword: action.mustChange ?? false }
+            : u,
+        ),
+        audit: audit(state, 'anmeldung', `Passwort gesetzt für ${user.firstName} ${user.lastName}`, action.userId),
+      }
+    }
     case 'SET_CURRENT_USER':
       return { ...state, currentUserId: action.userId }
     case 'UPSERT_USER': {
@@ -224,7 +261,13 @@ function reducer(state: AppState, action: Action): AppState {
       }
     }
     case 'DELETE_USER':
-      return { ...state, users: state.users.filter((u) => u.id !== action.userId), audit: audit(state, 'admin', 'Benutzer gelöscht') }
+      return {
+        ...state,
+        users: state.users.filter((u) => u.id !== action.userId),
+        // Wer sich selbst löscht, wird abgemeldet
+        session: state.session?.userId === action.userId ? null : state.session,
+        audit: audit(state, 'admin', 'Benutzer gelöscht'),
+      }
     case 'IMPORT_USERS':
       return { ...state, users: [...state.users, ...action.users], audit: audit(state, 'admin', `CSV-Import: ${action.users.length} Benutzer importiert`) }
     case 'UPSERT_GROUP': {
@@ -396,6 +439,10 @@ function toastForAction(action: Action): Toast['message'] | { message: string; k
       return 'Alarm beendet – Entwarnung versendet'
     case 'ACK_ALARM':
       return action.ack === 'acknowledged' ? 'Quittiert – Sie nehmen teil' : 'Als nicht verfügbar gemeldet'
+    case 'LOGOUT':
+      return 'Abgemeldet'
+    case 'SET_PASSWORD':
+      return 'Passwort gespeichert'
     case 'UPSERT_USER':
       return 'Benutzer gespeichert'
     case 'DELETE_USER':
@@ -470,6 +517,35 @@ function ToastHost({ toasts }: { toasts: Toast[] }) {
   )
 }
 
+/**
+ * Bestehende Speicherstände auf die Anmeldung umstellen.
+ * Benutzer ohne Passwort erhalten – wo möglich – das Passwort des gleichnamigen
+ * Seed-Kontos. Bleibt danach kein anmeldefähiges Konto übrig, bekommen alle
+ * Administratoren das Erstpasswort mit erzwungener Änderung, damit niemand
+ * aus seinem eigenen Datenbestand ausgesperrt wird.
+ */
+function migrateAuth(parsed: AppState): AppState {
+  const seedById = new Map(SEED_USERS.map((u) => [u.id, u]))
+  let users = parsed.users.map((u) => {
+    if (u.passwordHash && u.passwordSalt) return u
+    const seed = seedById.get(u.id)
+    if (seed?.passwordHash && seed.passwordSalt) {
+      return { ...u, passwordSalt: seed.passwordSalt, passwordHash: seed.passwordHash }
+    }
+    return u
+  })
+
+  if (!users.some((u) => u.passwordHash && u.passwordSalt)) {
+    const salt = randomSalt()
+    const hash = hashPassword(LIVE_INITIAL_PASSWORD, salt)
+    users = users.map((u) =>
+      u.role === 'admin' ? { ...u, passwordSalt: salt, passwordHash: hash, mustChangePassword: true } : u,
+    )
+  }
+
+  return { ...parsed, users, session: parsed.session ?? null }
+}
+
 /** Live-Modus: aktive ausgehende Webhooks bei Alarmauslösung tatsächlich aufrufen */
 function sendOutboundWebhooks(state: AppState, alarm: Alarm) {
   const scenario = state.scenarios.find((s) => s.id === alarm.scenarioId)
@@ -524,7 +600,7 @@ function loadStateFor(mode: AppMode): AppState {
           contactIds: s.contactIds ?? [],
           icon: LEGACY_EMOJI_TO_ICON[s.icon] ?? s.icon,
         }))
-        return parsed
+        return migrateAuth(parsed)
       }
     }
   } catch {

@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
-import { Pencil, Plus, Trash2, Upload } from 'lucide-react'
+import { KeyRound, Pencil, Plus, Trash2, Upload } from 'lucide-react'
 import { uid, useStore } from '../store'
 import type { Role, User } from '../types'
 import { Badge, Button, Card, Field, Modal, inputClass, useConfirm } from '../components/ui'
+import { MIN_PASSWORD_LENGTH, hasPassword, passwordProblem } from '../lib/auth'
 
 export default function UsersPage() {
   const { state, dispatch } = useStore()
@@ -53,7 +54,7 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold text-slate-800">Benutzerverwaltung</h1>
           <p className="text-sm text-slate-500">
             Manuelle Erfassung, CSV-Upload oder automatische Synchronisation mit dem Personalsystem (siehe Integrationen) ·
-            Authentifizierung via SMS/E-Mail-Code oder SSO
+            Anmeldung mit E-Mail und Passwort, SSO vorbereitet
           </p>
         </div>
         <div className="flex gap-2">
@@ -78,6 +79,7 @@ export default function UsersPage() {
                 <th className="py-2 pr-4">Gruppen</th>
                 <th className="py-2 pr-4">Standort</th>
                 <th className="py-2 pr-4">Status</th>
+                <th className="py-2 pr-4">Anmeldung</th>
                 <th className="py-2" />
               </tr>
             </thead>
@@ -111,6 +113,15 @@ export default function UsersPage() {
                       {u.partTimeNote && <Badge color="blue">{u.partTimeNote}</Badge>}
                       {!absent && !u.partTimeNote && <Badge color="green">erreichbar</Badge>}
                     </td>
+                    <td className="py-2.5 pr-4">
+                      {!hasPassword(u) ? (
+                        <Badge color="amber">kein Passwort</Badge>
+                      ) : u.mustChangePassword ? (
+                        <Badge color="blue">Passwortwechsel nötig</Badge>
+                      ) : (
+                        <Badge color="green">aktiv</Badge>
+                      )}
+                    </td>
                     <td className="py-2.5 text-right whitespace-nowrap">
                       <Button variant="ghost" onClick={() => setEditing(u)}><Pencil size={14} /></Button>
                       <Button variant="ghost" onClick={() => ask(`${u.firstName} ${u.lastName} löschen?`, () => dispatch({ type: 'DELETE_USER', userId: u.id }))}>
@@ -139,12 +150,25 @@ function UserEditor({ user, onClose }: { user: User; onClose: () => void }) {
   const [draft, setDraft] = useState<User>({ ...user })
   const [absenceFrom, setAbsenceFrom] = useState(user.absence?.from ?? '')
   const [absenceTo, setAbsenceTo] = useState(user.absence?.to ?? '')
+  const [password, setPassword] = useState('')
+  const [mustChange, setMustChange] = useState(!hasPassword(user) || Boolean(user.mustChangePassword))
+  const [passwordError, setPasswordError] = useState<string | null>(null)
 
   function save() {
+    if (password) {
+      const problem = passwordProblem(password)
+      if (problem) return setPasswordError(problem)
+    }
     dispatch({
       type: 'UPSERT_USER',
-      user: { ...draft, absence: absenceFrom && absenceTo ? { from: absenceFrom, to: absenceTo } : undefined },
+      user: {
+        ...draft,
+        absence: absenceFrom && absenceTo ? { from: absenceFrom, to: absenceTo } : undefined,
+        mustChangePassword: mustChange,
+      },
     })
+    // Passwort separat, damit der Klartext nie im Benutzerobjekt landet
+    if (password) dispatch({ type: 'SET_PASSWORD', userId: draft.id, password, mustChange })
     onClose()
   }
 
@@ -213,6 +237,29 @@ function UserEditor({ user, onClose }: { user: User; onClose: () => void }) {
       <Field label="Teilzeit-Notiz (optional)">
         <input className={inputClass} placeholder="z. B. 60 %, Mo–Mi" value={draft.partTimeNote ?? ''} onChange={(e) => setDraft({ ...draft, partTimeNote: e.target.value || undefined })} />
       </Field>
+
+      <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 mb-1">
+          <KeyRound size={15} /> Anmeldung
+        </div>
+        <p className="text-xs text-slate-500 mb-3">
+          {hasPassword(user)
+            ? 'Für dieses Konto ist ein Passwort gesetzt. Ein neues Passwort überschreibt das bisherige.'
+            : 'Ohne Passwort kann sich diese Person weder im Webportal noch in der App anmelden.'}
+        </p>
+        <Field label={hasPassword(user) ? 'Neues Passwort (optional)' : `Passwort (mind. ${MIN_PASSWORD_LENGTH} Zeichen, mit Ziffer)`}>
+          <input
+            type="text" autoComplete="new-password" className={inputClass}
+            placeholder={hasPassword(user) ? 'leer lassen = unverändert' : 'z. B. Startpasswort vergeben'}
+            value={password} onChange={(e) => { setPassword(e.target.value); setPasswordError(null) }}
+          />
+        </Field>
+        <label className="flex items-center gap-2 text-sm text-slate-600 mt-2">
+          <input type="checkbox" checked={mustChange} onChange={(e) => setMustChange(e.target.checked)} />
+          Passwortänderung bei der nächsten Anmeldung erzwingen
+        </label>
+        {passwordError && <div className="text-xs text-brand-600 mt-2">{passwordError}</div>}
+      </div>
       <div className="flex justify-end gap-2 mt-5">
         <Button variant="secondary" onClick={onClose}>Abbrechen</Button>
         <Button onClick={save} disabled={!draft.firstName.trim() || !draft.lastName.trim()}>Speichern</Button>
