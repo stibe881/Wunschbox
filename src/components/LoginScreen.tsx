@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { AlertTriangle, Eye, EyeOff, Info, KeyRound, LogIn, Mail, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, Eye, EyeOff, Info, KeyRound, LogIn, Mail, Server as ServerIcon, ShieldCheck } from 'lucide-react'
 import { useStore } from '../store'
 import { DEMO_PASSWORD, LIVE_INITIAL_PASSWORD } from '../data/seed'
-import { MIN_PASSWORD_LENGTH, authenticate, passwordProblem } from '../lib/auth'
+import { MIN_PASSWORD_LENGTH, passwordProblem } from '../lib/auth'
+import { DEFAULT_SERVER_URL, serverUrl, setServerUrl } from '../lib/api'
 import type { User } from '../types'
 
 const fieldClass =
@@ -49,26 +50,27 @@ function Shell({ children, subtitle, showModeSwitch = false }: { children: React
 
 /** Anmeldung mit E-Mail und Passwort */
 export default function LoginScreen() {
-  const { state, dispatch } = useStore()
+  const { state, login, serverStatus } = useStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [show, setShow] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [serverBearbeiten, setServerBearbeiten] = useState(false)
+  const [adresse, setAdresse] = useState(serverUrl())
 
   // Live-Erstinbetriebnahme: solange nur das ausgelieferte Admin-Konto besteht,
   // wird der Erstzugang angezeigt – nach der Passwortänderung verschwindet der Hinweis
   const liveFirstRun =
     state.mode === 'live' && state.users.length === 1 && state.users[0].mustChangePassword === true
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
-    const result = authenticate(state.users, email, password)
-    if (!result.ok) {
-      setError(result.error)
-      return
-    }
+    setBusy(true)
     setError(null)
-    dispatch({ type: 'LOGIN', userId: result.user.id })
+    const ergebnis = await login(email, password)
+    setBusy(false)
+    if (!ergebnis.ok) setError(ergebnis.error)
   }
 
   return (
@@ -122,9 +124,10 @@ export default function LoginScreen() {
 
         <button
           type="submit"
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 text-sm transition"
+          disabled={busy}
+          className="w-full flex items-center justify-center gap-2 rounded-xl bg-brand-600 hover:bg-brand-700 disabled:opacity-60 text-white font-semibold py-3 text-sm transition"
         >
-          <LogIn size={16} /> Anmelden
+          <LogIn size={16} /> {busy ? 'Anmelden …' : 'Anmelden'}
         </button>
       </form>
 
@@ -165,6 +168,52 @@ export default function LoginScreen() {
         </div>
       )}
 
+      {state.mode === 'live' && (
+        <div className="mt-4 text-center">
+          {serverBearbeiten ? (
+            <div className="rounded-2xl bg-slate-800/40 border border-slate-800 p-4 text-left">
+              <label className="block text-xs text-slate-400 mb-1.5">Adresse des Alarmservers</label>
+              <input
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 text-white px-3 py-2 text-sm outline-none focus:border-brand-500"
+                value={adresse}
+                onChange={(e) => setAdresse(e.target.value)}
+                placeholder={DEFAULT_SERVER_URL}
+              />
+              <p className="text-[11px] text-slate-500 mt-2">
+                Im Schulnetz z. B. <code>http://192.168.1.42:3001</code> – die IP-Adresse des Rechners, auf dem
+                der Alarmserver läuft.
+              </p>
+              <div className="flex gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => setServerBearbeiten(false)}
+                  className="flex-1 rounded-lg bg-slate-800 text-slate-300 py-2 text-xs font-semibold"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setServerUrl(adresse); setServerBearbeiten(false); setError(null); location.reload() }}
+                  className="flex-1 rounded-lg bg-brand-600 text-white py-2 text-xs font-semibold"
+                >
+                  Übernehmen
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setAdresse(serverUrl()); setServerBearbeiten(true) }}
+              className="inline-flex items-center gap-1.5 text-[11px] text-slate-500 hover:text-slate-300 transition"
+            >
+              <ServerIcon size={12} />
+              Alarmserver: {serverUrl()}
+              {serverStatus === 'getrennt' && <span className="text-brand-400 font-semibold">nicht erreichbar</span>}
+            </button>
+          )}
+        </div>
+      )}
+
       <p className="text-center text-[11px] text-slate-600 mt-5 leading-relaxed">
         Anmeldung über Microsoft Entra ID (SSO) ist vorbereitet und kann unter Integrationen aktiviert werden,
         sobald der Verzeichnisdienst angebunden ist.
@@ -175,17 +224,19 @@ export default function LoginScreen() {
 
 /** Erzwungene Passwortänderung nach der ersten Anmeldung */
 export function ForcePasswordChange({ user }: { user: User }) {
-  const { dispatch } = useStore()
+  const { changePassword, logout, knownPassword } = useStore()
+  const [aktuell, setAktuell] = useState('')
   const [password, setPassword] = useState('')
   const [repeat, setRepeat] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
     const problem = passwordProblem(password)
     if (problem) return setError(problem)
     if (password !== repeat) return setError('Die beiden Passwörter stimmen nicht überein.')
-    dispatch({ type: 'SET_PASSWORD', userId: user.id, password })
+    const ergebnis = await changePassword(knownPassword ?? aktuell, password)
+    if (!ergebnis.ok) setError(ergebnis.error)
   }
 
   return (
@@ -195,6 +246,18 @@ export function ForcePasswordChange({ user }: { user: User }) {
           <ShieldCheck size={16} className="shrink-0 mt-0.5" />
           Bitte vergeben Sie ein eigenes Passwort, bevor Sie fortfahren.
         </div>
+
+        {/* Nach einem Neuladen ist das Anmeldepasswort nicht mehr bekannt */}
+        {!knownPassword && (
+          <label className="block">
+            <span className="text-xs text-slate-400">Bisheriges Passwort</span>
+            <input
+              type="password" autoComplete="current-password"
+              className={fieldClass.replace('px-10', 'px-3.5') + ' mt-1.5'}
+              value={aktuell} onChange={(e) => { setAktuell(e.target.value); setError(null) }}
+            />
+          </label>
+        )}
 
         <label className="block">
           <span className="text-xs text-slate-400">Neues Passwort (mind. {MIN_PASSWORD_LENGTH} Zeichen, mit Ziffer)</span>
@@ -224,7 +287,7 @@ export function ForcePasswordChange({ user }: { user: User }) {
         </button>
         <button
           type="button"
-          onClick={() => dispatch({ type: 'LOGOUT' })}
+          onClick={logout}
           className="w-full text-xs text-slate-500 hover:text-slate-300 transition"
         >
           Abmelden

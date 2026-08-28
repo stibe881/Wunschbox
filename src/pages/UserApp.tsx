@@ -9,7 +9,7 @@ import type { Channel, LoneWorkSession, Scenario, User as AppUser } from '../typ
 import { CHANNEL_LABELS } from '../types'
 import { Badge, HoldButton, Toggle, formatDuration, formatRelative, inputClass, useConfirm } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
-import { MIN_PASSWORD_LENGTH, passwordProblem, verifyPassword } from '../lib/auth'
+import { MIN_PASSWORD_LENGTH, passwordProblem } from '../lib/auth'
 
 type Tab = 'start' | 'szenarien' | 'alleinarbeit' | 'notruf' | 'profil'
 
@@ -754,7 +754,7 @@ function ContactsTab() {
 // ---------- Profil ----------
 
 function ProfileTab() {
-  const { state, dispatch } = useStore()
+  const { state, dispatch, logout } = useStore()
   const navigate = useNavigate()
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
   const myLocation = state.locations.find((l) => l.id === me.locationId)
@@ -831,7 +831,7 @@ function ProfileTab() {
         </div>
       </div>
 
-      <PasswordCard user={me} />
+      <PasswordCard />
 
       {state.mode === 'demo' && (
         <div className="rounded-2xl bg-white border border-slate-200 p-4">
@@ -850,7 +850,7 @@ function ProfileTab() {
 
       <button
         className="w-full rounded-2xl border border-slate-200 bg-white text-slate-600 py-3 font-semibold flex items-center justify-center gap-2 hover:bg-slate-50 transition"
-        onClick={() => dispatch({ type: 'LOGOUT' })}
+        onClick={logout}
       >
         <LogOut size={16} /> Abmelden
       </button>
@@ -859,20 +859,20 @@ function ProfileTab() {
 }
 
 /** Eigenes Passwort ändern */
-function PasswordCard({ user }: { user: AppUser }) {
-  const { dispatch } = useStore()
+function PasswordCard() {
+  const { changePassword } = useStore()
   const [open, setOpen] = useState(false)
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [repeat, setRepeat] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  function save() {
-    if (!verifyPassword(user, current)) return setError('Das aktuelle Passwort ist falsch.')
+  async function save() {
     const problem = passwordProblem(next)
     if (problem) return setError(problem)
     if (next !== repeat) return setError('Die beiden neuen Passwörter stimmen nicht überein.')
-    dispatch({ type: 'SET_PASSWORD', userId: user.id, password: next })
+    const ergebnis = await changePassword(current, next)
+    if (!ergebnis.ok) return setError(ergebnis.error)
     setOpen(false)
     setCurrent(''); setNext(''); setRepeat(''); setError(null)
   }

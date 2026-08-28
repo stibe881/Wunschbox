@@ -56,7 +56,7 @@ function ModeBadge({ mode }: { mode: 'demo' | 'live' }) {
 
 /** Mitarbeitende haben keinen Webportal-Zugriff – Verweis auf die iOS-App */
 function NoWebAccess() {
-  const { state, dispatch } = useStore()
+  const { state, logout } = useStore()
   const currentUser = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
 
   return (
@@ -85,7 +85,7 @@ function NoWebAccess() {
           </NavLink>
         </div>
         <button
-          onClick={() => dispatch({ type: 'LOGOUT' })}
+          onClick={logout}
           className="mt-6 w-full flex items-center justify-center gap-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium py-3 transition"
         >
           <LogOut size={16} /> Abmelden
@@ -96,7 +96,7 @@ function NoWebAccess() {
 }
 
 function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const { state, dispatch } = useStore()
+  const { state, dispatch, logout, serverStatus } = useStore()
   const currentUser = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
   const activeAlarms = state.alarms.filter((a) => a.status === 'active')
 
@@ -168,6 +168,22 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               </button>
             ))}
           </div>
+          {state.mode === 'live' && (
+            <div className="mt-2 flex items-center gap-1.5 text-[11px]">
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  serverStatus === 'verbunden' ? 'bg-emerald-500' : serverStatus === 'getrennt' ? 'bg-brand-500' : 'bg-amber-500'
+                }`}
+              />
+              <span className="text-slate-500">
+                {serverStatus === 'verbunden'
+                  ? 'Mit Alarmserver verbunden'
+                  : serverStatus === 'getrennt'
+                    ? 'Alarmserver nicht erreichbar'
+                    : 'Verbinde mit Alarmserver …'}
+              </span>
+            </div>
+          )}
           <p className="text-[11px] text-slate-500 mt-2 leading-snug">
             {state.mode === 'demo'
               ? 'Beispieldaten, Zustellung wird simuliert. Beide Modi behalten ihre Daten.'
@@ -185,7 +201,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <div className="text-slate-500 truncate">{currentUser.email}</div>
           </div>
           <button
-            onClick={() => dispatch({ type: 'LOGOUT' })}
+            onClick={logout}
             className="shrink-0 p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
             title="Abmelden"
             aria-label="Abmelden"

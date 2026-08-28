@@ -1,9 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react'
 import { CheckCircle2, Siren } from 'lucide-react'
-import type { AppMode, AppState, Alarm, AlarmButton, AlarmPlan, Channel, Delivery, EscalationLevel, Group, Location, LoneWorkSession, Scenario, User, Webhook, AuditEntry } from './types'
+import type { AppMode, AppState, Alarm, AlarmButton, AlarmPlan, Channel, Delivery, EscalationLevel, Group, Location, LoneWorkSession, Scenario, Session, User, Webhook, AuditEntry } from './types'
+
+/** Datenbestand, wie ihn der Alarmserver liefert – ohne lokale Anteile */
+export type ServerData = Omit<AppState, 'mode' | 'session' | 'currentUserId' | 'scenarioContentVersion' | 'authVersion'>
 import { CHANNEL_LABELS } from './types'
 import { LIVE_INITIAL_PASSWORD, SCENARIO_CONTENT_VERSION, SEED_SCENARIOS, SEED_USERS, createInitialState, createLiveInitialState } from './data/seed'
-import { hashPassword, randomSalt } from './lib/auth'
+import { authenticate, hashPassword, passwordProblem, randomSalt, verifyPassword } from './lib/auth'
+import { ApiError, api, authToken, setAuthToken, subscribeToServer } from './lib/api'
 import { LEGACY_EMOJI_TO_ICON } from './components/ScenarioIcon'
 
 /** Erhöhen, wenn gespeicherte Passwortdaten einmalig korrigiert werden müssen */
@@ -27,7 +31,7 @@ export type Action =
   | { type: 'LOGOUT' }
   | { type: 'SET_PASSWORD'; userId: string; password: string; mustChange?: boolean }
   | { type: 'SET_CURRENT_USER'; userId: string }
-  | { type: 'UPSERT_USER'; user: User }
+  | { type: 'UPSERT_USER'; user: User; password?: string }
   | { type: 'DELETE_USER'; userId: string }
   | { type: 'IMPORT_USERS'; users: User[] }
   | { type: 'UPSERT_GROUP'; group: Group }
@@ -56,6 +60,7 @@ export type Action =
   | { type: 'AUDIT'; entryType: string; message: string; userId?: string }
   | { type: 'SET_MODE'; mode: AppMode }
   | { type: 'ADOPT_EXTERNAL'; state: AppState }
+  | { type: 'ADOPT_SERVER'; data: ServerData; session: Session | null }
   | { type: 'RESET_DEMO' }
 
 /** Ist dieses Konto der einzige verbleibende Administrator? */
@@ -266,10 +271,14 @@ function reducer(state: AppState, action: Action): AppState {
       const exists = state.users.some((u) => u.id === action.user.id)
       // Der letzte Administrator darf sich nicht selbst die Rechte entziehen
       if (exists && isLastAdmin(state, action.user.id) && action.user.role !== 'admin') return state
+      const salt = action.password ? randomSalt() : undefined
+      const user: User = action.password
+        ? { ...action.user, passwordSalt: salt, passwordHash: hashPassword(action.password, salt!) }
+        : action.user
       return {
         ...state,
-        users: exists ? state.users.map((u) => (u.id === action.user.id ? action.user : u)) : [...state.users, action.user],
-        audit: audit(state, 'admin', `${exists ? 'Benutzer aktualisiert' : 'Benutzer erstellt'}: ${action.user.firstName} ${action.user.lastName}`),
+        users: exists ? state.users.map((u) => (u.id === user.id ? user : u)) : [...state.users, user],
+        audit: audit(state, 'admin', `${exists ? 'Benutzer aktualisiert' : 'Benutzer erstellt'}: ${user.firstName} ${user.lastName}`),
       }
     }
     case 'DELETE_USER':
@@ -429,7 +438,19 @@ function reducer(state: AppState, action: Action): AppState {
     case 'AUDIT':
       return { ...state, audit: audit(state, action.entryType, action.message, action.userId) }
     case 'SET_MODE':
-      return action.mode === state.mode ? state : loadStateFor(action.mode)
+      if (action.mode === state.mode) return state
+      return action.mode === 'live' ? leererLiveZustand() : loadStateFor('demo')
+    case 'ADOPT_SERVER': {
+      // Im Live-Modus ist der Server die Wahrheit; Modus und Anmeldung bleiben lokal
+      const session = action.session
+      return {
+        ...state,
+        ...action.data,
+        mode: 'live',
+        session,
+        currentUserId: session?.userId ?? state.currentUserId,
+      }
+    }
     case 'ADOPT_EXTERNAL': {
       // Änderungen aus einem anderen Browser-Tab übernehmen. Die Anmeldung dieses
       // Tabs bleibt bestehen, solange das Konto im übernommenen Bestand existiert –
@@ -480,7 +501,7 @@ function toastForAction(action: Action): Toast['message'] | { message: string; k
     case 'SET_PASSWORD':
       return 'Passwort gespeichert'
     case 'UPSERT_USER':
-      return 'Benutzer gespeichert'
+      return action.password ? 'Benutzer und Passwort gespeichert' : 'Benutzer gespeichert'
     case 'DELETE_USER':
       return 'Benutzer gelöscht'
     case 'IMPORT_USERS':
@@ -639,9 +660,148 @@ function sendOutboundWebhooks(state: AppState, alarm: Alarm) {
   }
 }
 
+/**
+ * Eine Aktion im Live-Modus auf dem Server ausführen.
+ *
+ * Der Server ist dort die einzige Wahrheit: Die Aktion wird nicht lokal auf den
+ * Zustand angewendet, sondern verschickt; der neue Stand kommt anschliessend
+ * über /state zurück. Gibt true zurück, wenn die Aktion behandelt wurde.
+ */
+async function serverEffekt(action: Action, state: AppState): Promise<boolean> {
+  switch (action.type) {
+    case 'UPSERT_USER': {
+      const u = action.user
+      await api.saveUser({
+        id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email, phone: u.phone,
+        role: u.role, groupIds: u.groupIds, locationId: u.locationId, language: u.language,
+        absence: u.absence, partTimeNote: u.partTimeNote, mustChangePassword: u.mustChangePassword,
+        ...(action.password ? { password: action.password } : {}),
+      })
+      return true
+    }
+    case 'DELETE_USER':
+      await api.deleteUser(action.userId)
+      return true
+    case 'SET_PASSWORD':
+      await api.setUserPassword(action.userId, action.password, action.mustChange ?? false)
+      return true
+    case 'IMPORT_USERS':
+      for (const u of action.users) await api.saveUser(u)
+      return true
+    case 'UPSERT_GROUP':
+      await api.saveDoc('groups', action.group)
+      return true
+    case 'DELETE_GROUP':
+      await api.deleteDoc('groups', action.groupId)
+      return true
+    case 'UPSERT_LOCATION':
+      await api.saveDoc('locations', action.location)
+      return true
+    case 'DELETE_LOCATION':
+      await api.deleteDoc('locations', action.locationId)
+      return true
+    case 'UPSERT_SCENARIO':
+      await api.saveDoc('scenarios', action.scenario)
+      return true
+    case 'DELETE_SCENARIO':
+      await api.deleteDoc('scenarios', action.scenarioId)
+      return true
+    case 'UPSERT_PLAN':
+      await api.saveDoc('plans', action.plan)
+      return true
+    case 'DELETE_PLAN':
+      await api.deleteDoc('plans', action.planId)
+      return true
+    case 'UPSERT_BUTTON':
+      await api.saveDoc('buttons', action.button)
+      return true
+    case 'DELETE_BUTTON':
+      await api.deleteDoc('buttons', action.buttonId)
+      return true
+    case 'ADD_CONTACT':
+      await api.saveDoc('contacts', action.contact)
+      return true
+    case 'DELETE_CONTACT':
+      await api.deleteDoc('contacts', action.contactId)
+      return true
+    case 'UPDATE_INTEGRATIONS':
+      await api.saveIntegrations(action.integrations)
+      return true
+    case 'UPSERT_WEBHOOK': {
+      const webhooks = state.integrations.webhooks.some((w) => w.id === action.webhook.id)
+        ? state.integrations.webhooks.map((w) => (w.id === action.webhook.id ? action.webhook : w))
+        : [...state.integrations.webhooks, action.webhook]
+      await api.saveIntegrations({ ...state.integrations, webhooks })
+      return true
+    }
+    case 'DELETE_WEBHOOK':
+      await api.saveIntegrations({ ...state.integrations, webhooks: state.integrations.webhooks.filter((w) => w.id !== action.webhookId) })
+      return true
+    case 'ADD_ACCESS_CODE': {
+      const code = `${action.locationId.slice(-2).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+      await api.saveIntegrations({
+        ...state.integrations,
+        accessCodes: [{ code, locationId: action.locationId, role: 'mitarbeiter', createdAt: Date.now(), used: 0 }, ...state.integrations.accessCodes],
+      })
+      return true
+    }
+    case 'TRIGGER_ALARM': {
+      const a = action.alarm
+      await api.triggerAlarm({
+        scenarioId: a.scenarioId, message: a.message, silent: a.silent, requireAck: a.requireAck,
+        channels: a.channels, groupIds: a.groupIds, locationIds: a.locationIds,
+        triggeredVia: a.triggeredVia, planId: a.planId, escalation: a.escalation,
+        recipientUserIds: [...new Set(a.deliveries.map((d) => d.userId))],
+      })
+      return true
+    }
+    case 'END_ALARM':
+      await api.endAlarm(action.alarmId)
+      return true
+    case 'ACK_ALARM':
+      await api.ackAlarm(action.alarmId, action.ack)
+      return true
+    case 'START_LONE_WORK': {
+      const s = action.session
+      await api.startLoneWork({ activity: s.activity, durationMin: s.durationMin, locationId: s.locationId, silent: s.silent })
+      return true
+    }
+    case 'EXTEND_LONE_WORK':
+      await api.extendLoneWork(action.sessionId, action.minutes)
+      return true
+    case 'COMPLETE_LONE_WORK':
+      await api.completeLoneWork(action.sessionId)
+      return true
+    default:
+      // Rein lokale Aktionen (Modus, Ansicht, Tick) laufen weiter über den Reducer
+      return false
+  }
+}
+
 // ---------- Context / Provider ----------
 
-const StoreContext = createContext<{ state: AppState; dispatch: React.Dispatch<Action> } | null>(null)
+export type ServerStatus = 'lokal' | 'verbindet' | 'verbunden' | 'getrennt'
+
+interface StoreCtx {
+  state: AppState
+  dispatch: React.Dispatch<Action>
+  /** Anmelden – im Demo-Modus lokal, im Live-Modus über den Alarmserver */
+  login: (email: string, password: string) => Promise<{ ok: true } | { ok: false; error: string }>
+  logout: () => void
+  /** Eigenes Passwort ändern */
+  changePassword: (aktuell: string, neu: string) => Promise<{ ok: true } | { ok: false; error: string }>
+  serverStatus: ServerStatus
+  /**
+   * Das bei der Anmeldung eingegebene Passwort – nur im Arbeitsspeicher, nie
+   * gespeichert. Wird für den erzwungenen Erstwechsel gebraucht, damit die
+   * Person es nicht ein zweites Mal eintippen muss.
+   */
+  knownPassword: string | null
+  /** Datenbestand neu vom Server laden */
+  refresh: () => void
+}
+
+const StoreContext = createContext<StoreCtx | null>(null)
 
 function loadStateFor(mode: AppMode): AppState {
   try {
@@ -676,6 +836,12 @@ function loadStateFor(mode: AppMode): AppState {
   return mode === 'live' ? createLiveInitialState() : createInitialState()
 }
 
+/** Gerüst für den Live-Modus, bevor der Server geantwortet hat */
+function leererLiveZustand(): AppState {
+  const basis = createLiveInitialState()
+  return { ...basis, users: [], alarms: [], loneWorkSessions: [], audit: [], session: null }
+}
+
 function loadState(): AppState {
   let mode: AppMode = 'demo'
   try {
@@ -683,7 +849,8 @@ function loadState(): AppState {
   } catch {
     // kein Storage verfügbar -> Demo
   }
-  return loadStateFor(mode)
+  // Live-Daten kommen vom Server, nicht aus dem Browserspeicher
+  return mode === 'live' ? leererLiveZustand() : loadStateFor(mode)
 }
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
@@ -706,19 +873,125 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   /** markiert einen Zustand, der aus einem anderen Tab stammt */
   const adopted = useRef(false)
 
+  const [serverStatus, setServerStatus] = useState<ServerStatus>('lokal')
+  const [knownPassword, setKnownPassword] = useState<string | null>(null)
+
+  /** Datenbestand vom Alarmserver holen */
+  const refresh = useCallback(async () => {
+    if (stateRef.current.mode !== 'live') return
+    if (!authToken()) {
+      setServerStatus('getrennt')
+      return
+    }
+    try {
+      const [{ user }, daten] = await Promise.all([api.me(), api.state()])
+      rawDispatch({ type: 'ADOPT_SERVER', data: daten, session: { userId: user.id, loginAt: Date.now() } })
+      setServerStatus('verbunden')
+    } catch (fehler) {
+      if (fehler instanceof ApiError && fehler.status === 401) {
+        // Sitzung abgelaufen oder auf dem Server beendet
+        setAuthToken(null)
+        rawDispatch({ type: 'LOGOUT' })
+        setServerStatus('verbunden')
+      } else {
+        setServerStatus('getrennt')
+      }
+    }
+  }, [])
+
+  const login = useCallback<StoreCtx['login']>(async (email, password) => {
+    if (stateRef.current.mode === 'demo') {
+      const ergebnis = authenticate(stateRef.current.users, email, password)
+      if (!ergebnis.ok) return { ok: false, error: ergebnis.error }
+      setKnownPassword(password)
+      rawDispatch({ type: 'LOGIN', userId: ergebnis.user.id })
+      return { ok: true }
+    }
+    try {
+      const { token } = await api.login(email, password)
+      setAuthToken(token)
+      setKnownPassword(password)
+      await refresh()
+      return { ok: true }
+    } catch (fehler) {
+      return { ok: false, error: fehler instanceof ApiError ? fehler.message : 'Anmeldung fehlgeschlagen.' }
+    }
+  }, [refresh])
+
+  const logout = useCallback(() => {
+    if (stateRef.current.mode === 'live') {
+      api.logout().catch(() => {
+        // Server nicht erreichbar – lokal trotzdem abmelden
+      })
+      setAuthToken(null)
+    }
+    setKnownPassword(null)
+    rawDispatch({ type: 'LOGOUT' })
+    pushToast('Abgemeldet')
+  }, [pushToast])
+
+  const changePassword = useCallback<StoreCtx['changePassword']>(async (aktuell, neu) => {
+    const eigen = stateRef.current.users.find((u) => u.id === stateRef.current.session?.userId)
+    if (!eigen) return { ok: false, error: 'Nicht angemeldet.' }
+
+    if (stateRef.current.mode === 'demo') {
+      if (!verifyPassword(eigen, aktuell)) return { ok: false, error: 'Das aktuelle Passwort ist falsch.' }
+      const problem = passwordProblem(neu)
+      if (problem) return { ok: false, error: problem }
+      rawDispatch({ type: 'SET_PASSWORD', userId: eigen.id, password: neu })
+      setKnownPassword(neu)
+      pushToast('Passwort gespeichert')
+      return { ok: true }
+    }
+    try {
+      await api.changePassword(aktuell, neu)
+      setKnownPassword(neu)
+      await refresh()
+      pushToast('Passwort gespeichert')
+      return { ok: true }
+    } catch (fehler) {
+      return { ok: false, error: fehler instanceof ApiError ? fehler.message : 'Passwort konnte nicht geändert werden.' }
+    }
+  }, [pushToast, refresh])
+
   const dispatch = useCallback(
     (action: Action) => {
-      rawDispatch(action)
-      if (action.type === 'TRIGGER_ALARM' && stateRef.current.mode === 'live') {
-        sendOutboundWebhooks(stateRef.current, action.alarm)
+      const modus = stateRef.current.mode
+
+      if (modus === 'live') {
+        // Anmeldung und Modus laufen über eigene Wege, nicht über den Server
+        if (action.type === 'LOGIN' || action.type === 'LOGOUT') {
+          rawDispatch(action)
+          return
+        }
+        const vorher = stateRef.current
+        serverEffekt(action, vorher)
+          .then((behandelt) => {
+            if (!behandelt) {
+              rawDispatch(action)
+              return
+            }
+            const t = toastForAction(action)
+            if (t) {
+              if (typeof t === 'string') pushToast(t)
+              else pushToast(t.message, t.kind)
+            }
+            return refresh()
+          })
+          .catch((fehler) => {
+            pushToast(fehler instanceof ApiError ? fehler.message : 'Der Alarmserver hat die Aktion abgelehnt.', 'alarm')
+          })
+        return
       }
+
+      rawDispatch(action)
       const t = toastForAction(action)
       if (t) {
         if (typeof t === 'string') pushToast(t)
         else pushToast(t.message, t.kind)
       }
     },
-    [pushToast],
+    [pushToast, refresh],
   )
 
   useEffect(() => {
@@ -729,19 +1002,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       return
     }
     try {
-      localStorage.setItem(DATA_KEYS[state.mode], JSON.stringify(state))
+      // Live-Daten gehören dem Server; lokal wird nur der Modus gemerkt
+      if (state.mode === 'demo') localStorage.setItem(DATA_KEYS.demo, JSON.stringify(state))
       localStorage.setItem(MODE_KEY, state.mode)
     } catch {
       // Speicher voll – Offline-Cache nicht kritisch
     }
   }, [state])
 
-  // Portal und App-Vorschau laufen in getrennten Tabs auf demselben Speicher.
-  // Ohne diesen Abgleich arbeitet jeder Tab auf einem veralteten Stand und
-  // überschreibt beim nächsten Schreiben die Änderungen des anderen.
+  // Portal und App-Vorschau laufen im Demo-Modus in getrennten Tabs auf demselben
+  // Speicher. Ohne diesen Abgleich arbeitet jeder Tab auf einem veralteten Stand
+  // und überschreibt beim nächsten Schreiben die Änderungen des anderen.
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
-      if (e.key !== DATA_KEYS[stateRef.current.mode] || !e.newValue) return
+      if (stateRef.current.mode !== 'demo' || e.key !== DATA_KEYS.demo || !e.newValue) return
       try {
         const incoming = JSON.parse(e.newValue) as AppState
         if (!incoming.users || !incoming.scenarios) return
@@ -755,13 +1029,27 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('storage', onStorage)
   }, [])
 
+  // Im Live-Modus den Serverstand laden und Änderungen anderer Geräte abonnieren
   useEffect(() => {
+    if (state.mode !== 'live') {
+      setServerStatus('lokal')
+      return
+    }
+    setServerStatus('verbindet')
+    void refresh()
+    if (!state.session) return
+    return subscribeToServer(() => void refresh())
+  }, [state.mode, state.session?.userId, refresh])
+
+  // Simulation nur im Demo-Modus; im Live-Betrieb rechnet der Server
+  useEffect(() => {
+    if (state.mode !== 'demo') return
     const interval = setInterval(() => rawDispatch({ type: 'TICK', now: Date.now() }), 1000)
     return () => clearInterval(interval)
-  }, [])
+  }, [state.mode])
 
   return (
-    <StoreContext.Provider value={{ state, dispatch }}>
+    <StoreContext.Provider value={{ state, dispatch, login, logout, changePassword, serverStatus, knownPassword, refresh: () => void refresh() }}>
       {children}
       <ToastHost toasts={toasts} />
     </StoreContext.Provider>

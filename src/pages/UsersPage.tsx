@@ -168,6 +168,8 @@ function UserEditor({ user, onClose }: { user: User; onClose: () => void }) {
       const problem = passwordProblem(password)
       if (problem) return setPasswordError(problem)
     }
+    // Passwort gehört in dieselbe Aktion: sonst laufen Anlegen und Passwortvergabe
+    // im Live-Betrieb als zwei Serveraufrufe in einen Wettlauf
     dispatch({
       type: 'UPSERT_USER',
       user: {
@@ -175,9 +177,8 @@ function UserEditor({ user, onClose }: { user: User; onClose: () => void }) {
         absence: absenceFrom && absenceTo ? { from: absenceFrom, to: absenceTo } : undefined,
         mustChangePassword: mustChange,
       },
+      password: password || undefined,
     })
-    // Passwort separat, damit der Klartext nie im Benutzerobjekt landet
-    if (password) dispatch({ type: 'SET_PASSWORD', userId: draft.id, password, mustChange })
     onClose()
   }
 

@@ -208,6 +208,32 @@ router.post('/users', auth, adminOnly, (req, res) => {
   res.json({ user: publicUser(user) })
 })
 
+/** Passwort eines fremden Kontos setzen – nur für die Administration */
+router.post('/users/:id/password', auth, adminOnly, (req, res) => {
+  const ziel = findStoredUser(req.params.id)
+  if (!ziel) {
+    res.status(404).json({ error: 'Benutzer nicht gefunden.' })
+    return
+  }
+  const problem = passwordProblem(String(req.body?.password ?? ''))
+  if (problem) {
+    res.status(400).json({ error: problem })
+    return
+  }
+  const salt = newSalt()
+  upsertUser({
+    ...ziel,
+    passwordSalt: salt,
+    passwordHash: hashPassword(String(req.body.password), salt),
+    mustChangePassword: Boolean(req.body?.mustChange),
+  })
+  // Bestehende Anmeldungen dieses Kontos beenden
+  destroyUserSessions(ziel.id)
+  addAudit('admin', `Passwort gesetzt für ${ziel.firstName} ${ziel.lastName}`)
+  broadcast('state')
+  res.json({ ok: true })
+})
+
 router.delete('/users/:id', auth, adminOnly, (req, res) => {
   if (istLetzterAdmin(req.params.id)) {
     res.status(400).json({ error: 'Der letzte Administrator kann nicht gelöscht werden.' })
