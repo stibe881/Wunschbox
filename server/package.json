@@ -9,6 +9,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "serve": "bash scripts/run.sh",
     "test": "tsx src/test.ts"
   },
   "dependencies": {

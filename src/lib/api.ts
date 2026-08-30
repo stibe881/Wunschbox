@@ -46,6 +46,43 @@ export function setAuthToken(token: string | null): void {
   }
 }
 
+// ---------- Aktualisierung ----------
+
+export type UpdateScope = 'server' | 'server+ios'
+
+export interface UpdateSchritt {
+  id: string
+  titel: string
+  status: 'offen' | 'laufend' | 'erfolgreich' | 'fehlgeschlagen' | 'übersprungen'
+  ausgabe: string
+  startedAt?: number
+  finishedAt?: number
+}
+
+export interface UpdateJob {
+  id: string
+  scope: UpdateScope
+  status: 'laufend' | 'erfolgreich' | 'fehlgeschlagen' | 'neustart'
+  startedAt: number
+  finishedAt?: number
+  gestartetVon: string
+  schritte: UpdateSchritt[]
+  buildUrl?: string
+  fehler?: string
+}
+
+export interface VersionsInfo {
+  branch: string
+  commit: string
+  commitKurz: string
+  commitDatum: string
+  commitTitel: string
+  hinterher: number
+  iosMoeglich: boolean
+  iosHinweis?: string
+  neustartMoeglich: boolean
+}
+
 export class ApiError extends Error {
   constructor(message: string, readonly status: number) {
     super(message)
@@ -112,6 +149,11 @@ export const api = {
     anfrage<{ alarm: AppState['alarms'][number] }>(`/alarms/${id}/ack`, { method: 'POST', body: JSON.stringify({ ack }) }),
   endAlarm: (id: string) =>
     anfrage<{ alarm: AppState['alarms'][number] }>(`/alarms/${id}/end`, { method: 'POST' }),
+
+  updateStatus: () => anfrage<{ version: VersionsInfo; job: UpdateJob | null }>('/update/status'),
+  updateJob: () => anfrage<{ job: UpdateJob | null }>('/update/job'),
+  startUpdate: (scope: UpdateScope) =>
+    anfrage<{ job: UpdateJob }>('/update', { method: 'POST', body: JSON.stringify({ scope }) }),
 
   startLoneWork: (daten: Record<string, unknown>) =>
     anfrage<{ session: AppState['loneWorkSessions'][number] }>('/lone-work', { method: 'POST', body: JSON.stringify(daten) }),

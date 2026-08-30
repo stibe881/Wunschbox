@@ -16,6 +16,7 @@ und ein Alarm erreicht nur das Gerät, auf dem er ausgelöst wurde.
 - **Echte Push-Nachrichten** an alle registrierten iPhones über den Expo-Push-Dienst.
 - **Live-Aktualisierung** über Server-Sent Events: Jede Änderung erreicht alle
   offenen Portale und Apps sofort, ohne Neuladen.
+- **Aktualisierung per Knopfdruck** aus dem Portal – siehe unten.
 
 ## Starten
 
@@ -39,6 +40,9 @@ zu kopieren.
 | `SOBE_DB_PATH` | Pfad der Datenbankdatei | `data/sobe-notfall.sqlite` |
 | `SOBE_ADMIN_EMAIL` | Konto des ersten Administrators | `stefan.gross@sonnenberg-baar.ch` |
 | `SOBE_ADMIN_PASSWORD` | Erstpasswort dieses Kontos | `SOBE-Start2026!` |
+| `SOBE_REPO_ROOT` | Arbeitsverzeichnis für die Aktualisierung | ein Verzeichnis über `server/` |
+| `SOBE_AUTO_RESTART` | Neustart nach der Aktualisierung (`false` schaltet ihn ab) | an |
+| `EXPO_TOKEN` | Zugangstoken von expo.dev, nötig für den iOS-Build | – |
 
 Beim ersten Start werden Standorte, Gruppen, Szenarien, Alarmplan-Vorlagen und
 Notrufnummern angelegt sowie ein Administratorkonto mit erzwungenem
@@ -62,6 +66,63 @@ Für den Betrieb ausserhalb des Schulnetzes gehört der Server hinter HTTPS
 (Reverse Proxy mit Zertifikat) – Passwörter und Token dürfen nicht unverschlüsselt
 über fremde Netze gehen.
 
+## Aktualisierung per Knopfdruck
+
+Administratoren finden im Portal in der Seitenleiste den Knopf **Aktualisierung**.
+Dort ist der aktuelle Stand sichtbar (Branch, Commit, ob Änderungen offen sind),
+und es gibt zwei Möglichkeiten:
+
+| Auswahl | Was passiert | Dauer |
+| --- | --- | --- |
+| **Nur Server** | `git fetch` → `git pull --ff-only` → Abhängigkeiten von Portal und Server → beide bauen → Server neu starten | wenige Minuten |
+| **Server und iOS-App** | zusätzlich Abhängigkeiten der App und `eas build --platform ios --profile production --auto-submit` (TestFlight) | 20 bis 45 Minuten |
+
+Jeder Schritt wird mit Status und vollständiger Ausgabe angezeigt, auch wenn
+etwas fehlschlägt. Bricht ein Schritt ab, werden die folgenden übersprungen und
+es wird nicht neu gestartet.
+
+Die Befehle liegen fest im Server (`src/update.ts`); der Client wählt nur den
+Umfang. Die Endpunkte sind Administratoren vorbehalten.
+
+### Voraussetzungen
+
+**Neustart.** Der Server beendet sich nach einer erfolgreichen Aktualisierung
+mit Code 0. Damit er mit dem neuen Stand wieder hochkommt, muss er unter einem
+Dienstverwalter laufen:
+
+```bash
+npm run serve                  # Linux/macOS: mitgelieferte Neustart-Schleife
+scripts\run.cmd                # Windows: dasselbe als Batch-Datei
+```
+
+Für den Dauerbetrieb ist systemd besser – eine Vorlage liegt unter
+`scripts/sobe-notfall.service` (mit `Restart=always`). Alternativ pm2:
+
+```bash
+pm2 start dist/index.js --name sobe-notfall
+```
+
+Ohne Dienstverwalter setzen Sie `SOBE_AUTO_RESTART=false`; die Aktualisierung
+läuft dann durch, der Neustart erfolgt von Hand.
+
+**Git-Zugang.** `git pull` läuft unter dem Benutzer des Servers. Für ein
+privates Repository muss dort ein Deploy-Key (SSH) oder ein Token im
+Anmeldespeicher hinterlegt sein – sonst scheitert der Schritt mit einer
+Zugriffsmeldung im Protokoll.
+
+**iOS-Build.** Für die zweite Auswahl braucht der Server ein Zugangstoken von
+expo.dev als `EXPO_TOKEN`:
+
+1. Auf [expo.dev](https://expo.dev) unter *Account settings → Access tokens*
+   ein Token erstellen.
+2. Auf dem Server hinterlegen, z. B. in der systemd-Unit:
+   `Environment=EXPO_TOKEN=...`
+3. Server neu starten.
+
+Ohne Token bleibt die Auswahl «Server und iOS-App» gesperrt und nennt den Grund.
+Die Apple-Zugangsdaten für die Übermittlung an TestFlight verwaltet EAS selbst
+(einmalig über `eas credentials` eingerichtet).
+
 ## Schnittstelle
 
 Alle Endpunkte unter `/api`, Authentifizierung über `Authorization: Bearer <token>`.
@@ -83,6 +144,9 @@ Alle Endpunkte unter `/api`, Authentifizierung über `Authorization: Bearer <tok
 | POST | `/alarms/:id/end` | Entwarnung (Administration und Krisenstab) |
 | POST | `/lone-work`, `/lone-work/:id/extend`, `/lone-work/:id/complete` | Alleinarbeit |
 | POST | `/push/register`, `/push/unregister` | Push-Token eines Geräts |
+| GET | `/update/status` | Stand und laufende Aktualisierung (nur Administration) |
+| GET | `/update/job` | Fortschritt der laufenden Aktualisierung |
+| POST | `/update` | Aktualisierung starten (`scope`: `server` oder `server+ios`) |
 
 ## Tests
 
@@ -92,7 +156,8 @@ SOBE_TEST_URL=http://localhost:3001 npm test   # in einem zweiten
 ```
 
 46 Integrationstests über Anmeldung, Rechte, Benutzerverwaltung, Alarme,
-Alleinarbeit und Push-Registrierung.
+Alleinarbeit und Push-Registrierung. Die Aktualisierung ist zusätzlich gegen ein
+eigenes Testrepository geprüft (Ablauf, Fehlschlag, Rechte, iOS-Sperre).
 
 ## Push-Nachrichten
 

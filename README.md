@@ -85,6 +85,13 @@ cd server && npm install && npm run dev
 Die Serveradresse lässt sich auf der Anmeldemaske eintragen (im Portal wie in
 der App) – im Schulnetz die IP-Adresse des Rechners, auf dem der Server läuft.
 
+**Aktualisieren ohne Kommandozeile:** Administratoren finden im Portal in der
+Seitenleiste den Knopf **Aktualisierung** und wählen dort zwischen «Nur Server»
+und «Server und iOS-App» (Letzteres stösst auch den TestFlight-Build an). Jeder
+Schritt wird mit Protokoll angezeigt. Die Voraussetzungen – Dienstverwalter für
+den Neustart, Git-Zugang, `EXPO_TOKEN` – stehen in
+[`server/README.md`](server/README.md).
+
 ## Anmeldung
 
 | Modus | Konto | Passwort |

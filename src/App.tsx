@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import {
   AlertTriangle, BellRing, BookOpen, Building2, ClipboardList, ExternalLink, FileClock, LayoutDashboard,
-  Lock, LogOut, Menu, Phone, Plug, Radio, Siren, Smartphone, Timer, Users, UsersRound, X,
+  Download, Lock, LogOut, Menu, Phone, Plug, Radio, Siren, Smartphone, Timer, Users, UsersRound, X,
 } from 'lucide-react'
 import { useStore } from './store'
 import Dashboard from './pages/Dashboard'
@@ -20,6 +20,7 @@ import Contacts from './pages/Contacts'
 import AuditLog from './pages/AuditLog'
 import UserApp from './pages/UserApp'
 import LoginScreen, { ForcePasswordChange } from './components/LoginScreen'
+import UpdateDialog from './components/UpdateDialog'
 
 const NAV = [
   { section: 'Gefahrenabwehr' },
@@ -99,6 +100,9 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { state, dispatch, logout, serverStatus } = useStore()
   const currentUser = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
   const activeAlarms = state.alarms.filter((a) => a.status === 'active')
+  const [updateOffen, setUpdateOffen] = useState(false)
+  // Aktualisieren betrifft den Server – im Demo-Modus gibt es keinen
+  const zeigeUpdate = state.mode === 'live' && currentUser.role === 'admin'
 
   return (
     <div className="h-full w-72 lg:w-64 bg-slate-900 text-slate-300 flex flex-col">
@@ -191,6 +195,18 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </p>
         </div>
       </nav>
+      {zeigeUpdate && (
+        <div className="px-5 pb-3">
+          <button
+            onClick={() => setUpdateOffen(true)}
+            className="w-full flex items-center justify-center gap-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-medium py-2.5 transition"
+          >
+            <Download size={15} /> Aktualisierung
+          </button>
+        </div>
+      )}
+      {updateOffen && <UpdateDialog onClose={() => setUpdateOffen(false)} />}
+
       <div className="px-5 py-4 border-t border-slate-800 text-xs">
         <div className="text-slate-500 mb-1">Angemeldet als</div>
         <div className="flex items-center gap-2">

@@ -7,6 +7,7 @@ import { addClient } from './events.js'
 import { broadcast } from './events.js'
 import { alarmPush, ausgehendeWebhooks } from './engine.js'
 import { registerPushToken, removePushToken } from './push.js'
+import { aktuellerJob, starteUpdate, updateLaeuft, versionsInfo, type UpdateScope } from './update.js'
 import { ensureAdmin } from './setup.js'
 import {
   addAudit, allLoneWork, allStoredUsers, createAlarm, deleteDoc, deleteUser, findAlarm, findStoredUser,
@@ -453,6 +454,36 @@ router.post('/lone-work/:id/complete', auth, (req: AuthRequest, res) => {
   addAudit('alleinarbeit', 'Alleinarbeit sicher beendet', req.user!.id)
   broadcast('state')
   res.json({ ok: true })
+})
+
+// ---------- Aktualisierung ----------
+
+router.get('/update/status', auth, adminOnly, async (_req, res) => {
+  res.json({ version: await versionsInfo(), job: aktuellerJob() })
+})
+
+/** Schnelle Abfrage ohne Netzzugriff – für regelmässiges Nachsehen */
+router.get('/update/job', auth, adminOnly, (_req, res) => {
+  res.json({ job: aktuellerJob() })
+})
+
+router.post('/update', auth, adminOnly, async (req: AuthRequest, res) => {
+  if (updateLaeuft()) {
+    res.status(409).json({ error: 'Es läuft bereits eine Aktualisierung.' })
+    return
+  }
+  const scope: UpdateScope = req.body?.scope === 'server+ios' ? 'server+ios' : 'server'
+  if (scope === 'server+ios') {
+    const info = await versionsInfo(false)
+    if (!info.iosMoeglich) {
+      res.status(400).json({ error: info.iosHinweis ?? 'Der iOS-Build ist auf diesem Server nicht eingerichtet.' })
+      return
+    }
+  }
+  const person = req.user!
+  const job = starteUpdate(scope, `${person.firstName} ${person.lastName}`)
+  addAudit('system', `Aktualisierung gestartet (${scope === 'server+ios' ? 'Server und iOS-App' : 'Server'})`, person.id)
+  res.json({ job })
 })
 
 // ---------- Push-Registrierung ----------
