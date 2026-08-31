@@ -211,3 +211,17 @@ Der Server sendet über `https://exp.host/--/api/v2/push/send`. Damit ein Telefo
 Nachrichten empfängt, muss die App ihr Push-Token über `/push/register` melden.
 Das funktioniert nur in einem eigenen App-Build (TestFlight oder App Store);
 Expo Go kann seit SDK 53 keine Remote-Push-Nachrichten mehr empfangen.
+
+**Nicht stille Alarme gehen als Critical Alert hinaus** – sie klingeln auch bei
+stummgeschaltetem Telefon. Weil Apple dafür eine Bewilligung verlangt, meldet
+jedes Gerät bei der Registrierung, ob es Critical Alerts empfangen darf
+(`criticalAlerts`). Der Server setzt die Stufe daraufhin pro Gerät:
+
+| Gerät | Stufe |
+| --- | --- |
+| Critical Alerts bewilligt | `critical` – klingelt trotz Stummschalter |
+| sonst | `time-sensitive` – durchbricht Fokus-Modi, respektiert den Stummschalter |
+
+Stille Alarme lösen unverändert gar keinen Push aus. Wie die Bewilligung
+beantragt und aktiviert wird, steht in
+[`mobile/CRITICAL-ALERTS.md`](../mobile/CRITICAL-ALERTS.md).

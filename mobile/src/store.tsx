@@ -5,7 +5,7 @@ import type { Alarm, AlarmLogEntry, Channel, Delivery, EmergencyContact, Escalat
 import { CHANNEL_LABELS } from './types'
 import { LIVE_INITIAL_PASSWORD, SEED_CONTACTS, SEED_GROUPS, SEED_LOCATIONS, SEED_SCENARIOS, SEED_USERS } from './seed'
 import { hashPassword, randomSalt } from './auth'
-import { getPushToken, notifyNow } from './notifications'
+import { criticalAlertsGranted, getPushToken, notifyNow } from './notifications'
 import { ApiError, api, authToken, loadApiSettings, setAuthToken, type ServerData } from './api'
 import { authenticate, passwordProblem, verifyPassword } from './auth'
 
@@ -573,7 +573,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const registerPush = useCallback(async () => {
     try {
       const pushToken = await getPushToken()
-      if (pushToken) await api.registerPush(pushToken)
+      if (!pushToken) return
+      // Der Server braucht die Stufe pro Gerät: Critical Alert nur dort, wo erlaubt
+      await api.registerPush(pushToken, await criticalAlertsGranted())
     } catch {
       // Push ist eine Zusatzfunktion, keine Voraussetzung
     }
@@ -653,7 +655,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             }
             if (action.type === 'TRIGGER_ALARM' && !action.alarm.silent) {
               const scenario = stateRef.current.scenarios.find((s) => s.id === action.alarm.scenarioId)
-              notifyNow(scenario ? `Alarm: ${scenario.title}` : 'Alarm ausgelöst', action.alarm.message)
+              notifyNow(scenario ? `Alarm: ${scenario.title}` : 'Alarm ausgelöst', action.alarm.message, true)
             }
             const t = toastForAction(action)
             if (t) {
@@ -671,7 +673,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       rawDispatch(action)
       if (action.type === 'TRIGGER_ALARM' && !action.alarm.silent) {
         const scenario = stateRef.current.scenarios.find((s) => s.id === action.alarm.scenarioId)
-        notifyNow(scenario ? `Alarm: ${scenario.title}` : 'Alarm ausgelöst', action.alarm.message)
+        notifyNow(scenario ? `Alarm: ${scenario.title}` : 'Alarm ausgelöst', action.alarm.message, true)
       }
       const t = toastForAction(action)
       if (t) {

@@ -551,7 +551,7 @@ async function scheduleLoneWorkNotifications(sessionId: string, activity: string
   const warnAt = expiresAt - 5 * 60_000
   const ids = await Promise.all([
     scheduleAt('Alleinarbeit: Timer läuft bald ab', `Noch 5 Minuten (${activity}) – Lebenszeichen geben, sonst wird alarmiert.`, warnAt),
-    scheduleAt('Alleinarbeit: Alarm ausgelöst', `Timer abgelaufen (${activity}) – Schulsanität und Hausdienst werden alarmiert.`, expiresAt),
+    scheduleAt('Alleinarbeit: Alarm ausgelöst', `Timer abgelaufen (${activity}) – Schulsanität und Hausdienst werden alarmiert.`, expiresAt, true),
   ])
   loneWorkNotifIds.set(sessionId, ids)
 }

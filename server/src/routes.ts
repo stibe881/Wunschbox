@@ -511,7 +511,12 @@ router.post('/push/register', auth, (req: AuthRequest, res) => {
     res.status(400).json({ error: 'Kein gültiges Expo-Push-Token.' })
     return
   }
-  registerPushToken(req.user!.id, token, String(req.body?.platform ?? 'ios'))
+  registerPushToken(
+    req.user!.id,
+    token,
+    String(req.body?.platform ?? 'ios'),
+    Boolean(req.body?.criticalAlerts),
+  )
   res.json({ ok: true })
 })
 

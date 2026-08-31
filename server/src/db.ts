@@ -115,6 +115,15 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(userId);
 `)
 
+/** Nachträglich ergänzte Spalten – SQLite kennt kein «ADD COLUMN IF NOT EXISTS» */
+function ensureColumn(table: string, column: string, definition: string): void {
+  const vorhanden = (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).some((c) => c.name === column)
+  if (!vorhanden) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
+}
+
+// Darf dieses Gerät Alarme auch bei stummem Telefon hörbar machen?
+ensureColumn('push_tokens', 'criticalAlerts', 'INTEGER NOT NULL DEFAULT 0')
+
 export function getSetting(key: string): string | null {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
   return row?.value ?? null

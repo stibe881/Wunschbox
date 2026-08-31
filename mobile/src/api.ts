@@ -108,8 +108,12 @@ export const api = {
   extendLoneWork: (id: string, minutes: number) =>
     anfrage<{ session: AppState['loneWorkSessions'][number] }>(`/lone-work/${id}/extend`, { method: 'POST', body: JSON.stringify({ minutes }) }),
   completeLoneWork: (id: string) => anfrage<{ ok: boolean }>(`/lone-work/${id}/complete`, { method: 'POST' }),
-  registerPush: (token: string) =>
-    anfrage<{ ok: boolean }>('/push/register', { method: 'POST', body: JSON.stringify({ token, platform: 'ios' }) }),
+  /** criticalAlerts: Darf dieses Gerät Alarme auch bei stummem Telefon hörbar machen? */
+  registerPush: (token: string, criticalAlerts: boolean) =>
+    anfrage<{ ok: boolean }>('/push/register', {
+      method: 'POST',
+      body: JSON.stringify({ token, platform: 'ios', criticalAlerts }),
+    }),
   unregisterPush: (token: string) =>
     anfrage<{ ok: boolean }>('/push/unregister', { method: 'POST', body: JSON.stringify({ token }) }),
 }
