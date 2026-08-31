@@ -288,11 +288,22 @@ gut möglich, etwa durch eine eigene ältere Anwendung:
 ```bash
 ps -u "$USER" -f | grep -i node | grep -v grep    # eigene Node-Prozesse
 ss -lntp 2>/dev/null | grep ':3001'               # was dort lauscht
+```
 
-# eigener Prozess von früher? beenden:
-pkill -f "node dist/index.js"
+> **Nicht blind nach dem Namen abschiessen.** `dist/index.js` heissen viele
+> Node-Anwendungen. Laufen mehrere, trifft `pkill -f "node dist/index.js"`
+> alle - auch fremde. Erst zuordnen, dann gezielt beenden:
 
-# fremder Prozess? freien Port suchen und in .env eintragen:
+```bash
+for pid in $(pgrep -u "$USER" -f "node dist/index.js"); do
+  echo "PID $pid -> $(readlink /proc/$pid/cwd)"
+done
+
+# nur die PID beenden, deren Verzeichnis auf dieses Projekt zeigt:
+kill PID
+
+# Ist der Port von einer anderen Anwendung belegt, freien Port suchen
+# und in .env eintragen:
 for p in 3011 3021 3031 3041; do
   (echo > /dev/tcp/127.0.0.1/$p) 2>/dev/null || { echo "frei: $p"; break; }
 done
