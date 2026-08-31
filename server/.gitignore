@@ -3,3 +3,7 @@ dist
 data
 *.sqlite
 *.sqlite-journal
+
+# Zugangsdaten – nie einchecken
+.env
+.env.local

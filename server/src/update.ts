@@ -81,6 +81,20 @@ interface BefehlErgebnis {
 }
 
 /**
+ * Geheimnisse aus der Ausgabe entfernen.
+ * Das Protokoll eines Laufs wird im Portal angezeigt – ein Zugangstoken, das
+ * ein Werkzeug versehentlich ausgibt, darf dort nicht landen.
+ */
+function unkenntlich(text: string): string {
+  let sauber = text
+  for (const name of ['EXPO_TOKEN', 'SOBE_ADMIN_PASSWORD', 'GITHUB_TOKEN', 'GH_TOKEN']) {
+    const wert = process.env[name]
+    if (wert && wert.length >= 8) sauber = sauber.split(wert).join(`«${name} entfernt»`)
+  }
+  return sauber
+}
+
+/**
  * Einen fest hinterlegten Befehl ausführen. Argumente werden als Array
  * übergeben, es gibt keine Shell – damit ist keine Befehlsverkettung möglich.
  */
@@ -94,7 +108,7 @@ function fuehreAus(
   return new Promise((fertig) => {
     let ausgabe = ''
     const sammeln = (daten: Buffer) => {
-      const text = daten.toString()
+      const text = unkenntlich(daten.toString())
       ausgabe = (ausgabe + text).slice(-MAX_AUSGABE)
       beiAusgabe(text)
     }

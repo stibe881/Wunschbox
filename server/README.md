@@ -32,6 +32,24 @@ Der Server läuft auf `http://localhost:3001`. Die Datenbank ist eine einzelne
 Datei unter `server/data/sobe-notfall.sqlite` – zum Sichern genügt es, diese Datei
 zu kopieren.
 
+### Einstellungen über die Datei server/.env
+
+Am einfachsten über eine Datei, damit Zugangsdaten nicht in der Kommandozeile
+oder in Systemeinstellungen stehen:
+
+```bash
+cd server
+copy .env.example .env      # Windows
+cp .env.example .env        # Linux/macOS
+```
+
+Dann die gewünschten Werte eintragen und den Server neu starten. Beim Start
+meldet er `[env] Einstellungen aus … geladen`.
+
+`server/.env` ist von der Versionsverwaltung ausgenommen und darf nie
+eingecheckt werden. Ausgaben des Update-Laufs werden vor der Anzeige im Portal
+von bekannten Geheimnissen bereinigt.
+
 ### Einstellungen über Umgebungsvariablen
 
 | Variable | Bedeutung | Standard |

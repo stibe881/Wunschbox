@@ -1,3 +1,5 @@
+// Muss als erstes stehen: lädt server/.env, bevor andere Module process.env lesen
+import './env.js'
 import cors from 'cors'
 import express from 'express'
 import { purgeExpiredSessions } from './auth.js'
