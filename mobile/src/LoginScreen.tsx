@@ -185,11 +185,12 @@ export default function LoginScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 keyboardType="url"
-                placeholder="http://192.168.1.42:3001"
+                placeholder="https://temp-gross-ict.ch"
                 placeholderTextColor="#64748b"
               />
               <Text style={s.hintText}>
-                Die IP-Adresse des Rechners im Schulnetz, auf dem der Alarmserver läuft.
+                Vollständige Adresse mit https. Sie ist bereits eingetragen und muss nur
+                geändert werden, wenn ein anderer Server verwendet wird.
               </Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <Pressable style={[s.kleinerKnopf, { backgroundColor: '#334155' }]} onPress={() => setServerBearbeiten(false)}>

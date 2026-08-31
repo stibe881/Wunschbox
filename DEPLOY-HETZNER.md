@@ -1,86 +1,146 @@
-# Betrieb auf dem Hetzner-Webhosting
+# Umzug auf das Hetzner-Webhosting
 
-Ziel: Portal und Alarmserver laufen unter **einer** Adresse. Der Node-Server
-liefert die Schnittstelle unter `/api` und das gebaute Portal unter `/` aus.
-
-Das ist auf einem Hosting die einfachste Variante — ein Zertifikat, keine
-CORS-Fragen, kein Mixed-Content, und die iOS-App braucht nur eine Adresse.
+Ziel: Portal und Alarmserver laufen unter **einer** Adresse, erreichbar aus
+jedem Netz – Schulhaus, Mobilfunk, Homeoffice.
 
 ```
-https://temp-gross-ict.ch/            → Portal
-https://temp-gross-ict.ch/api/…       → Schnittstelle
+https://temp-gross-ict.ch/          -> Portal
+https://temp-gross-ict.ch/api/...   -> Schnittstelle für Portal und App
 ```
 
-## 1. Vorbereitung auf dem eigenen Rechner
+Das ist im Hosting die einfachste Variante: ein Zertifikat, keine CORS-Fragen,
+kein Mixed-Content, und die App braucht nur eine Adresse.
 
-Portal bauen und alles einpacken, was auf den Server gehört:
+Rechnen Sie mit **60 bis 90 Minuten**. Die Schritte bauen aufeinander auf;
+jeder endet mit einer Prüfung, die Sie sehen können.
 
-```powershell
-cd "C:\Webseiten und Apps\Wunschbox"
-npm ci
-npm run build          # erzeugt dist/
+---
+
+## 0. Vorher klären
+
+Drei Dinge müssen stimmen, sonst hilft alles Weitere nichts.
+
+| Was | Warum | Wie prüfen |
+| --- | --- | --- |
+| **Node.js 20 oder 22** im Panel | `better-sqlite3` bringt fertige Binärdateien nur für gerade Versionen mit | Panel: Node.js-Anwendung anlegen, Versionsauswahl ansehen |
+| **SSH-Zugang** | Ohne Konsole lässt sich nichts installieren und nichts prüfen | `ssh benutzer@server` |
+| **Let's-Encrypt-Zertifikat** für die Domain | Ohne HTTPS gingen Passwörter im Klartext durchs Netz | Panel: SSL/TLS |
+
+Sind alle drei da, weiter mit Schritt 1.
+
+> **Ohne Node.js-Unterstützung geht es nicht.** Ein reines PHP-Webhosting kann
+> keinen dauerhaft laufenden Node-Prozess veröffentlichen.
+
+---
+
+## 1. Projekt auf den Server holen
+
+Nicht Dateien hochladen, sondern klonen: Nur mit einem Git-Arbeitsverzeichnis
+funktioniert später der Knopf **Aktualisierung** im Portal.
+
+```bash
+ssh benutzer@server
+cd ~/public_html/temp-gross-ict.ch
+
+# Verzeichnis muss leer sein - sonst verweigert git clone
+ls -A
+
+git clone -b claude/e-mergency-webapp-5hc2yl \
+  https://github.com/stibe881/Wunschbox.git .
+```
+
+**Prüfen:**
+
+```bash
+git log --oneline -1     # zeigt den letzten Commit
+node -v                  # v20.x oder v22.x
+```
+
+Zeigt `node -v` eine ältere Version, ist die falsche Node-Version aktiv. Bei
+manchen Paketen liegt die richtige unter einem eigenen Pfad – im Panel
+nachsehen und diesen Pfad in Schritt 2 verwenden.
+
+---
+
+## 2. Abhängigkeiten installieren und bauen
+
+Beides braucht die Entwicklungspakete: `npm run build` ruft TypeScript und Vite
+auf, und der Update-Knopf tut später dasselbe.
+
+```bash
+cd ~/public_html/temp-gross-ict.ch
+npm install --no-audit --no-fund
+npm run build                       # erzeugt dist/ - das Portal
 
 cd server
-npm ci
-npm run build          # erzeugt server/dist/
+npm install --no-audit --no-fund
+npm run build                       # erzeugt server/dist/
 ```
 
-Auf den Server gehören:
+**Prüfen:**
 
-| Vom Rechner | Auf den Server |
-| --- | --- |
-| `dist/` | `~/public_html/temp-gross-ict.ch/dist/` |
-| `server/dist/` | `~/public_html/temp-gross-ict.ch/server/dist/` |
-| `server/package.json`, `server/package-lock.json` | `~/public_html/temp-gross-ict.ch/server/` |
+```bash
+ls ~/public_html/temp-gross-ict.ch/dist/index.html
+ls ~/public_html/temp-gross-ict.ch/server/dist/index.js
+node -e "require('better-sqlite3'); console.log('better-sqlite3 laeuft')"
+```
 
-**Nicht** übertragen: `node_modules` (wird auf dem Server installiert),
-`server/.env` (wird dort neu angelegt), `server/data/` (die Datenbank des
-Testbetriebs).
-
-Übertragen zum Beispiel mit WinSCP oder FileZilla per SFTP.
-
-## 2. Abhängigkeiten auf dem Server installieren
+Die dritte Zeile ist die wichtigste. `better-sqlite3` enthält einen
+kompilierten Teil; passt die fertige Binärdatei nicht zur Node-Version des
+Hosters, scheitert der Server später mit einer unverständlichen Meldung. Dann:
 
 ```bash
 cd ~/public_html/temp-gross-ict.ch/server
-npm ci --omit=dev
-```
-
-`better-sqlite3` enthält einen kompilierten Teil. Schlägt die Installation fehl,
-hilft meistens:
-
-```bash
 npm rebuild better-sqlite3 --build-from-source
 ```
+
+Fehlt dafür ein Compiler, hilft nur eine andere Node-Version im Panel.
+
+---
 
 ## 3. Einstellungen hinterlegen
 
 ```bash
 cd ~/public_html/temp-gross-ict.ch/server
 cp .env.example .env
+pwd                                  # den ausgegebenen Pfad gleich einsetzen
 nano .env
 ```
 
-Inhalt:
+Inhalt – die beiden Pfade mit der Ausgabe von `pwd` ersetzen:
 
 ```
 PORT=3001
 HOST=127.0.0.1
-SOBE_DB_PATH=/usr/home/jqviwy/public_html/temp-gross-ict.ch/server/data/sobe-notfall.sqlite
-SOBE_WEB_ROOT=/usr/home/jqviwy/public_html/temp-gross-ict.ch/dist
+SOBE_DB_PATH=/usr/home/BENUTZER/public_html/temp-gross-ict.ch/server/data/sobe-notfall.sqlite
+SOBE_WEB_ROOT=/usr/home/BENUTZER/public_html/temp-gross-ict.ch/dist
+SOBE_REPO_ROOT=/usr/home/BENUTZER/public_html/temp-gross-ict.ch
 SOBE_ADMIN_EMAIL=stefan.gross@sonnenberg-baar.ch
 EXPO_TOKEN=
 ```
 
-Den absoluten Pfad mit `pwd` ermitteln und einsetzen. `HOST=127.0.0.1` sorgt
-dafür, dass der Server nur lokal lauscht und ausschliesslich über den Webserver
-des Hosters erreichbar ist.
+Was die Zeilen bedeuten:
 
-`EXPO_TOKEN` wird nur für den iOS-Build über den Update-Knopf gebraucht. Ob
-dieser Knopf auf dem Hosting sinnvoll ist, hängt davon ab, ob dort ein
-Git-Arbeitsverzeichnis liegt — siehe Abschnitt 6.
+- **`HOST=127.0.0.1`** – der Server lauscht nur lokal. Erreichbar ist er
+  ausschliesslich über den Webserver des Hosters. Das ist die sicherere
+  Einstellung und für den Panel-Betrieb die richtige.
+- **Absolute Pfade** – das Panel startet den Prozess möglicherweise aus einem
+  anderen Arbeitsverzeichnis. Relative Pfade zeigten dann ins Leere.
+- **`SOBE_REPO_ROOT`** – ohne diese Zeile findet der Update-Knopf das
+  Git-Verzeichnis nicht.
+- **`EXPO_TOKEN`** bleibt vorerst leer; damit ist im Update-Dialog nur
+  «Nur Server» wählbar. Siehe Schritt 9.
 
-## 4. Server starten
+> **`server/.env` gehört niemandem sonst.** Die Datei ist von der
+> Versionsverwaltung ausgenommen und darf nicht ins Web-Verzeichnis kopiert
+> werden.
+
+---
+
+## 4. Erster Start von Hand
+
+Bevor das Panel den Prozess übernimmt, einmal selbst starten – so sehen Sie
+Fehlermeldungen direkt.
 
 ```bash
 cd ~/public_html/temp-gross-ict.ch/server
@@ -90,108 +150,224 @@ node dist/index.js
 Erwartete Ausgabe:
 
 ```
-[env] Einstellungen aus …/server/.env geladen
+[env] Einstellungen aus .../server/.env geladen
 SOBE-Notfall-Alarmserver läuft auf http://localhost:3001
-Webportal wird mit ausgeliefert aus …/dist
+Webportal wird mit ausgeliefert aus .../dist
 Administrator: stefan.gross@sonnenberg-baar.ch
 ```
 
-Prüfen, solange der Server läuft (zweite Sitzung):
+Steht dort **«Kein Webportal unter …»**, stimmt `SOBE_WEB_ROOT` nicht.
+
+**Prüfen** – in einer zweiten SSH-Sitzung, während der Server läuft:
 
 ```bash
 curl -s http://127.0.0.1:3001/api/health
+# {"ok":true,"time":...}
+
 curl -sI http://127.0.0.1:3001/ | head -1
+# HTTP/1.1 200 OK
+
+curl -s http://127.0.0.1:3001/api/setup
+# {"freshInstall":true,"adminEmail":"stefan.gross@sonnenberg-baar.ch","userCount":1}
 ```
 
-## 5. Dauerbetrieb und Erreichbarkeit von aussen
+Danach den Server mit `Strg+C` beenden.
 
-Hier unterscheiden sich die Hosting-Pakete. Zwei Wege:
+---
 
-**a) Node.js-Anwendung im Hosting-Panel.** Bietet das Paket eine
-Node.js-Anwendung an, wird dort eingetragen:
+## 5. Als Anwendung im Panel eintragen
 
-- Anwendungsverzeichnis: `public_html/temp-gross-ict.ch/server`
-- Startdatei: `dist/index.js`
-- Node-Version: 20 oder neuer
+Jetzt übernimmt das Panel: Es startet den Prozess, überwacht ihn und leitet die
+Domain darauf um. Die Feldnamen unterscheiden sich je nach Panel, die Werte sind
+dieselben:
 
-Das Panel startet den Prozess, überwacht ihn und leitet die Domain darauf um.
+| Feld | Wert |
+| --- | --- |
+| Anwendungsverzeichnis / Application root | `public_html/temp-gross-ict.ch/server` |
+| Startdatei / Startup file | `dist/index.js` |
+| Node-Version | 20 oder 22 |
+| Anwendungs-URL | `temp-gross-ict.ch` |
+| Umgebungsvariablen | siehe unten |
 
-**b) Start über Cron.** Steht kein Panel-Eintrag zur Verfügung, hält ein
-Cron-Eintrag den Prozess am Leben — dasselbe Vorgehen wie bei Ihren
-bestehenden Node-Anwendungen (`cron-push.sh`, `app.log`):
+Bietet das Panel ein Feld für Umgebungsvariablen, tragen Sie dort dieselben
+Werte wie in `server/.env` ein. Beides zusammen schadet nicht – die `.env`
+gewinnt nur dort, wo das Panel nichts vorgibt.
+
+**Prüfen:** `https://temp-gross-ict.ch/api/health` im Browser aufrufen. Kommt
+`{"ok":true,...}`, ist die Weiterleitung eingerichtet.
+
+Kommt eine Fehlerseite des Hosters, läuft der Prozess nicht oder die Domain
+zeigt woanders hin. Das Panel hat dafür ein Protokoll – zuerst dort nachsehen.
+
+---
+
+## 6. HTTPS erzwingen
+
+Im Panel das Let's-Encrypt-Zertifikat ausstellen und die Weiterleitung von
+`http` auf `https` einschalten.
+
+**Prüfen:**
 
 ```bash
-# ~/public_html/temp-gross-ict.ch/server/start.sh
-#!/bin/bash
-cd "$(dirname "$0")"
-pgrep -f "node dist/index.js" >/dev/null && exit 0
-nohup node dist/index.js >> ../app.log 2>> ../node_error.log &
+curl -sI http://temp-gross-ict.ch/ | head -1
+# HTTP/1.1 301 Moved Permanently
 ```
 
-```bash
-chmod +x start.sh
-crontab -e
-# alle fünf Minuten prüfen, ob der Server läuft
-*/5 * * * * /usr/home/jqviwy/public_html/temp-gross-ict.ch/server/start.sh
-```
+> Ohne HTTPS gehen Passwörter und Sitzungs-Token unverschlüsselt durchs Netz.
+> Dieser Schritt ist nicht optional.
 
-Die Domain muss anschliessend auf `127.0.0.1:3001` weitergeleitet werden. Ohne
-Node-Unterstützung im Panel geht das nur mit einem Reverse Proxy, den der Hoster
-bereitstellen muss.
+---
 
-> **Ohne Weiterleitung ist der Server von aussen nicht erreichbar.** Ein reines
-> PHP-Webhosting kann keinen Node-Prozess veröffentlichen. Klären Sie das vor
-> dem Übertragen mit dem Hoster ab.
+## 7. Konten anlegen
 
-## 6. Update-Knopf auf dem Hosting
+Zwei Wege – wählen Sie einen.
 
-Der Knopf im Portal führt `git pull` und die Builds aus. Dafür muss auf dem
-Server ein Git-Arbeitsverzeichnis liegen — statt Dateien zu übertragen, wird das
-Projekt dort geklont:
+### a) Frisch anfangen (empfohlen)
 
-```bash
-cd ~/public_html/temp-gross-ict.ch
-git clone -b claude/e-mergency-webapp-5hc2yl https://github.com/stibe881/Wunschbox.git .
-npm ci && npm run build
-cd server && npm ci && npm run build
-```
-
-Dann zeigt `SOBE_REPO_ROOT` auf dieses Verzeichnis, und der Update-Knopf
-funktioniert wie lokal. Für den Neustart nach der Aktualisierung braucht es den
-Cron-Eintrag aus Abschnitt 5 oder den Panel-Eintrag — beide starten den Prozess
-von selbst neu.
-
-Ohne Git-Verzeichnis bleibt der Weg über das Übertragen der gebauten Dateien;
-setzen Sie dann `SOBE_AUTO_RESTART=false` und aktualisieren Sie von Hand.
-
-## 7. Nach dem ersten Start
+Der Server startet mit genau einem Administratorkonto und dem Erstpasswort
+`SOBE-Start2026!`.
 
 1. `https://temp-gross-ict.ch` aufrufen, oben auf **LIVE** stellen.
-2. Mit `stefan.gross@sonnenberg-baar.ch` und dem Erstpasswort anmelden, sofort
-   ein eigenes vergeben.
-3. In der iOS-App unter «Alarmserver» `https://temp-gross-ict.ch` eintragen.
+2. Mit `stefan.gross@sonnenberg-baar.ch` anmelden. Das System verlangt sofort
+   ein eigenes Passwort.
+3. Unter **Benutzer** die Mitarbeitenden erfassen – mit Startpasswort und
+   gesetztem Häkchen bei «Passwortänderung bei der nächsten Anmeldung erzwingen».
 
-Ab hier kommen alle Konten und Daten vom Hosting, und Portal wie App sehen
-denselben Stand — unabhängig davon, in welchem Netz sich ein Gerät befindet.
+### b) Den lokalen Datenbestand mitnehmen
 
-## Sicherung
+Nur sinnvoll, wenn lokal bereits echte Konten und Alarme liegen. Der Bestand ist
+**eine** Datei – aber sie darf nur im Stillstand kopiert werden, sonst fehlen
+die zuletzt geschriebenen Daten.
 
-Der gesamte Datenbestand liegt in einer Datei:
+Auf dem eigenen Rechner: den lokalen Server **beenden**, dann alle drei Dateien
+übertragen (WinSCP oder FileZilla, per SFTP):
 
-```bash
-cp ~/public_html/temp-gross-ict.ch/server/data/sobe-notfall.sqlite \
-   ~/sicherung-sobe-$(date +%F).sqlite
+```
+server\data\sobe-notfall.sqlite
+server\data\sobe-notfall.sqlite-wal
+server\data\sobe-notfall.sqlite-shm
 ```
 
-Das lohnt sich als täglicher Cron-Eintrag.
+Ziel: `~/public_html/temp-gross-ict.ch/server/data/`. Danach die Anwendung im
+Panel neu starten und mit den bekannten Zugangsdaten anmelden.
 
-## Was noch fehlt
+---
 
-**HTTPS ist Pflicht.** Über `http` gehen Passwörter und Sitzungs-Token
-unverschlüsselt durchs Netz. Das Zertifikat stellt der Hoster; die Domain muss
-auf `https` erzwungen werden.
+## 8. Die App auf die neue Adresse bringen
 
-**Die App braucht einen neuen Build**, sobald die Adresse wechselt — nicht
-zwingend, da die Serveradresse in der App eingetragen werden kann, aber
-angenehmer: Die Vorgabe `DEFAULT_SERVER_URL` in `mobile/src/api.ts` lässt sich
-auf `https://temp-gross-ict.ch` setzen, dann stimmt sie ab Installation.
+Die Adresse `https://temp-gross-ict.ch` ist als Vorgabe im Quellcode
+hinterlegt. Für Geräte gibt es zwei Fälle:
+
+**Bereits installierte Apps** behalten die alte Adresse, weil sie einmal
+gespeichert wurde. Im Anmeldebildschirm unten auf **Alarmserver** tippen,
+`https://temp-gross-ict.ch` eintragen, **Übernehmen**. Beim nächsten Versuch
+steht dort «verbunden».
+
+**Neue Installationen** sind ab dem nächsten Build sofort richtig eingestellt.
+
+**Prüfen:** In der App auf **LIVE** stellen und mit einem im Portal angelegten
+Konto anmelden. Gelingt das, sehen App und Portal denselben Bestand.
+
+---
+
+## 9. Update-Knopf scharfschalten
+
+Der Knopf **Aktualisierung** unten in der Seitenleiste holt den neuen Stand,
+baut Portal und Server neu und startet den Server neu.
+
+**Voraussetzung 1 – Neustart nach dem Update.** Der Server beendet sich nach
+einer erfolgreichen Aktualisierung mit Code 0 und verlässt sich darauf, dass
+das Panel ihn wieder startet. Prüfen Sie das einmal bewusst:
+
+```bash
+# Anwendung im Panel starten, dann:
+pkill -f "node dist/index.js"
+sleep 20
+curl -s https://temp-gross-ict.ch/api/health
+```
+
+Kommt wieder `{"ok":true,...}`, startet das Panel von selbst neu – dann ist
+alles bereit. Bleibt es still, ergänzen Sie in `server/.env`:
+
+```
+SOBE_AUTO_RESTART=false
+```
+
+Der Update-Knopf baut dann alles neu, startet aber nicht neu; den Neustart
+lösen Sie danach im Panel aus. Der Dialog sagt das auch.
+
+**Voraussetzung 2 – iOS-Builds.** Für «Server und iOS-App» braucht der Server
+einen Zugangstoken von expo.dev in `server/.env`:
+
+```
+EXPO_TOKEN=hier_einsetzen
+```
+
+Zu finden unter expo.dev → Account settings → Access tokens. Wie ein Passwort
+behandeln. Solange die Zeile leer ist, bleibt die zweite Auswahl im Dialog
+gesperrt und nennt genau das als Grund. «Nur Server» funktioniert unabhängig
+davon.
+
+> **Nicht während eines Ereignisses aktualisieren.** Der Alarmserver ist dabei
+> kurz nicht erreichbar.
+
+---
+
+## 10. Sicherung einrichten
+
+Der gesamte Datenbestand liegt in einer Datei. Ein täglicher Cron-Eintrag
+genügt:
+
+```bash
+crontab -e
+```
+
+```
+# täglich um 03:15 sichern, 30 Tage aufbewahren
+15 3 * * * cd ~/public_html/temp-gross-ict.ch/server && cp data/sobe-notfall.sqlite ~/sicherung/sobe-$(date +\%F).sqlite && find ~/sicherung -name 'sobe-*.sqlite' -mtime +30 -delete
+```
+
+Vorher einmal `mkdir -p ~/sicherung`.
+
+Die Kopie im laufenden Betrieb kann die letzten Sekunden verpassen – für eine
+tägliche Sicherung ist das vertretbar. Vor einem Umzug oder Eingriff gilt
+weiterhin: Server beenden, dann kopieren.
+
+---
+
+## Wenn etwas nicht geht
+
+**`Error: Cannot find module '...better_sqlite3.node'`**
+Die kompilierte Binärdatei passt nicht zur Node-Version.
+`cd server && npm rebuild better-sqlite3 --build-from-source`.
+
+**Der Browser zeigt die Startseite des Hosters**
+Die Domain zeigt nicht auf die Node-Anwendung. Im Panel den Eintrag der
+Anwendungs-URL prüfen.
+
+**`{"ok":true}` kommt lokal, aber nicht über die Domain**
+Der Prozess läuft, die Weiterleitung fehlt. Panel-Protokoll ansehen.
+
+**Anmeldung schlägt fehl, obwohl die Daten stimmen**
+Der Umschalter im Portal steht auf DEMO statt LIVE. Demo- und Live-Konten sind
+getrennt.
+
+**Das Portal aktualisiert sich nicht von selbst**
+Der Server schickt Änderungen über einen offenen Datenstrom. Puffert der
+Webserver des Hosters ihn, kommen sie verspätet an. Der Server setzt dagegen
+bereits `X-Accel-Buffering: no`; hilft das nicht, muss der Hoster die Pufferung
+für `/api/events` abschalten. Alarme gehen davon unabhängig raus – betroffen
+ist nur die Anzeige im Portal.
+
+**Nach einer Aktualisierung ist der Server weg**
+Das Panel startet ihn nicht neu. Siehe Schritt 9, `SOBE_AUTO_RESTART=false`.
+
+**Der Administrator ist ausgesperrt**
+
+```bash
+cd ~/public_html/temp-gross-ict.ch/server
+npm run reset-admin
+```
+
+Das setzt das Administratorkonto auf ein neues Erstpasswort zurück und meldet
+es auf der Konsole.

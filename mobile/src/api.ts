@@ -11,8 +11,12 @@ import type { AppState, User } from './types'
 const URL_KEY = 'sobe-server-url'
 const TOKEN_KEY = 'sobe-server-token'
 
-/** Ohne eigene Angabe wird der Server im Schulnetz erwartet */
-export const DEFAULT_SERVER_URL = 'http://192.168.1.42:3001'
+/**
+ * Betriebsadresse des Alarmservers. Wer die App neu installiert, ist damit
+ * sofort verbunden; unter «Alarmserver» im Anmeldebildschirm lässt sie sich
+ * ändern, etwa für einen Testserver im Schulnetz.
+ */
+export const DEFAULT_SERVER_URL = 'https://temp-gross-ict.ch'
 
 let serverUrlCache = DEFAULT_SERVER_URL
 let tokenCache: string | null = null
