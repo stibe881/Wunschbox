@@ -313,20 +313,21 @@ function reducer(state: MobileState, action: Action): MobileState {
       const session = action.session
       return {
         ...state,
-        users: action.data.users,
-        groups: action.data.groups,
-        locations: action.data.locations,
-        scenarios: action.data.scenarios,
-        contacts: action.data.contacts,
-        alarms: action.data.alarms,
-        loneWorkSessions: action.data.loneWorkSessions,
+        users: action.data.users ?? state.users,
+        groups: action.data.groups ?? state.groups,
+        locations: action.data.locations ?? state.locations,
+        scenarios: action.data.scenarios ?? state.scenarios,
+        contacts: action.data.contacts ?? state.contacts,
+        alarms: action.data.alarms ?? [],
+        loneWorkSessions: action.data.loneWorkSessions ?? [],
         mode: 'live',
         session,
         currentUserId: session?.userId ?? state.currentUserId,
       }
     }
     case 'HYDRATE':
-      return action.state
+      // Fehlende Felder auffüllen, damit ein alter Stand nie zu undefined führt
+      return fuelleFehlendeFelder(action.state, action.state.mode ?? state.mode)
     case 'RESET': {
       const fresh = initialState(state.mode)
       // Angemeldet bleiben, sofern das eigene Konto im frischen Bestand existiert
@@ -400,7 +401,32 @@ function ensureLoginPossible(users: User[]): User[] {
  * Demo-Passwörter gelten nur im Demo-Modus; Live-Bestände, denen eine frühere
  * Fassung ein Demo-Passwort zugewiesen hat, werden auf das Erstpasswort gesetzt.
  */
-function migrateAuth(parsed: MobileState, mode: AppMode): MobileState {
+/**
+ * Gespeicherten Stand auf die aktuelle Form bringen.
+ *
+ * Ältere Versionen der App kannten weder Gruppen, Standorte, Szenarien noch
+ * Notrufnummern im Zustand – diese Felder fehlen dort schlicht. Ohne Auffüllen
+ * stünde beim Start `undefined` statt einer Liste, und die App stürzt beim
+ * ersten Zugriff ab.
+ */
+export function fuelleFehlendeFelder(parsed: Partial<MobileState>, mode: AppMode): MobileState {
+  const fallback = initialState(mode)
+  return {
+    ...fallback,
+    ...parsed,
+    mode,
+    users: parsed.users ?? fallback.users,
+    groups: parsed.groups ?? fallback.groups,
+    locations: parsed.locations ?? fallback.locations,
+    scenarios: parsed.scenarios ?? fallback.scenarios,
+    contacts: parsed.contacts ?? fallback.contacts,
+    alarms: parsed.alarms ?? [],
+    loneWorkSessions: parsed.loneWorkSessions ?? [],
+  }
+}
+
+function migrateAuth(roh: Partial<MobileState>, mode: AppMode): MobileState {
+  const parsed = fuelleFehlendeFelder(roh, mode)
   const fallback = initialState(mode)
   const seedById = new Map(SEED_USERS.map((u) => [u.id, u]))
   let users = parsed.users?.length ? parsed.users : fallback.users
@@ -429,7 +455,8 @@ function migrateAuth(parsed: MobileState, mode: AppMode): MobileState {
     authVersion: AUTH_MIGRATION_VERSION,
     users,
     session: session && users.some((u) => u.id === session.userId) ? session : null,
-    currentUserId: users.some((u) => u.id === parsed.currentUserId) ? parsed.currentUserId : users[0].id,
+    // Im Live-Modus ist die Liste vor der Anmeldung leer – dann bleibt sie leer
+    currentUserId: users.some((u) => u.id === parsed.currentUserId) ? parsed.currentUserId : (users[0]?.id ?? ''),
   }
 }
 
@@ -437,7 +464,7 @@ async function loadStateForMode(mode: AppMode): Promise<MobileState> {
   try {
     const raw = await AsyncStorage.getItem(DATA_KEYS[mode])
     if (raw) {
-      const parsed = JSON.parse(raw) as MobileState
+      const parsed = JSON.parse(raw) as Partial<MobileState>
       if (parsed.currentUserId) return migrateAuth(parsed, mode)
     }
   } catch {

@@ -441,11 +441,24 @@ function reducer(state: AppState, action: Action): AppState {
       if (action.mode === state.mode) return state
       return action.mode === 'live' ? leererLiveZustand() : loadStateFor('demo')
     case 'ADOPT_SERVER': {
-      // Im Live-Modus ist der Server die Wahrheit; Modus und Anmeldung bleiben lokal
+      // Im Live-Modus ist der Server die Wahrheit; Modus und Anmeldung bleiben lokal.
+      // Fehlt eine Sammlung in der Antwort, bleibt die bisherige stehen – so führt
+      // eine unvollständige Antwort nie zu undefined im Zustand.
+      const d = action.data
       const session = action.session
       return {
         ...state,
-        ...action.data,
+        users: d.users ?? state.users,
+        groups: d.groups ?? state.groups,
+        locations: d.locations ?? state.locations,
+        scenarios: d.scenarios ?? state.scenarios,
+        plans: d.plans ?? state.plans,
+        alarms: d.alarms ?? [],
+        buttons: d.buttons ?? state.buttons,
+        loneWorkSessions: d.loneWorkSessions ?? [],
+        integrations: d.integrations ?? state.integrations,
+        contacts: d.contacts ?? state.contacts,
+        audit: d.audit ?? [],
         mode: 'live',
         session,
         currentUserId: session?.userId ?? state.currentUserId,
