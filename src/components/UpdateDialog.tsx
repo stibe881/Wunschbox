@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   AlertTriangle, ArrowRight, Check, CircleDashed, Download, ExternalLink, Loader2, RefreshCw,
   Server as ServerIcon, Smartphone, X,
@@ -72,7 +73,10 @@ export default function UpdateDialog({ onClose }: { onClose: () => void }) {
 
   const zeigtAuswahl = !laeuft && !wartetAufServer && job?.status !== 'neustart'
 
-  return (
+  // Direkt an den Seitenkörper hängen: Der Knopf sitzt in der Seitenleiste, und
+  // deren position: sticky bildet einen eigenen Stapelkontext. Ohne Portal
+  // zeichnet der später folgende Hauptbereich seine Inhalte darüber.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/60 p-4 overflow-y-auto" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mt-10 mb-10" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
@@ -140,7 +144,8 @@ export default function UpdateDialog({ onClose }: { onClose: () => void }) {
           {job && <JobFortschritt job={job} offenerSchritt={offenerSchritt} setOffenerSchritt={setOffenerSchritt} />}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

@@ -181,6 +181,11 @@ pm2 start dist/index.js --name sobe-notfall
 Ohne Dienstverwalter setzen Sie `SOBE_AUTO_RESTART=false`; die Aktualisierung
 läuft dann durch, der Neustart erfolgt von Hand.
 
+**npm und git im Suchpfad.** Der Update-Lauf ruft `git`, `npm` und `npx` auf.
+Diese müssen für den Benutzer erreichbar sein, unter dem der Server läuft – wird
+er als Dienst gestartet, ist der Suchpfad oft ein anderer als in der eigenen
+Sitzung. Fehlt etwas, nennt das Protokoll den Befehl und den Grund.
+
 **Git-Zugang.** `git pull` läuft unter dem Benutzer des Servers. Für ein
 privates Repository muss dort ein Deploy-Key (SSH) oder ein Token im
 Anmeldespeicher hinterlegt sein – sonst scheitert der Schritt mit einer

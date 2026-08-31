@@ -95,8 +95,20 @@ function unkenntlich(text: string): string {
 }
 
 /**
+ * Unter Windows sind npm und npx Batch-Dateien (npm.cmd, npx.cmd). Node kann
+ * solche Dateien seit den Sicherheitskorrekturen von 2024 nicht mehr direkt
+ * starten – ohne Shell scheitert der Aufruf mit ENOENT. Für diese beiden
+ * Befehle wird dort deshalb die Shell verwendet. Die Argumente stammen
+ * ausschliesslich aus dem fest hinterlegten Ablaufplan, nie vom Client.
+ */
+function brauchtShell(befehl: string): boolean {
+  return process.platform === 'win32' && (befehl === 'npm' || befehl === 'npx')
+}
+
+/**
  * Einen fest hinterlegten Befehl ausführen. Argumente werden als Array
- * übergeben, es gibt keine Shell – damit ist keine Befehlsverkettung möglich.
+ * übergeben; ausser für npm und npx unter Windows läuft alles ohne Shell,
+ * damit keine Befehlsverkettung möglich ist.
  */
 function fuehreAus(
   befehl: string,
@@ -117,7 +129,8 @@ function fuehreAus(
     const kind = spawn(befehl, argumente, {
       cwd: arbeitsverzeichnis,
       env: { ...process.env, CI: '1', npm_config_fund: 'false', npm_config_audit: 'false', ...zusatzUmgebung },
-      shell: false,
+      shell: brauchtShell(befehl),
+      windowsHide: true,
     })
     const uhr = setTimeout(() => {
       kind.kill('SIGKILL')
@@ -128,7 +141,11 @@ function fuehreAus(
     kind.stderr.on('data', sammeln)
     kind.on('error', (fehler) => {
       clearTimeout(uhr)
-      fertig({ code: 127, ausgabe: ausgabe + `\n[${befehl} nicht ausführbar: ${fehler.message}]` })
+      const hinweis =
+        (fehler as NodeJS.ErrnoException).code === 'ENOENT'
+          ? `\n[${befehl} wurde nicht gefunden. Ist es installiert und im Suchpfad des Benutzers, unter dem der Server läuft?]`
+          : `\n[${befehl} nicht ausführbar: ${fehler.message}]`
+      fertig({ code: 127, ausgabe: ausgabe + hinweis })
     })
     kind.on('close', (code) => {
       clearTimeout(uhr)

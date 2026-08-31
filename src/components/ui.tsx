@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
 export function Card({ title, actions, children, className = '' }: { title?: React.ReactNode; actions?: React.ReactNode; children: React.ReactNode; className?: string }) {
@@ -51,7 +52,10 @@ export function Modal({ title, onClose, children, wide = false }: { title: strin
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  return (
+  // Direkt an den Seitenkörper hängen: Wird der Dialog aus einem Bereich mit
+  // eigenem Stapelkontext geöffnet (etwa der Seitenleiste mit position: sticky),
+  // würde ihn der später gezeichnete Hauptbereich sonst überdecken.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/50 p-4 overflow-y-auto" onClick={onClose}>
       <div className={`bg-white rounded-xl shadow-xl w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} mt-10`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
@@ -62,7 +66,8 @@ export function Modal({ title, onClose, children, wide = false }: { title: strin
         </div>
         <div className="p-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
