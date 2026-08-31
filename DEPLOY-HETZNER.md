@@ -431,15 +431,33 @@ baut Portal und Server neu und startet den Server neu.
 einer erfolgreichen Aktualisierung mit Code 0 und verlässt sich darauf, dass
 das Panel ihn wieder startet. Prüfen Sie das einmal bewusst:
 
+Der Befehl sucht sich den richtigen Prozess selbst – es ist nichts einzusetzen.
+Er beendet nur den, dessen Arbeitsverzeichnis auf dieses Projekt zeigt, und
+lässt andere Node-Anwendungen unberührt:
+
 ```bash
-# Anwendung im Panel starten, dann:
-pkill -f "node dist/index.js"
-sleep 20
-curl -s https://temp-gross-ict.ch/api/health
+ZIEL=~/public_html/temp-gross-ict.ch/server
+
+vorher=""
+for pid in $(pgrep -u "$USER" -f "node dist/index.js"); do
+  [ "$(readlink -f /proc/$pid/cwd 2>/dev/null)" = "$(readlink -f "$ZIEL")" ] && vorher="$pid"
+done
+echo "Serverprozess: ${vorher:-keiner gefunden}"
+
+kill "$vorher"
+sleep 30
+
+nachher=""
+for pid in $(pgrep -u "$USER" -f "node dist/index.js"); do
+  [ "$(readlink -f /proc/$pid/cwd 2>/dev/null)" = "$(readlink -f "$ZIEL")" ] && nachher="$pid"
+done
+echo "vorher $vorher / nachher ${nachher:-keiner}"
+curl -s https://temp-gross-ict.ch/api/health; echo
 ```
 
-Kommt wieder `{"ok":true,...}`, startet das Panel von selbst neu – dann ist
-alles bereit. Bleibt es still, ergänzen Sie in `server/.env`:
+Steht am Ende eine **andere** Nummer als vorher und kommt `{"ok":true,...}`,
+startet das Panel von selbst neu – dann ist alles bereit. Steht dort «keiner»,
+ergänzen Sie in `server/.env`:
 
 ```
 SOBE_AUTO_RESTART=false
