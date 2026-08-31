@@ -244,6 +244,10 @@ Was die Zeilen bedeuten:
 - **`HOST=127.0.0.1`** – der Server lauscht nur lokal. Erreichbar ist er
   ausschliesslich über den Webserver des Hosters. Das ist die sicherere
   Einstellung und für den Panel-Betrieb die richtige.
+- **`PORT=3001`** – nur die Vorgabe für den Start von Hand. Vorhandene
+  Umgebungsvariablen werden von der `.env` **nicht** überschrieben: Gibt das
+  Panel später einen eigenen Port vor, gewinnt das Panel. Ist 3001 schon
+  belegt, tut es jede andere freie Zahl.
 - **Absolute Pfade** – das Panel startet den Prozess möglicherweise aus einem
   anderen Arbeitsverzeichnis. Relative Pfade zeigten dann ins Leere.
 - **`SOBE_REPO_ROOT`** – ohne diese Zeile findet der Update-Knopf das
@@ -277,6 +281,22 @@ Administrator: stefan.gross@sonnenberg-baar.ch
 ```
 
 Steht dort **«Kein Webportal unter …»**, stimmt `SOBE_WEB_ROOT` nicht.
+
+Meldet der Start `EADDRINUSE`, ist der Port belegt – auf einem geteilten Server
+gut möglich, etwa durch eine eigene ältere Anwendung:
+
+```bash
+ps -u "$USER" -f | grep -i node | grep -v grep    # eigene Node-Prozesse
+ss -lntp 2>/dev/null | grep ':3001'               # was dort lauscht
+
+# eigener Prozess von früher? beenden:
+pkill -f "node dist/index.js"
+
+# fremder Prozess? freien Port suchen und in .env eintragen:
+for p in 3011 3021 3031 3041; do
+  (echo > /dev/tcp/127.0.0.1/$p) 2>/dev/null || { echo "frei: $p"; break; }
+done
+```
 
 **Prüfen** – in einer zweiten SSH-Sitzung, während der Server läuft:
 
@@ -460,6 +480,10 @@ weiterhin: Server beenden, dann kopieren.
 **`Error: Cannot find module '...better_sqlite3.node'`**
 Die kompilierte Binärdatei passt nicht zur Node-Version.
 `cd server && npm rebuild better-sqlite3 --build-from-source`.
+
+**`EADDRINUSE: address already in use`**
+Der Port ist belegt. Siehe Schritt 4 – eigenen Altprozess beenden oder in
+`server/.env` einen freien Port eintragen.
 
 **Der Browser zeigt die Startseite des Hosters**
 Die Domain zeigt nicht auf die Node-Anwendung. Im Panel den Eintrag der
