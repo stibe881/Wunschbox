@@ -487,6 +487,30 @@ weiterhin: Server beenden, dann kopieren.
 
 ---
 
+## Abnahme
+
+Läuft alles, bestätigen diese fünf Abrufe den Betrieb – von einem beliebigen
+Rechner aus, nicht vom Server:
+
+```bash
+curl -s  https://temp-gross-ict.ch/api/health; echo    # {"ok":true,...}
+curl -sI https://temp-gross-ict.ch/ | head -1          # 200
+curl -sI http://temp-gross-ict.ch/ | head -1           # 301 - Umleitung auf https
+curl -s  https://temp-gross-ict.ch/api/setup; echo     # Konto und Erstinstallation
+curl -s  https://temp-gross-ict.ch/server/.env | head -1
+```
+
+Die letzte Zeile prüft, dass nichts Vertrauliches ausgeliefert wird. Erwartet
+wird `<!doctype html>` – die Startseite des Portals. Der Server beantwortet
+jeden unbekannten Pfad damit; das ist richtig so. Käme dort der Inhalt der
+Datei, läge die Konfiguration offen.
+
+Dazu drei Prüfungen, die sich nicht abfragen lassen:
+
+- [ ] Anmeldung im Portal mit einem Live-Konto
+- [ ] Anmeldung in der iOS-App auf **LIVE**, mit demselben Konto
+- [ ] Ein Testalarm kommt auf dem Telefon an und lässt sich quittieren
+
 ## Wenn etwas nicht geht
 
 **`Error: Cannot find module '...better_sqlite3.node'`**
