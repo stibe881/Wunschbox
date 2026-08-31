@@ -114,8 +114,12 @@ ls ~/public_html/temp-gross-ict.ch/dist/index.html
 ls ~/public_html/temp-gross-ict.ch/server/dist/index.js
 
 cd ~/public_html/temp-gross-ict.ch/server
-node -e "require('better-sqlite3'); console.log('better-sqlite3 laeuft')"
+node -e "const D=require('better-sqlite3'); new D(':memory:').prepare('select 1').get(); console.log('better-sqlite3 laeuft')"
 ```
+
+Der Befehl öffnet bewusst eine Datenbank. Ein blosses `require` genügt nicht:
+Es lädt nur den JavaScript-Teil und meldet auch dann Erfolg, wenn die
+kompilierte Datei fehlt – der Fehler käme dann erst beim Start des Servers.
 
 Diese Prüfung ist die wichtigste der ganzen Anleitung. `better-sqlite3` enthält
 einen kompilierten Teil, und der muss zur Node-Version passen. Fertige
@@ -127,19 +131,37 @@ Binärdateien gibt es für:
 | 22 | ja |
 | 24 | ja |
 
-Kommt stattdessen ein Fehler, hilft meistens:
+Kommt stattdessen ein Fehler, hilft dieser Dreischritt:
 
 ```bash
-npm rebuild better-sqlite3 --build-from-source
+# 1. Welche Version liegt überhaupt da?
+node -p "require('better-sqlite3/package.json').version"    # muss 12.x sein
+
+# 2. Nachinstallieren und dabei zusehen
+npm rebuild better-sqlite3 --foreground-scripts
+
+# 3. Erneut prüfen
+node -e "const D=require('better-sqlite3'); new D(':memory:').prepare('select 1').get(); console.log('better-sqlite3 laeuft')"
 ```
 
-Fehlt dafür ein Compiler, im Panel auf Node 22 oder 24 wechseln und
-`npm install` wiederholen.
+`--foreground-scripts` zeigt, woran es liegt. Die Zeile
+`prebuild-install || node-gyp rebuild` bedeutet: Zuerst wird die fertige
+Binärdatei geladen; klappt das nicht, wird kompiliert.
 
-> **`Cannot find module 'better-sqlite3'`** heisst nur, dass `npm install` noch
-> nicht gelaufen ist oder die Prüfung im falschen Verzeichnis stand. Der
-> kompilierte Teil meldet sich anders, mit `NODE_MODULE_VERSION` in der
-> Fehlermeldung.
+| Was in der Ausgabe steht | Was zu tun ist |
+| --- | --- |
+| Version ist 11.x | `npm install` lief vor dem letzten `git pull`. Erneut `npm install` |
+| `prebuild-install` findet nichts | Node-Version passt nicht – im Panel auf 22 oder 24 wechseln |
+| Download scheitert am Netz | Der Server kommt nicht an github.com. Beim Hoster nachfragen |
+| `node-gyp` bricht ab | Kein Compiler vorhanden. Dann muss die fertige Binärdatei kommen, also Punkt 2 oder 3 lösen |
+
+### Drei Fehlerbilder auseinanderhalten
+
+| Meldung | Bedeutung |
+| --- | --- |
+| `Cannot find module 'better-sqlite3'` | `npm install` fehlt oder falsches Verzeichnis |
+| `Could not locate the bindings file` | JavaScript da, kompilierte Datei fehlt – der Dreischritt oben |
+| `NODE_MODULE_VERSION ... does not match` | Kompilierte Datei da, aber für eine andere Node-Version |
 
 ---
 
