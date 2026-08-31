@@ -1,5 +1,8 @@
 // Service Worker: App-Shell und Assets für Offline-Betrieb zwischenspeichern
-const CACHE = 'sonnenberg-notfall-v1'
+//
+// Version erhöhen, wenn sich die Regeln ändern – beim Aktivieren werden alle
+// älteren Caches gelöscht.
+const CACHE = 'sonnenberg-notfall-v2'
 
 self.addEventListener('install', () => {
   self.skipWaiting()
@@ -16,7 +19,16 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const request = event.request
-  if (request.method !== 'GET' || new URL(request.url).origin !== location.origin) return
+  if (request.method !== 'GET') return
+
+  const url = new URL(request.url)
+  if (url.origin !== location.origin) return
+
+  // Die Schnittstelle darf niemals aus dem Zwischenspeicher kommen. Liefert der
+  // Alarmserver das Portal unter derselben Adresse aus, landen sonst Anmeldung,
+  // Benutzerliste und Alarme im Cache – und die App zeigt dauerhaft einen alten
+  // Stand. Der Ereignisstrom /api/events darf ohnehin nie abgefangen werden.
+  if (url.pathname.startsWith('/api/')) return
 
   // Seitenaufrufe: Netz zuerst, offline aus dem Cache
   if (request.mode === 'navigate') {

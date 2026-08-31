@@ -10,8 +10,25 @@ import type { AppState, User } from '../types'
 const URL_KEY = 'sobe-server-url'
 const TOKEN_KEY = 'sobe-server-token'
 
-/** Standardadresse: gleicher Rechner, Port 3001 */
-export const DEFAULT_SERVER_URL = 'http://localhost:3001'
+/** Ports, unter denen die Entwicklungsumgebung läuft – dort steht der Server separat */
+const ENTWICKLUNGS_PORTS = ['5173', '4173']
+
+/**
+ * Vorgabe für die Serveradresse.
+ *
+ * Im Betrieb liefert der Alarmserver das Portal selbst aus – dann ist die
+ * Schnittstelle unter derselben Adresse erreichbar, und es braucht weder
+ * CORS noch eine gesonderte Einstellung. Nur in der Entwicklung, wo Vite auf
+ * einem eigenen Port läuft, wird auf localhost:3001 gezeigt.
+ */
+export const DEFAULT_SERVER_URL = (() => {
+  try {
+    if (typeof window === 'undefined') return 'http://localhost:3001'
+    return ENTWICKLUNGS_PORTS.includes(window.location.port) ? 'http://localhost:3001' : window.location.origin
+  } catch {
+    return 'http://localhost:3001'
+  }
+})()
 
 export function serverUrl(): string {
   try {

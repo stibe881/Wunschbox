@@ -67,6 +67,12 @@ npm run build    # Produktions-Build nach dist/
 npm run preview  # Produktions-Build lokal testen
 ```
 
+## Betrieb auf einem Server
+
+Im Produktivbetrieb liefert der Alarmserver auch das Portal aus – eine Adresse
+für beides. Die Anleitung für das Hetzner-Hosting steht in
+[`DEPLOY-HETZNER.md`](DEPLOY-HETZNER.md).
+
 ## Betriebsarten
 
 | | Demo | Live |

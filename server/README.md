@@ -18,6 +18,17 @@ und ein Alarm erreicht nur das Gerät, auf dem er ausgelöst wurde.
   offenen Portale und Apps sofort, ohne Neuladen.
 - **Aktualisierung per Knopfdruck** aus dem Portal – siehe unten.
 
+## Portal und Schnittstelle unter einer Adresse
+
+Liegt unter `SOBE_WEB_ROOT` ein gebautes Portal (`dist/index.html`), liefert der
+Server beides aus: das Portal unter `/`, die Schnittstelle unter `/api`. Der
+Client erkennt das und spricht dieselbe Adresse an – ohne Einstellung, ohne
+CORS, ohne Mixed-Content. Für den Betrieb auf einem Hosting ist das der
+empfohlene Aufbau, siehe [`../DEPLOY-HETZNER.md`](../DEPLOY-HETZNER.md).
+
+In der Entwicklung läuft das Portal weiterhin getrennt über Vite auf Port 5173;
+dort zeigt der Client wie bisher auf `http://localhost:3001`.
+
 ## Starten
 
 ```bash
@@ -55,6 +66,8 @@ von bekannten Geheimnissen bereinigt.
 | Variable | Bedeutung | Standard |
 | --- | --- | --- |
 | `PORT` | Port des Servers | `3001` |
+| `HOST` | Netzwerkschnittstelle (`127.0.0.1` = nur lokal) | `0.0.0.0` |
+| `SOBE_WEB_ROOT` | Verzeichnis mit dem gebauten Portal | `../dist` |
 | `SOBE_DB_PATH` | Pfad der Datenbankdatei | `data/sobe-notfall.sqlite` |
 | `SOBE_ADMIN_EMAIL` | Konto des ersten Administrators | `stefan.gross@sonnenberg-baar.ch` |
 | `SOBE_ADMIN_PASSWORD` | Erstpasswort dieses Kontos | `SOBE-Start2026!` |
