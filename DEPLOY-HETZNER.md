@@ -131,6 +131,52 @@ Binärdateien gibt es für:
 | 22 | ja |
 | 24 | ja |
 
+### Wenn npm Installationsskripte sperrt
+
+Neuere npm-Versionen führen Installationsskripte nur aus, wenn das Paket in
+`package.json` unter `allowScripts` steht. Genau daran hängt hier alles:
+`better-sqlite3` holt seine Binärdatei in einem solchen Skript, `esbuild` seine
+ebenfalls. Ohne Freigabe wird beides übersprungen – npm meldet trotzdem Erfolg
+und schreibt den Hinweis nur als Warnung:
+
+```
+npm warn install-scripts 2 packages had install scripts blocked because they
+npm warn install-scripts are not covered by allowScripts
+```
+
+Die Freigaben für dieses Projekt sind eingecheckt und kommen mit dem Klonen
+mit. Nachsehen lässt sich das mit:
+
+```bash
+npm install-scripts ls          # im Projektstamm und in server/
+```
+
+Meldet der Befehl gesperrte Pakete, sind die Freigaben veraltet – siehe unten.
+
+> **Nach einer Freigabe genügt `npm install` nicht.** Für ein bereits
+> installiertes Paket hält npm den Stand für aktuell und führt das Skript nicht
+> nach. Es braucht `npm rebuild PAKET --foreground-scripts`.
+
+### Wenn eine Abhängigkeit eine neue Version bekommt
+
+Die Freigaben sind auf die Version festgenagelt, etwa
+`"better-sqlite3@12.11.1": true`. Steigt die Version, greift die Freigabe nicht
+mehr, das Skript wird wieder gesperrt – und der Server startet nach der
+nächsten Aktualisierung nicht mehr. Dann:
+
+```bash
+cd ~/public_html/temp-gross-ict.ch/server
+npm install-scripts ls                 # zeigt Paket und neue Version
+npm install-scripts approve better-sqlite3
+npm rebuild better-sqlite3 --foreground-scripts
+git diff package.json                  # die neue Freigabe ...
+```
+
+… und die Änderung an `package.json` melden, damit sie eingecheckt wird.
+Sonst wiederholt sich das beim nächsten Umzug.
+
+### Sonstige Fehler
+
 Kommt stattdessen ein Fehler, hilft dieser Dreischritt:
 
 ```bash
@@ -150,6 +196,7 @@ Binärdatei geladen; klappt das nicht, wird kompiliert.
 
 | Was in der Ausgabe steht | Was zu tun ist |
 | --- | --- |
+| `install scripts blocked` | Freigabe fehlt – siehe oben |
 | Version ist 11.x | `npm install` lief vor dem letzten `git pull`. Erneut `npm install` |
 | `prebuild-install` findet nichts | Node-Version passt nicht – im Panel auf 22 oder 24 wechseln |
 | Download scheitert am Netz | Der Server kommt nicht an github.com. Beim Hoster nachfragen |

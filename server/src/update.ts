@@ -238,7 +238,10 @@ function schrittPlan(scope: UpdateScope): SchrittDefinition[] {
     },
     {
       id: 'deps-web', titel: 'Abhängigkeiten des Portals aktualisieren',
-      befehl: 'npm', argumente: ['install', '--no-audit', '--no-fund'], verzeichnis: (r) => r,
+      // --foreground-scripts: Neuere npm-Versionen sperren Installationsskripte, wenn
+      // das Paket nicht unter allowScripts in package.json steht. Ohne diesen Schalter
+      // steht die Warnung nirgends und der Build scheitert später ohne erkennbaren Grund.
+      befehl: 'npm', argumente: ['install', '--no-audit', '--no-fund', '--foreground-scripts'], verzeichnis: (r) => r,
     },
     {
       id: 'build-web', titel: 'Portal bauen',
@@ -246,7 +249,7 @@ function schrittPlan(scope: UpdateScope): SchrittDefinition[] {
     },
     {
       id: 'deps-server', titel: 'Abhängigkeiten des Servers aktualisieren',
-      befehl: 'npm', argumente: ['install', '--no-audit', '--no-fund'], verzeichnis: (r) => resolve(r, 'server'),
+      befehl: 'npm', argumente: ['install', '--no-audit', '--no-fund', '--foreground-scripts'], verzeichnis: (r) => resolve(r, 'server'),
     },
     {
       id: 'build-server', titel: 'Server bauen',
@@ -258,7 +261,7 @@ function schrittPlan(scope: UpdateScope): SchrittDefinition[] {
     schritte.push(
       {
         id: 'deps-app', titel: 'Abhängigkeiten der App aktualisieren',
-        befehl: 'npm', argumente: ['install', '--no-audit', '--no-fund'], verzeichnis: (r) => resolve(r, 'mobile'),
+        befehl: 'npm', argumente: ['install', '--no-audit', '--no-fund', '--foreground-scripts'], verzeichnis: (r) => resolve(r, 'mobile'),
       },
       {
         id: 'ios-build', titel: 'iOS-Build anstossen (läuft bei Expo weiter)',
