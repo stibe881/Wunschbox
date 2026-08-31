@@ -1,0 +1,42 @@
+# Schutz für den Fall, dass der Webserver dieses Verzeichnis direkt ausliefert.
+#
+# Bei einem Webhosting ist ~/public_html/<domain> in der Regel das
+# Wurzelverzeichnis der Domain. Solange die Node-Anwendung im Panel noch nicht
+# eingetragen ist – oder falls der Hoster statische Dateien weiterhin selbst
+# ausliefert – wäre sonst der ganze Projektordner über das Netz abrufbar,
+# einschliesslich server/.env und der Datenbank mit Passwort-Hashes und
+# Sitzungs-Token.
+#
+# Die Node-Anwendung liefert das Portal aus dist/ und die Schnittstelle unter
+# /api aus. Keine der hier gesperrten Adressen gehört dazu; die Regeln stören
+# den Betrieb also nicht.
+#
+# Erlaubt mod_rewrite der Hoster in .htaccess nicht, wird der erste Block
+# stillschweigend übergangen. Der zweite Block wirkt auch ohne mod_rewrite.
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Zertifikatsprüfung von Let's Encrypt muss durchkommen
+  RewriteRule ^\.well-known/ - [L]
+
+  # Quellcode, Abhängigkeiten und Daten sind nicht für das Netz bestimmt
+  RewriteRule ^(\.git|\.github|server|mobile|src|docs|scripts|node_modules)(/|$) - [F,L]
+
+  # Konfigurationsdateien in jedem Unterverzeichnis
+  RewriteRule (^|/)\.env - [F,L]
+</IfModule>
+
+# Wirkt auch ohne mod_rewrite: Dateien, die nie ausgeliefert werden dürfen
+<FilesMatch "(^\.env|\.sqlite($|-)|^\.git)">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# Verzeichnisinhalte nie auflisten
+Options -Indexes

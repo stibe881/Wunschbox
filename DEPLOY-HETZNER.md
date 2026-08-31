@@ -66,6 +66,31 @@ gibt, verrät `ls /usr/local/nodejs/`; im Panel lässt sich die richtige wählen
 
 ---
 
+## 1b. Nachsehen, ob der Projektordner offen im Netz liegt
+
+Bei einem Webhosting ist `~/public_html/<domain>` in der Regel das
+Wurzelverzeichnis der Domain. Solange die Node-Anwendung im Panel noch nicht
+eingetragen ist, liefert der Webserver diesen Ordner womöglich direkt aus – und
+damit alles, was Sie gerade geklont haben.
+
+```bash
+curl -sI https://temp-gross-ict.ch/server/.env.example | head -1
+curl -sI https://temp-gross-ict.ch/package.json | head -1
+```
+
+Kommt zweimal `HTTP/1.1 404`, ist nichts offen. Kommt `200 OK`, greift die
+Datei `.htaccess` aus dem Projekt – sie liegt seit dem Klonen bereits im
+Verzeichnis und sperrt Quellcode, Konfiguration und Datenbank. Prüfen Sie dann
+erneut; kommt weiterhin `200`, erlaubt der Hoster keine eigenen Regeln, und der
+Ordner muss vor dem nächsten Schritt aus dem Wurzelverzeichnis der Domain
+heraus.
+
+> **Das ist keine Formalie.** Ohne diese Sperre wären `server/.env` und die
+> Datenbank mit Passwort-Hashes und Sitzungs-Token für jeden abrufbar, der die
+> Adresse errät.
+
+---
+
 ## 2. Abhängigkeiten installieren und bauen
 
 Beides braucht die Entwicklungspakete: `npm run build` ruft TypeScript und Vite
@@ -120,25 +145,30 @@ Fehlt dafür ein Compiler, im Panel auf Node 22 oder 24 wechseln und
 
 ## 3. Einstellungen hinterlegen
 
+Die Pfade müssen absolut sein und dürfen keinen Verweis enthalten. Statt sie
+abzutippen, lassen Sie sie ermitteln:
+
 ```bash
 cd ~/public_html/temp-gross-ict.ch/server
-cp .env.example .env
-pwd -P                               # echten Pfad ausgeben, gleich einsetzen
-nano .env
-```
+BASIS=$(cd .. && pwd -P)
+echo "$BASIS"                        # Kontrolle, bevor es in die Datei geht
 
-Inhalt – die drei Pfade mit der Ausgabe von `pwd -P` ersetzen (ohne das
-angehängte `/server`, das steht nur in `SOBE_DB_PATH`):
-
-```
+cat > .env <<EOF
 PORT=3001
 HOST=127.0.0.1
-SOBE_DB_PATH=/usr/www/users/BENUTZER/temp-gross-ict.ch/server/data/sobe-notfall.sqlite
-SOBE_WEB_ROOT=/usr/www/users/BENUTZER/temp-gross-ict.ch/dist
-SOBE_REPO_ROOT=/usr/www/users/BENUTZER/temp-gross-ict.ch
+SOBE_DB_PATH=$BASIS/server/data/sobe-notfall.sqlite
+SOBE_WEB_ROOT=$BASIS/dist
+SOBE_REPO_ROOT=$BASIS
 SOBE_ADMIN_EMAIL=stefan.gross@sonnenberg-baar.ch
 EXPO_TOKEN=
+EOF
+
+cat .env                             # so steht es jetzt in der Datei
 ```
+
+Achten Sie darauf, dass in der ausgegebenen Datei echte Pfade stehen und nicht
+`$BASIS` – sonst wurde der Block in einer Umgebung ausgeführt, die keine
+Ersetzung vornimmt.
 
 Was die Zeilen bedeuten:
 
