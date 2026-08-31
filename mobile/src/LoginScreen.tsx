@@ -1,10 +1,10 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { AlertTriangle, Eye, EyeOff, LogIn, ShieldCheck } from 'lucide-react-native'
 import { useStore } from './store'
-import { DEMO_PASSWORD } from './seed'
+import { DEMO_PASSWORD, LIVE_INITIAL_PASSWORD } from './seed'
 import { MIN_PASSWORD_LENGTH, passwordProblem } from './auth'
-import { serverUrl, setServerUrl } from './api'
+import { ApiError, api, serverUrl, setServerUrl, type SetupInfo } from './api'
 import type { User } from './types'
 import { colors } from './ui'
 
@@ -48,7 +48,7 @@ function Shell({ subtitle, children, showModeSwitch = false }: { subtitle: strin
 
 /** Anmeldung mit E-Mail und Passwort */
 export default function LoginScreen() {
-  const { state, login, serverStatus } = useStore()
+  const { state, login } = useStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [show, setShow] = useState(false)
@@ -56,6 +56,23 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false)
   const [serverBearbeiten, setServerBearbeiten] = useState(false)
   const [adresse, setAdresse] = useState(serverUrl())
+  const [setup, setSetup] = useState<SetupInfo | null>(null)
+  const [serverErreichbar, setServerErreichbar] = useState<boolean | null>(null)
+
+  // Im Live-Modus beim Server nachfragen, ob er erreichbar und frisch eingerichtet ist
+  useEffect(() => {
+    if (state.mode !== 'live') return
+    let abgebrochen = false
+    api
+      .setup()
+      .then((info) => { if (!abgebrochen) { setSetup(info); setServerErreichbar(true) } })
+      .catch((f) => { if (!abgebrochen) setServerErreichbar(!(f instanceof ApiError && f.status === 0)) })
+    return () => { abgebrochen = true }
+  }, [state.mode, serverBearbeiten])
+
+  // Erstinbetriebnahme: Der Server meldet, solange nur das ausgelieferte
+  // Administratorkonto mit unverändertem Erstpasswort besteht
+  const liveFirstRun = state.mode === 'live' && setup?.freshInstall === true
 
   async function submit() {
     setBusy(true)
@@ -125,6 +142,37 @@ export default function LoginScreen() {
         </View>
       )}
 
+      {liveFirstRun && (
+        <View style={[s.hint, { borderColor: '#065f46' }]}>
+          <View style={s.hintRow}>
+            <ShieldCheck size={14} color={colors.green} />
+            <Text style={[s.hintTitle, { color: colors.green }]}>Erstinbetriebnahme</Text>
+          </View>
+          <Pressable
+            onPress={() => { setEmail(setup!.adminEmail ?? ''); setPassword(LIVE_INITIAL_PASSWORD); setError(null) }}
+          >
+            <Text style={s.hintLink}>{setup!.adminEmail}</Text>
+          </Pressable>
+          <Text style={s.hintText}>
+            Erstpasswort {LIVE_INITIAL_PASSWORD} – sofern beim Serverstart nichts anderes gesetzt wurde. Zum
+            Übernehmen auf die Adresse tippen.
+          </Text>
+        </View>
+      )}
+
+      {state.mode === 'live' && serverErreichbar === false && (
+        <View style={[s.hint, { borderColor: '#991b1b' }]}>
+          <View style={s.hintRow}>
+            <AlertTriangle size={14} color="#fecaca" />
+            <Text style={[s.hintTitle, { color: '#fecaca' }]}>Alarmserver nicht erreichbar</Text>
+          </View>
+          <Text style={[s.hintText, { marginBottom: 0 }]}>
+            Im Live-Modus kommen alle Konten vom Alarmserver. Prüfen Sie die Adresse unten und ob der Server
+            läuft. Zum Arbeiten ohne Server oben auf DEMO wechseln.
+          </Text>
+        </View>
+      )}
+
       {state.mode === 'live' && (
         <View style={s.hint}>
           {serverBearbeiten ? (
@@ -160,7 +208,7 @@ export default function LoginScreen() {
               <Text style={s.hintTitle}>Alarmserver</Text>
               <Text style={s.hintText}>
                 {serverUrl()}
-                {serverStatus === 'getrennt' ? ' – nicht erreichbar' : ''}
+                {serverErreichbar === false ? ' – nicht erreichbar' : serverErreichbar === true ? ' – verbunden' : ''}
               </Text>
               <Text style={[s.hintText, { marginBottom: 0 }]}>Zum Ändern tippen.</Text>
             </Pressable>

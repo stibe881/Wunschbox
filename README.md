@@ -85,6 +85,9 @@ cd server && npm install && npm run dev
 
 Die Serveradresse lässt sich auf der Anmeldemaske eintragen (im Portal wie in
 der App) – im Schulnetz die IP-Adresse des Rechners, auf dem der Server läuft.
+Läuft der Server nicht, sagt die Maske das ausdrücklich; bei einer frischen
+Installation zeigt sie Konto und Erstpasswort an. Kommt niemand mehr hinein:
+`cd server && npm run accounts` beziehungsweise `npm run reset-admin`.
 
 **Aktualisieren ohne Kommandozeile:** Administratoren finden im Portal in der
 Seitenleiste den Knopf **Aktualisierung** und wählen dort zwischen «Nur Server»

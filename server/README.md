@@ -66,6 +66,34 @@ Für den Betrieb ausserhalb des Schulnetzes gehört der Server hinter HTTPS
 (Reverse Proxy mit Zertifikat) – Passwörter und Token dürfen nicht unverschlüsselt
 über fremde Netze gehen.
 
+## Wenn die Anmeldung nicht klappt
+
+Im Live-Modus kommen alle Konten vom Server – ohne laufenden Server gibt es keine
+Anmeldung. Die Anmeldemaske sagt das inzwischen ausdrücklich und zeigt bei einer
+frischen Installation Konto und Erstpasswort an.
+
+Zwei Werkzeuge helfen weiter:
+
+```bash
+npm run accounts                                   # welche Konten kennt der Server?
+npm run reset-admin                                # erstes Administratorkonto, neues Zufallspasswort
+npm run reset-admin -- name@schule.ch              # bestimmtes Konto
+npm run reset-admin -- name@schule.ch Neu2026sicher
+```
+
+`accounts` zeigt für jedes Konto, ob ein Passwort gesetzt ist, ob ein Wechsel
+offen ist und wann die letzte Anmeldung war. `reset-admin` setzt ein neues
+Passwort, beendet alle bestehenden Anmeldungen des Kontos und erzwingt den
+Wechsel bei der nächsten Anmeldung.
+
+Häufige Ursachen:
+
+| Meldung | Ursache |
+| --- | --- |
+| «Der Alarmserver … ist nicht erreichbar» | Server läuft nicht oder die Adresse stimmt nicht – Adresse auf der Anmeldemaske prüfen |
+| «E-Mail-Adresse oder Passwort ist falsch» | Passwort wurde bereits geändert, oder es ist eine andere Datenbankdatei im Einsatz (`SOBE_DB_PATH`) |
+| «Für dieses Konto ist noch kein Passwort gesetzt» | Konto wurde ohne Passwort angelegt – in der Benutzerverwaltung eines vergeben |
+
 ## Aktualisierung per Knopfdruck
 
 Administratoren finden im Portal in der Seitenleiste den Knopf **Aktualisierung**.
@@ -144,6 +172,7 @@ Alle Endpunkte unter `/api`, Authentifizierung über `Authorization: Bearer <tok
 | POST | `/alarms/:id/end` | Entwarnung (Administration und Krisenstab) |
 | POST | `/lone-work`, `/lone-work/:id/extend`, `/lone-work/:id/complete` | Alleinarbeit |
 | POST | `/push/register`, `/push/unregister` | Push-Token eines Geräts |
+| GET | `/setup` | Öffentlich: ist der Server frisch eingerichtet? (für die Anmeldemaske) |
 | GET | `/update/status` | Stand und laufende Aktualisierung (nur Administration) |
 | GET | `/update/job` | Fortschritt der laufenden Aktualisierung |
 | POST | `/update` | Aktualisierung starten (`scope`: `server` oder `server+ios`) |

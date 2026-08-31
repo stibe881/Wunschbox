@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertTriangle, Eye, EyeOff, Info, KeyRound, LogIn, Mail, Server as ServerIcon, ShieldCheck } from 'lucide-react'
 import { useStore } from '../store'
 import { DEMO_PASSWORD, LIVE_INITIAL_PASSWORD } from '../data/seed'
 import { MIN_PASSWORD_LENGTH, passwordProblem } from '../lib/auth'
-import { DEFAULT_SERVER_URL, serverUrl, setServerUrl } from '../lib/api'
+import { ApiError, DEFAULT_SERVER_URL, api, serverUrl, setServerUrl, type SetupInfo } from '../lib/api'
 import type { User } from '../types'
 
 const fieldClass =
@@ -50,7 +50,7 @@ function Shell({ children, subtitle, showModeSwitch = false }: { children: React
 
 /** Anmeldung mit E-Mail und Passwort */
 export default function LoginScreen() {
-  const { state, login, serverStatus } = useStore()
+  const { state, login } = useStore()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [show, setShow] = useState(false)
@@ -58,11 +58,23 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false)
   const [serverBearbeiten, setServerBearbeiten] = useState(false)
   const [adresse, setAdresse] = useState(serverUrl())
+  const [setup, setSetup] = useState<SetupInfo | null>(null)
+  const [serverErreichbar, setServerErreichbar] = useState<boolean | null>(null)
 
-  // Live-Erstinbetriebnahme: solange nur das ausgelieferte Admin-Konto besteht,
-  // wird der Erstzugang angezeigt – nach der Passwortänderung verschwindet der Hinweis
-  const liveFirstRun =
-    state.mode === 'live' && state.users.length === 1 && state.users[0].mustChangePassword === true
+  // Im Live-Modus beim Server nachfragen, ob er erreichbar und frisch eingerichtet ist
+  useEffect(() => {
+    if (state.mode !== 'live') return
+    let abgebrochen = false
+    api
+      .setup()
+      .then((info) => { if (!abgebrochen) { setSetup(info); setServerErreichbar(true) } })
+      .catch((f) => { if (!abgebrochen) setServerErreichbar(!(f instanceof ApiError && f.status === 0)) })
+    return () => { abgebrochen = true }
+  }, [state.mode])
+
+  // Erstinbetriebnahme: Der Server meldet, solange nur das ausgelieferte
+  // Administratorkonto mit unverändertem Erstpasswort besteht
+  const liveFirstRun = state.mode === 'live' && setup?.freshInstall === true
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -158,12 +170,32 @@ export default function LoginScreen() {
       {liveFirstRun && (
         <div className="mt-4 rounded-2xl bg-slate-800/40 border border-emerald-800/60 p-4 text-xs text-slate-400">
           <div className="flex items-center gap-2 text-emerald-400 font-semibold mb-2">
-            <ShieldCheck size={14} /> Erstzugang Live-Betrieb
+            <ShieldCheck size={14} /> Erstinbetriebnahme
           </div>
           <p>
-            <span className="text-slate-300">{state.users[0].email}</span> mit dem Erstpasswort{' '}
-            <code className="text-slate-200 font-semibold">{LIVE_INITIAL_PASSWORD}</code>. Das Passwort muss bei der
-            ersten Anmeldung geändert werden; danach wird dieser Hinweis nicht mehr angezeigt.
+            <button
+              type="button"
+              onClick={() => { setEmail(setup!.adminEmail ?? ''); setPassword(LIVE_INITIAL_PASSWORD); setError(null) }}
+              className="text-slate-300 hover:text-white underline underline-offset-2"
+            >
+              {setup!.adminEmail}
+            </button>{' '}
+            mit dem Erstpasswort <code className="text-slate-200 font-semibold">{LIVE_INITIAL_PASSWORD}</code> – sofern
+            beim Serverstart nichts anderes gesetzt wurde. Das Passwort muss bei der ersten Anmeldung geändert werden;
+            danach verschwindet dieser Hinweis.
+          </p>
+        </div>
+      )}
+
+      {state.mode === 'live' && serverErreichbar === false && (
+        <div className="mt-4 rounded-2xl bg-brand-600/10 border border-brand-600/40 p-4 text-xs text-brand-200">
+          <div className="flex items-center gap-2 font-semibold mb-2">
+            <AlertTriangle size={14} /> Alarmserver nicht erreichbar
+          </div>
+          <p className="leading-relaxed">
+            Im Live-Modus kommen alle Konten vom Alarmserver. Starten Sie ihn mit{' '}
+            <code className="text-brand-100">cd server &amp;&amp; npm run dev</code> und prüfen Sie die Adresse unten.
+            Zum Arbeiten ohne Server oben auf <span className="font-semibold">Demo</span> wechseln.
           </p>
         </div>
       )}
@@ -208,7 +240,8 @@ export default function LoginScreen() {
             >
               <ServerIcon size={12} />
               Alarmserver: {serverUrl()}
-              {serverStatus === 'getrennt' && <span className="text-brand-400 font-semibold">nicht erreichbar</span>}
+              {serverErreichbar === false && <span className="text-brand-400 font-semibold">nicht erreichbar</span>}
+              {serverErreichbar === true && <span className="text-emerald-500 font-semibold">verbunden</span>}
             </button>
           )}
         </div>

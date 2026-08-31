@@ -110,8 +110,18 @@ async function anfrage<T>(pfad: string, optionen: RequestInit = {}): Promise<T> 
   return daten as T
 }
 
+export interface SetupInfo {
+  /** Genau ein Administratorkonto mit unverändertem Erstpasswort */
+  freshInstall: boolean
+  adminEmail: string | null
+  userCount: number
+}
+
 export const api = {
   health: () => anfrage<{ ok: boolean }>('/health'),
+
+  /** Öffentliche Auskunft für die Anmeldemaske – ohne Anmeldung abrufbar */
+  setup: () => anfrage<SetupInfo>('/setup'),
 
   login: (email: string, password: string) =>
     anfrage<{ token: string; expiresAt: number; user: User }>('/auth/login', {

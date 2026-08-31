@@ -59,6 +59,23 @@ function staffOnly(req: AuthRequest, res: Response, next: NextFunction): void {
 
 const FALSCHE_ANMELDUNG = 'E-Mail-Adresse oder Passwort ist falsch.'
 
+/**
+ * Öffentliche Auskunft für die Anmeldemaske: Ist der Server frisch eingerichtet?
+ * Bewusst minimal – nur, ob genau ein Administratorkonto mit unverändertem
+ * Erstpasswort besteht, und dessen Adresse. Sobald das Passwort geändert wurde,
+ * verschwindet die Auskunft.
+ */
+router.get('/setup', (_req, res) => {
+  const users = allStoredUsers()
+  const frisch =
+    users.length === 1 && users[0].role === 'admin' && users[0].mustChangePassword === true
+  res.json({
+    freshInstall: frisch,
+    adminEmail: frisch ? users[0].email : null,
+    userCount: users.length,
+  })
+})
+
 router.post('/auth/login', (req, res) => {
   const { email, password } = req.body ?? {}
   if (!email || !password) {

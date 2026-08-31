@@ -81,8 +81,16 @@ async function anfrage<T>(pfad: string, optionen: RequestInit = {}): Promise<T> 
 
 export type ServerData = Omit<AppState, 'mode' | 'session' | 'currentUserId' | 'scenarioContentVersion' | 'authVersion'>
 
+export interface SetupInfo {
+  freshInstall: boolean
+  adminEmail: string | null
+  userCount: number
+}
+
 export const api = {
   health: () => anfrage<{ ok: boolean }>('/health'),
+  /** Öffentliche Auskunft für die Anmeldemaske – ohne Anmeldung abrufbar */
+  setup: () => anfrage<SetupInfo>('/setup'),
   login: (email: string, password: string) =>
     anfrage<{ token: string; user: User }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   logout: () => anfrage<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
