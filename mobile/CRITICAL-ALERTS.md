@@ -50,10 +50,19 @@ verankert werden. Dafür genügt ein einziger Build **mit Rückfragen**: Dabei
 meldet sich EAS bei Apple an, trägt die Berechtigung ein und erneuert das
 Profil.
 
-Wo Sie das tun, ist gleichgültig – am eigenen Rechner oder über SSH auf dem
-Server. Nötig ist nur, dass jemand dabeisitzt, der den Apple-Bestätigungscode
-eingeben kann. Am eigenen Rechner ist es meist bequemer, weil Node und die
-Abhängigkeiten der App dort schon liegen.
+**Warum das auch dem Server hilft, wenn Sie es am eigenen Rechner tun:** Die
+Bereitstellungsprofile und Zertifikate liegen nicht auf dem Rechner, der den
+Build startet, sondern **bei Expo, am Projekt**. Das Verzeichnis `mobile`
+enthält keine `credentials.json`, und `eas.json` setzt keine andere Quelle –
+damit gilt die Vorgabe: Expo verwaltet sie auf seinen Servern.
+
+Der eine Durchgang mit Rückfragen trägt die Berechtigung also nicht lokal ein,
+sondern im Apple Developer Portal und im Projekt bei Expo. Jeder spätere Build
+holt sie von dort – auch der vom Webhosting angestossene.
+
+Wo Sie den Durchgang machen, ist deshalb gleichgültig: am eigenen Rechner oder
+über SSH auf dem Server. Nötig ist nur, dass jemand dabeisitzt, der den
+Apple-Bestätigungscode eingeben kann.
 
 1. Bauen – **ohne** `--non-interactive`:
 
