@@ -299,8 +299,9 @@ for pid in $(pgrep -u "$USER" -f "node dist/index.js"); do
   echo "PID $pid -> $(readlink /proc/$pid/cwd)"
 done
 
-# nur die PID beenden, deren Verzeichnis auf dieses Projekt zeigt:
-kill PID
+# Nur die Zeile beenden, deren Verzeichnis auf dieses Projekt zeigt.
+# Die Zahl aus der Ausgabe oben einsetzen - «12345» ist ein Platzhalter:
+kill 12345
 
 # Ist der Port von einer anderen Anwendung belegt, freien Port suchen
 # und in .env eintragen:
