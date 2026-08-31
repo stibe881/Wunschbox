@@ -54,6 +54,14 @@ sich weder löschen noch herabstufen, und fehlt er, wird er beim Start wiederher
 
 ## Vom Telefon aus erreichbar machen
 
+> Die App muss aus einem Build stammen, der die Serveranbindung enthält
+> (ab Commit «iOS-App: Live-Modus läuft über den Alarmserver»). Ältere
+> TestFlight-Builds prüfen die Anmeldung noch auf dem Gerät und kennen die
+> Konten des Servers nicht – dort meldet die App «E-Mail-Adresse oder Passwort
+> ist falsch», obwohl das Konto auf dem Server existiert. In diesem Fall ist ein
+> neuer Build nötig.
+
+
 Im selben Netz genügt die IP-Adresse des Rechners, auf dem der Server läuft:
 
 ```
@@ -61,7 +69,16 @@ Im selben Netz genügt die IP-Adresse des Rechners, auf dem der Server läuft:
 ipconfig        # IPv4-Adresse suchen, z. B. 192.168.1.42
 ```
 
-In der App wird dann `http://192.168.1.42:3001` als Serveradresse eingetragen.
+In der App wird dann `http://192.168.1.42:3001` als Serveradresse eingetragen –
+auf der Anmeldemaske unter «Alarmserver».
+
+Damit iOS diese Verbindung überhaupt zulässt, trägt `mobile/app.json` zwei
+Einträge in die Info.plist ein: `NSAppTransportSecurity.NSAllowsLocalNetworking`
+erlaubt unverschlüsselte Verbindungen ins lokale Netz (nicht ins Internet), und
+`NSLocalNetworkUsageDescription` liefert den Text für die Nachfrage, die iOS beim
+ersten Zugriff aufs lokale Netz stellt. Diese Nachfrage muss bestätigt werden –
+wird sie abgelehnt, bleibt der Server für die App unerreichbar (Einstellungen →
+SOBE Notfall → Lokales Netzwerk).
 Für den Betrieb ausserhalb des Schulnetzes gehört der Server hinter HTTPS
 (Reverse Proxy mit Zertifikat) – Passwörter und Token dürfen nicht unverschlüsselt
 über fremde Netze gehen.

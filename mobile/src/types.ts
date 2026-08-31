@@ -27,9 +27,15 @@ export interface User {
   language: 'de' | 'en' | 'fr' | 'it'
   absence?: { from: string; to: string }
   partTimeNote?: string
-  /** Anmeldung: Salt und Hash des Passworts (siehe src/lib/auth.ts) */
+  /**
+   * Anmeldung im Demo-Modus: Salt und Hash liegen lokal (siehe src/lib/auth.ts).
+   * Im Live-Modus liefert der Server diese Felder nie – er sendet stattdessen
+   * hasPassword, weil Hashes den Server nicht verlassen.
+   */
   passwordSalt?: string
   passwordHash?: string
+  /** Vom Alarmserver gesetzt: Ist für dieses Konto ein Passwort hinterlegt? */
+  hasPassword?: boolean
   /** Erzwingt eine Passwortänderung bei der nächsten Anmeldung */
   mustChangePassword?: boolean
   lastLoginAt?: number

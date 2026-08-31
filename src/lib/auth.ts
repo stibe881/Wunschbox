@@ -41,7 +41,15 @@ export function passwordProblem(password: string): string | null {
   return null
 }
 
+/**
+ * Ist für dieses Konto ein Passwort hinterlegt?
+ *
+ * Im Live-Modus kommen die Konten vom Alarmserver, der die Hashes bewusst nicht
+ * mitschickt und stattdessen das Kennzeichen hasPassword setzt. Nur im
+ * Demo-Modus liegen Salt und Hash lokal vor.
+ */
 export function hasPassword(user: User): boolean {
+  if (typeof user.hasPassword === 'boolean') return user.hasPassword
   return Boolean(user.passwordHash && user.passwordSalt)
 }
 
