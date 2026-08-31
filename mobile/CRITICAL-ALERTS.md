@@ -1,41 +1,113 @@
-# Critical Alerts aktivieren
+# Alarme hörbar machen: zeitkritische Mitteilungen und Critical Alerts
 
-Nicht stille Alarme sollen auf dem iPhone klingeln, **auch wenn das Telefon
-stummgeschaltet ist**. Apple nennt das *Critical Alerts* und gibt es nur nach
-einer ausdrücklichen Bewilligung frei.
+Nicht stille Alarme sollen auf dem iPhone durchkommen, auch wenn das Gerät
+stummgeschaltet ist oder ein Fokus läuft. iOS kennt dafür zwei Stufen, und beide
+brauchen eine Berechtigung von Apple.
 
-## Was heute schon funktioniert
+| Stufe | Fokus / Nicht stören | Stummschalter | Antrag bei Apple |
+| --- | --- | --- | --- |
+| normal (heute aktiv) | wird zurückgehalten | stumm | – |
+| **zeitkritisch** | durchbricht | stumm | nein, aber einmalige Einrichtung |
+| **Critical Alert** | durchbricht | **klingelt** | ja, Formular |
 
-Ohne Bewilligung verschickt die App nicht stille Alarme als **zeitkritische
-Mitteilung** (`time-sensitive`). Die durchbricht Fokus-Modi wie «Nicht stören»
-und erscheint sofort auf dem Sperrbildschirm — **nicht** aber den physischen
-Stummschalter. Diese Stufe braucht keinen Antrag und ist bereits aktiv.
+Die App schickt bereits die passende Stufe mit. Solange die Berechtigung fehlt,
+ignoriert iOS sie schlicht – es gibt keine Fehlermeldung, der Alarm kommt nur
+leiser an.
 
-## Was Critical Alerts zusätzlich bringen
+---
 
-| | zeitkritisch (heute) | Critical Alert (nach Bewilligung) |
-| --- | --- | --- |
-| Fokus / Nicht stören | durchbricht | durchbricht |
-| Stummschalter am Gerät | stumm | **klingelt** |
-| Lautstärke | Systemlautstärke | eigene, bis 100 % |
-| Zustimmung | normale Mitteilungsfreigabe | eigener Dialog beim ersten Start |
+## Stufe 1: zeitkritische Mitteilungen
 
-## Bewilligung beantragen
+Kein Antrag nötig, aber die Berechtigung muss ins Bereitstellungsprofil. Genau
+daran ist ein Build gescheitert:
 
-1. Antrag stellen unter
-   <https://developer.apple.com/contact/request/notifications-critical-alerts-entitlement/>
-   mit der Bundle-ID `ch.sonnenberg.notfall`.
+```
+Provisioning profile "…" does not support the Time Sensitive Notifications capability.
+Entitlements file defines the value "com.apple.developer.usernotifications.time-sensitive"
+which is not registered for profile
+```
 
-   Begründung: Notfall- und Alarmierungssystem einer heilpädagogischen
-   Sonderschule. Alarme betreffen Brand, Evakuierung, medizinische Notfälle und
-   Bedrohungslagen; Mitarbeitende führen Unterricht und Therapie oft mit
-   stummgeschaltetem Telefon durch. Ein überhörter Alarm gefährdet Menschen.
+Grund: Der Update-Knopf baut ohne Rückfragen. In diesem Betrieb kann EAS sich
+nicht am Apple Developer Portal anmelden und die Berechtigung dort nicht
+nachtragen – es verwendet das vorhandene Profil, und dem fehlt sie.
 
-2. Apple antwortet erfahrungsgemäss innert einiger Tage bis Wochen.
+### Einmalig einrichten
 
-## Nach der Bewilligung
+Ein einziger Build vom eigenen Rechner aus, mit Rückfragen. Dabei meldet sich
+EAS bei Apple an, trägt die Berechtigung ein und erneuert das Profil.
 
-In `mobile/app.json` den Eintrag ergänzen:
+1. In `mobile/app.json` innerhalb von `"ios"` ergänzen:
+
+   ```json
+   "entitlements": {
+     "com.apple.developer.usernotifications.time-sensitive": true
+   }
+   ```
+
+2. Vom eigenen Rechner bauen – **ohne** `--non-interactive`:
+
+   ```bash
+   cd mobile
+   npx eas-cli build --platform ios --profile production --auto-submit
+   ```
+
+   Bei der Frage nach den Apple-Zugangsdaten anmelden. EAS meldet dann
+   «Syncing capabilities» und erstellt ein neues Profil.
+
+3. Läuft dieser Build durch, funktioniert der Update-Knopf ab sofort auch mit
+   der Berechtigung – das erneuerte Profil wird wiederverwendet.
+
+Wird Schritt 2 übersprungen, schlägt jeder Build fehl, solange der Eintrag in
+`app.json` steht. Deshalb ist er dort derzeit **nicht** gesetzt.
+
+---
+
+## Stufe 2: Critical Alerts
+
+Zusätzlich zur zeitkritischen Stufe: Ton auch bei stummgeschaltetem Telefon, mit
+eigener Lautstärke.
+
+### Bewilligung beantragen
+
+Formular: <https://developer.apple.com/contact/request/notifications-critical-alerts-entitlement/>
+mit der Bundle-ID `ch.sonnenberg.notfall`.
+
+**App Type:** Public Safety
+
+**Describe your app**
+
+> SOBE Notfall is the internal emergency alerting app of SONNENBERG
+> Kompetenzzentrum, a Swiss special-needs school for children and young people
+> with disabilities, operating three sites. Staff use it to raise and receive
+> alarms and to follow guided emergency procedures for fire, evacuation, medical
+> emergencies, incidents in the therapy pool and security incidents. It is
+> distributed only to the school's employees.
+
+**What type of notifications will you send as Critical Alerts?**
+
+> Only alarms requiring an immediate physical response: fire and building
+> evacuation, medical emergencies including cardiac arrest, drowning in the
+> therapy pool, and situations requiring the crisis team. All other
+> notifications are sent at normal priority. Alarms that must stay inaudible for
+> the safety of those involved are delivered silently by design.
+
+**How frequently will you send Critical Alerts?** Die seltenste zutreffende
+Option wählen – echte Notfälle sind selten.
+
+**Explain why you need this entitlement**
+
+> Staff supervise children with severe disabilities during lessons and therapy
+> and keep their phones silenced so as not to disturb the group. Many work alone
+> in therapy rooms, in the pool or in outlying buildings where they cannot hear
+> a building alarm. The people affected cannot help themselves: children with
+> impaired mobility depend on a named staff member to evacuate them, and a
+> drowning or cardiac arrest allows only minutes to act. A missed alarm
+> therefore directly endangers lives. Critical Alerts are used exclusively for
+> these emergencies, never for information or reminders.
+
+### Nach der Bewilligung
+
+Zweiten Eintrag ergänzen und wieder **einmal mit Rückfragen** bauen (wie oben):
 
 ```json
 "entitlements": {
@@ -44,39 +116,27 @@ In `mobile/app.json` den Eintrag ergänzen:
 }
 ```
 
-Danach neu bauen:
+Beim ersten Start fragt iOS zusätzlich nach der Zustimmung für kritische
+Hinweise – diese muss bestätigt werden.
 
-```bash
-cd mobile
-npx eas-cli build --platform ios --profile production --auto-submit
-```
-
-EAS gleicht die Berechtigung beim Build automatisch mit dem Apple Developer
-Portal ab. Beim ersten Start nach der Installation fragt iOS zusätzlich nach der
-Zustimmung für kritische Hinweise — diese muss bestätigt werden.
-
-> **Nicht vorher eintragen.** Ohne Bewilligung von Apple lässt sich das
-> Bereitstellungsprofil nicht ausstellen, und der Build schlägt mit einem
-> Signierungsfehler fehl.
+---
 
 ## Wie die App damit umgeht
 
-Es ist nichts weiter zu tun: Die App fragt beim Start nach der Berechtigung und
-prüft anschliessend, ob sie tatsächlich erteilt wurde.
+Am Code ist nichts zu ändern. Die App fragt beim Start nach der Berechtigung und
+prüft danach, ob sie erteilt wurde:
 
-- **erteilt** → lokale Alarme mit `interruptionLevel: 'critical'` und dem
-  Systemton `defaultCritical`; das Gerät meldet dem Alarmserver, dass es
-  Critical Alerts empfangen darf, und erhält Pushs mit derselben Stufe.
-- **nicht erteilt** → `time-sensitive` mit dem normalen Ton.
+- **erteilt** → `interruptionLevel: 'critical'`, Systemton `defaultCritical`; das
+  Gerät meldet dem Alarmserver, dass es Critical Alerts empfangen darf, und
+  bekommt Pushs mit derselben Stufe.
+- **nicht erteilt** → `timeSensitive` mit normalem Ton.
 
-Der Server entscheidet pro Gerät. Ein Gerät ohne Bewilligung bekommt nie einen
-Critical Alert geschickt — Apple würde die Nachricht sonst abweisen.
+Der Server entscheidet pro Gerät. Ein Gerät ohne Berechtigung bekommt nie einen
+Critical Alert – Apple würde die Nachricht abweisen.
 
-**Stille Alarme** (herausforderndes Verhalten, verdächtige Person, Todesfall)
-bleiben unverändert stumm. Sie lösen keinen Ton aus, unabhängig von dieser
-Einstellung.
+**Stille Alarme** bleiben unverändert stumm und lösen gar keinen Push aus.
 
 ## Android
 
-Der Kanal `alarme` wird beim Start mit höchster Wichtigkeit angelegt und
-umgeht «Nicht stören» (`bypassDnd`). Dort braucht es keine Bewilligung.
+Der Kanal `alarme` wird beim Start mit höchster Wichtigkeit angelegt und umgeht
+«Nicht stören». Dort braucht es keine Bewilligung.
