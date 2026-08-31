@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   AlertTriangle, ArrowRight, Check, CircleDashed, Download, ExternalLink, Loader2, RefreshCw,
@@ -227,10 +227,17 @@ function JobFortschritt({
 }: {
   job: UpdateJob
   offenerSchritt: string | null
-  setOffenerSchritt: (id: string | null) => void
+  setOffenerSchritt: React.Dispatch<React.SetStateAction<string | null>>
 }) {
   const logRef = useRef<HTMLPreElement>(null)
   const aktiverSchritt = job.schritte.find((s) => s.status === 'laufend')
+  const fehlerSchritt = job.schritte.find((s) => s.status === 'fehlgeschlagen')
+
+  // Bei einem Fehlschlag die Ausgabe von selbst zeigen – die Ursache steht
+  // dort, und sie erst hinter einem Klick zu verstecken hilft niemandem
+  useEffect(() => {
+    if (fehlerSchritt) setOffenerSchritt((aktuell) => aktuell ?? fehlerSchritt.id)
+  }, [fehlerSchritt?.id, setOffenerSchritt])
 
   // Ausgabe des laufenden Schritts mitscrollen
   useEffect(() => {
@@ -292,7 +299,13 @@ function JobFortschritt({
 
       {job.fehler && (
         <div className="px-4 py-3 bg-brand-50 border-t border-brand-200 text-sm text-brand-700">
-          {job.fehler} Die Ausgabe des Schritts zeigt die Ursache.
+          {job.fehler}
+          {job.buildUrl && (
+            <div className="text-xs mt-1 text-brand-600">
+              Der Build wurde bei Expo dennoch angelegt und läuft dort weiter – der Fehler betrifft einen Schritt
+              danach, meist die Übermittlung an TestFlight.
+            </div>
+          )}
         </div>
       )}
 
