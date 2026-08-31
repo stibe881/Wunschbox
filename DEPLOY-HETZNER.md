@@ -22,7 +22,7 @@ Drei Dinge müssen stimmen, sonst hilft alles Weitere nichts.
 
 | Was | Warum | Wie prüfen |
 | --- | --- | --- |
-| **Node.js 20 oder 22** im Panel | `better-sqlite3` bringt fertige Binärdateien nur für gerade Versionen mit | Panel: Node.js-Anwendung anlegen, Versionsauswahl ansehen |
+| **Node.js 22 oder 24** im Panel | `better-sqlite3` bringt fertige Binärdateien nur für bestimmte Versionen mit; ohne passende müsste auf dem Server kompiliert werden | `node -v` |
 | **SSH-Zugang** | Ohne Konsole lässt sich nichts installieren und nichts prüfen | `ssh benutzer@server` |
 | **Let's-Encrypt-Zertifikat** für die Domain | Ohne HTTPS gingen Passwörter im Klartext durchs Netz | Panel: SSL/TLS |
 
@@ -53,12 +53,16 @@ git clone -b claude/e-mergency-webapp-5hc2yl \
 
 ```bash
 git log --oneline -1     # zeigt den letzten Commit
-node -v                  # v20.x oder v22.x
+node -v                  # v22.x oder v24.x
+pwd -P                   # den echten Pfad merken - für Schritt 3
 ```
 
-Zeigt `node -v` eine ältere Version, ist die falsche Node-Version aktiv. Bei
-manchen Paketen liegt die richtige unter einem eigenen Pfad – im Panel
-nachsehen und diesen Pfad in Schritt 2 verwenden.
+`pwd -P` löst Verweise auf. Bei Hetzner ist `~/public_html/...` in der Regel ein
+Verweis auf `/usr/www/users/BENUTZER/...`; in `server/.env` gehört der echte
+Pfad.
+
+Zeigt `node -v` eine ältere Version, liegen auf dem Server mehrere. Welche es
+gibt, verrät `ls /usr/local/nodejs/`; im Panel lässt sich die richtige wählen.
 
 ---
 
@@ -77,24 +81,40 @@ npm install --no-audit --no-fund
 npm run build                       # erzeugt server/dist/
 ```
 
-**Prüfen:**
+**Prüfen** – die dritte Zeile muss **im Verzeichnis `server`** laufen, denn dort
+liegt das Paket:
 
 ```bash
 ls ~/public_html/temp-gross-ict.ch/dist/index.html
 ls ~/public_html/temp-gross-ict.ch/server/dist/index.js
+
+cd ~/public_html/temp-gross-ict.ch/server
 node -e "require('better-sqlite3'); console.log('better-sqlite3 laeuft')"
 ```
 
-Die dritte Zeile ist die wichtigste. `better-sqlite3` enthält einen
-kompilierten Teil; passt die fertige Binärdatei nicht zur Node-Version des
-Hosters, scheitert der Server später mit einer unverständlichen Meldung. Dann:
+Diese Prüfung ist die wichtigste der ganzen Anleitung. `better-sqlite3` enthält
+einen kompilierten Teil, und der muss zur Node-Version passen. Fertige
+Binärdateien gibt es für:
+
+| Node | fertige Binärdatei vorhanden |
+| --- | --- |
+| 20 | nein |
+| 22 | ja |
+| 24 | ja |
+
+Kommt stattdessen ein Fehler, hilft meistens:
 
 ```bash
-cd ~/public_html/temp-gross-ict.ch/server
 npm rebuild better-sqlite3 --build-from-source
 ```
 
-Fehlt dafür ein Compiler, hilft nur eine andere Node-Version im Panel.
+Fehlt dafür ein Compiler, im Panel auf Node 22 oder 24 wechseln und
+`npm install` wiederholen.
+
+> **`Cannot find module 'better-sqlite3'`** heisst nur, dass `npm install` noch
+> nicht gelaufen ist oder die Prüfung im falschen Verzeichnis stand. Der
+> kompilierte Teil meldet sich anders, mit `NODE_MODULE_VERSION` in der
+> Fehlermeldung.
 
 ---
 
@@ -103,18 +123,19 @@ Fehlt dafür ein Compiler, hilft nur eine andere Node-Version im Panel.
 ```bash
 cd ~/public_html/temp-gross-ict.ch/server
 cp .env.example .env
-pwd                                  # den ausgegebenen Pfad gleich einsetzen
+pwd -P                               # echten Pfad ausgeben, gleich einsetzen
 nano .env
 ```
 
-Inhalt – die beiden Pfade mit der Ausgabe von `pwd` ersetzen:
+Inhalt – die drei Pfade mit der Ausgabe von `pwd -P` ersetzen (ohne das
+angehängte `/server`, das steht nur in `SOBE_DB_PATH`):
 
 ```
 PORT=3001
 HOST=127.0.0.1
-SOBE_DB_PATH=/usr/home/BENUTZER/public_html/temp-gross-ict.ch/server/data/sobe-notfall.sqlite
-SOBE_WEB_ROOT=/usr/home/BENUTZER/public_html/temp-gross-ict.ch/dist
-SOBE_REPO_ROOT=/usr/home/BENUTZER/public_html/temp-gross-ict.ch
+SOBE_DB_PATH=/usr/www/users/BENUTZER/temp-gross-ict.ch/server/data/sobe-notfall.sqlite
+SOBE_WEB_ROOT=/usr/www/users/BENUTZER/temp-gross-ict.ch/dist
+SOBE_REPO_ROOT=/usr/www/users/BENUTZER/temp-gross-ict.ch
 SOBE_ADMIN_EMAIL=stefan.gross@sonnenberg-baar.ch
 EXPO_TOKEN=
 ```
@@ -185,7 +206,7 @@ dieselben:
 | --- | --- |
 | Anwendungsverzeichnis / Application root | `public_html/temp-gross-ict.ch/server` |
 | Startdatei / Startup file | `dist/index.js` |
-| Node-Version | 20 oder 22 |
+| Node-Version | 22 oder 24 |
 | Anwendungs-URL | `temp-gross-ict.ch` |
 | Umgebungsvariablen | siehe unten |
 
