@@ -85,6 +85,8 @@ export interface UpdateJob {
   gestartetVon: string
   schritte: UpdateSchritt[]
   buildUrl?: string
+  /** Auftrag durchgelaufen, aber mit einer Einschränkung */
+  hinweis?: string
   fehler?: string
 }
 

@@ -38,6 +38,8 @@ export interface UpdateJob {
   schritte: UpdateSchritt[]
   /** Link zum EAS-Build, sobald bekannt */
   buildUrl?: string
+  /** Auftrag durchgelaufen, aber mit einer Einschränkung */
+  hinweis?: string
   fehler?: string
 }
 
@@ -354,9 +356,26 @@ async function abarbeiten(job: UpdateJob, plan: SchrittDefinition[]): Promise<vo
     schritt.finishedAt = Date.now()
     schritt.status = code === 0 ? 'erfolgreich' : 'fehlgeschlagen'
 
-    if (definition.id === 'ios-build') job.buildUrl = findeBuildUrl(ausgabe)
+    let fehlgeschlagen = code !== 0
+    if (definition.id === 'ios-build') {
+      job.buildUrl = findeBuildUrl(ausgabe)
+      // Steht eine Build-Adresse in der Ausgabe, wurde der Build bei Expo
+      // angelegt und läuft dort weiter. Ein Fehler danach betrifft die
+      // Übermittlung an TestFlight, nicht den Build. Der Auftrag darf deshalb
+      // nicht als gescheitert gelten - sonst bliebe der frisch gebaute Server
+      // auf dem alten Stand, weil der Neustart ausbliebe.
+      if (fehlgeschlagen && job.buildUrl) {
+        fehlgeschlagen = false
+        schritt.status = 'erfolgreich'
+        job.hinweis =
+          'Der iOS-Build läuft bei Expo. Die Übermittlung an TestFlight ist nicht ' +
+          'angelaufen – dafür fehlen bei Expo die Zugangsdaten für App Store Connect. ' +
+          'Siehe mobile/CRITICAL-ALERTS.md, Abschnitt «Übermittlung an TestFlight».'
+        schritt.ausgabe += `\n\n[${job.hinweis}]`
+      }
+    }
 
-    if (code !== 0 && !definition.optional) {
+    if (fehlgeschlagen && !definition.optional) {
       job.status = 'fehlgeschlagen'
       job.fehler = `Schritt «${definition.titel}» ist fehlgeschlagen.`
       job.finishedAt = Date.now()

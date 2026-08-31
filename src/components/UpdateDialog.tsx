@@ -298,15 +298,11 @@ function JobFortschritt({
       </ul>
 
       {job.fehler && (
-        <div className="px-4 py-3 bg-brand-50 border-t border-brand-200 text-sm text-brand-700">
-          {job.fehler}
-          {job.buildUrl && (
-            <div className="text-xs mt-1 text-brand-600">
-              Der Build wurde bei Expo dennoch angelegt und läuft dort weiter – der Fehler betrifft einen Schritt
-              danach, meist die Übermittlung an TestFlight.
-            </div>
-          )}
-        </div>
+        <div className="px-4 py-3 bg-brand-50 border-t border-brand-200 text-sm text-brand-700">{job.fehler}</div>
+      )}
+
+      {job.hinweis && (
+        <div className="px-4 py-3 bg-amber-50 border-t border-amber-200 text-sm text-amber-900">{job.hinweis}</div>
       )}
 
       {job.buildUrl && (
@@ -320,8 +316,9 @@ function JobFortschritt({
             <ExternalLink size={14} /> Build bei Expo öffnen
           </a>
           <p className="text-xs text-slate-500 mt-1">
-            Der Build läuft dort 20 bis 45 Minuten und geht anschliessend automatisch an TestFlight, das nochmals
-            5 bis 15 Minuten für die Verarbeitung braucht.
+            {job.hinweis
+              ? 'Der Build läuft dort 20 bis 45 Minuten. Danach lässt er sich von Hand an TestFlight übermitteln.'
+              : 'Der Build läuft dort 20 bis 45 Minuten und geht anschliessend automatisch an TestFlight, das nochmals 5 bis 15 Minuten für die Verarbeitung braucht.'}
           </p>
         </div>
       )}

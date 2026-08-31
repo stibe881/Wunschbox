@@ -64,6 +64,53 @@ erneuert das Profil.
 
 ---
 
+## Übermittlung an TestFlight
+
+Der Update-Knopf baut mit `--auto-submit`: Nach dem Build soll Expo die App
+selbständig an TestFlight übergeben. Dafür braucht Expo Zugangsdaten für App
+Store Connect. Fehlen sie, sieht es so aus:
+
+- Der Build wird angelegt und läuft bei Expo durch.
+- Der Schritt danach scheitert, weil die CLI ohne Rückfragen keine Zugangsdaten
+  erfragen kann.
+- In TestFlight erscheint nichts.
+
+Das Portal erkennt diesen Fall inzwischen: Der Schritt gilt als erfolgreich,
+und darunter steht ein Hinweis auf die fehlende Übermittlung. Der Server
+startet dann wie vorgesehen neu.
+
+### Einmalig einrichten
+
+Denselben Build **einmal mit Rückfragen** vom eigenen Rechner starten. Dabei
+fragt EAS nach den Apple-Zugangsdaten, legt die Übermittlungsdaten beim Projekt
+ab und verwendet sie danach auch ohne Rückfragen:
+
+```bash
+cd mobile
+npx eas-cli build --platform ios --profile production --auto-submit
+```
+
+Das ist derselbe Lauf, der weiter oben die Berechtigung für zeitkritische
+Mitteilungen ins Bereitstellungsprofil einträgt. **Ein Durchgang erledigt
+beides.**
+
+Prüfen lässt sich der Stand mit:
+
+```bash
+npx eas-cli credentials
+```
+
+### Bis dahin von Hand übermitteln
+
+```bash
+cd mobile
+npx eas-cli submit --platform ios --latest
+```
+
+Oder im Expo-Dashboard beim fertigen Build auf «Submit to App Store» gehen.
+
+---
+
 ## Stufe 2: Critical Alerts
 
 Zusätzlich zur zeitkritischen Stufe: Ton auch bei stummgeschaltetem Telefon, mit
