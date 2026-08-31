@@ -119,7 +119,7 @@ export default function UpdateDialog({ onClose }: { onClose: () => void }) {
                 titel="Server und iOS-App"
                 beschreibung={
                   version.iosMoeglich
-                    ? 'Zusätzlich einen neuen iOS-Build erstellen und automatisch an TestFlight senden. Dauert je nach Auslastung 20 bis 45 Minuten.'
+                    ? 'Zusätzlich einen iOS-Build anstossen. Der läuft danach bei Expo weiter und geht von dort automatisch an TestFlight – der Lauf hier wartet nicht darauf.'
                     : (version.iosHinweis ?? 'Auf diesem Server nicht eingerichtet.')
                 }
                 gesperrt={!version.iosMoeglich}
@@ -307,7 +307,8 @@ function JobFortschritt({
             <ExternalLink size={14} /> Build bei Expo öffnen
           </a>
           <p className="text-xs text-slate-500 mt-1">
-            TestFlight braucht nach dem Hochladen meist noch 5 bis 15 Minuten für die Verarbeitung.
+            Der Build läuft dort 20 bis 45 Minuten und geht anschliessend automatisch an TestFlight, das nochmals
+            5 bis 15 Minuten für die Verarbeitung braucht.
           </p>
         </div>
       )}

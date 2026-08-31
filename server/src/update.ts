@@ -261,11 +261,23 @@ function schrittPlan(scope: UpdateScope): SchrittDefinition[] {
         befehl: 'npm', argumente: ['install', '--no-audit', '--no-fund'], verzeichnis: (r) => resolve(r, 'mobile'),
       },
       {
-        id: 'ios-build', titel: 'iOS-Build erstellen und an TestFlight senden',
+        id: 'ios-build', titel: 'iOS-Build anstossen (läuft bei Expo weiter)',
         befehl: 'npx',
-        argumente: ['--yes', 'eas-cli', 'build', '--platform', 'ios', '--profile', 'production', '--non-interactive', '--auto-submit'],
+        argumente: [
+          '--yes', 'eas-cli', 'build',
+          '--platform', 'ios',
+          '--profile', 'production',
+          '--non-interactive',
+          '--auto-submit',
+          // Nicht auf den Build warten: Er läuft auf den Servern von Expo, die
+          // Übermittlung an TestFlight schliesst dort automatisch an. Ohne dies
+          // hinge der Auftrag 20 bis 45 Minuten, der Server könnte nicht neu
+          // starten, und ein Abbruch der Verbindung sähe wie ein Fehlschlag aus.
+          '--no-wait',
+        ],
         verzeichnis: (r) => resolve(r, 'mobile'),
-        timeoutMs: 60 * 60_000,
+        // Hochladen des Projekts kann bei langsamer Leitung dauern
+        timeoutMs: 20 * 60_000,
         // Ohne diese Einstellung verlangt eas-cli im nicht interaktiven Betrieb
         // ein sauberes Git-Verzeichnis. Nach npm install sind die Lock-Dateien
         // aber oft verändert, und der Build bräche nach allen anderen Schritten

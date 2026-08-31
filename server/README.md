@@ -151,7 +151,13 @@ und es gibt zwei Möglichkeiten:
 | Auswahl | Was passiert | Dauer |
 | --- | --- | --- |
 | **Nur Server** | `git fetch` → `git pull --ff-only` → Abhängigkeiten von Portal und Server → beide bauen → Server neu starten | wenige Minuten |
-| **Server und iOS-App** | zusätzlich Abhängigkeiten der App und `eas build --platform ios --profile production --auto-submit` (TestFlight) | 20 bis 45 Minuten |
+| **Server und iOS-App** | zusätzlich Abhängigkeiten der App und `eas build --platform ios --profile production --auto-submit --no-wait` | ein bis zwei Minuten |
+
+Der iOS-Build wird nur angestossen: Er läuft auf den Servern von Expo weiter und
+geht von dort automatisch an TestFlight. Der Lauf im Portal wartet bewusst nicht
+darauf – sonst hinge er eine dreiviertel Stunde, der Server könnte nicht neu
+starten, und ein Verbindungsabbruch sähe wie ein Fehlschlag aus. Der Fortschritt
+ist über den Link zum Build bei Expo einsehbar.
 
 Jeder Schritt wird mit Status und vollständiger Ausgabe angezeigt, auch wenn
 etwas fehlschlägt. Bricht ein Schritt ab, werden die folgenden übersprungen und
