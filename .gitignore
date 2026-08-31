@@ -4,3 +4,4 @@ dist
 .DS_Store
 docs/bilder/roh
 __pycache__
+docs/*.pdf

@@ -1,24 +1,16 @@
 # -*- coding: utf-8 -*-
 TITEL = 'SOBE Handbuch Mitarbeitende'
-PALETTE = 'petrol'
+TITELSEITE = dict(
+    rolle='SOBE Notfall &middot; Handbuch 3 von 3',
+    titel='Die App im Alltag',
+    untertitel='Für alle Mitarbeitenden',
+    vorspann='Die App auf Ihrem Telefon macht zwei Dinge: Sie holt im Notfall in Sekunden Hilfe, und sie sagt Ihnen Schritt für Schritt, was zu tun ist. Mehr müssen Sie nicht können. Dieses Handbuch zeigt jeden Bildschirm, den Sie brauchen.',
+)
+
 KOERPER = r"""
 <div class="blatt">
 
-<header class="titelblatt">
-  <p class="marke">SOBE Notfall &middot; Handbuch 3 von 3</p>
-  <h1>Die App im Alltag</h1>
-  <p class="fuer">Für alle Mitarbeitenden</p>
-  <p class="vorspann">
-    Die App auf Ihrem Telefon macht zwei Dinge: Sie holt im Notfall in Sekunden Hilfe,
-    und sie sagt Ihnen Schritt für Schritt, was zu tun ist. Mehr müssen Sie nicht
-    können. Dieses Handbuch zeigt jeden Bildschirm, den Sie brauchen.
-  </p>
-  <p class="stand">
-    <span>SONNENBERG Kompetenzzentrum</span>
-    <span>Baar &middot; Menzingen &middot; Kloten</span>
-    <span>Stand: August 2026</span>
-  </p>
-</header>
+{TITELSEITE}
 
 <nav class="inhalt" aria-label="Inhalt">
   <h2>Inhalt</h2>
@@ -380,6 +372,7 @@ KOERPER = r"""
     Die Bildschirmfotos stammen aus dem Demo-Modus. Angaben zu Rechtsgrundlagen in den
     Szenarien sind eine Orientierungshilfe und ersetzen keine Rechtsberatung.
   </p>
+  {ADRESSE}
 </footer>
 
 </div>

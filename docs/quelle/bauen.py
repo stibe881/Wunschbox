@@ -28,7 +28,10 @@ def einbetten(html):
     return re.sub(r'src="(bilder/[^"]+)"', ersetze, html)
 
 for name, modul in DATEIEN:
-    seite = schale.seite(modul.TITEL, modul.PALETTE, modul.KOERPER)
+    koerper = (modul.KOERPER
+               .replace('{TITELSEITE}', schale.titelseite(**modul.TITELSEITE))
+               .replace('{ADRESSE}', schale.ADRESSE))
+    seite = schale.seite(modul.TITEL, koerper)
 
     # Abbildungen fortlaufend nummerieren, damit sich beim Einfügen einer
     # weiteren Abbildung nichts von Hand nachziehen lässt.

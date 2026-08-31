@@ -1,24 +1,16 @@
 # -*- coding: utf-8 -*-
 TITEL = 'SOBE Handbuch Administration'
-PALETTE = 'rot'
+TITELSEITE = dict(
+    rolle='SOBE Notfall &middot; Handbuch 1 von 3',
+    titel='Administration',
+    untertitel='Für die Schulleitung und die Systemverantwortlichen',
+    vorspann='Sie richten das Notfallsystem ein, halten es aktuell und verantworten, wer damit alarmieren darf. Dieses Handbuch führt durch das Webportal und durch die Teile der App, die nur Ihnen offenstehen.',
+)
+
 KOERPER = r"""
 <div class="blatt">
 
-<header class="titelblatt">
-  <p class="marke">SOBE Notfall &middot; Handbuch 1 von 3</p>
-  <h1>Administration</h1>
-  <p class="fuer">Für die Schulleitung und die Systemverantwortlichen</p>
-  <p class="vorspann">
-    Sie richten das Notfallsystem ein, halten es aktuell und verantworten, wer damit
-    alarmieren darf. Dieses Handbuch führt durch das Webportal und durch die Teile
-    der App, die nur Ihnen offenstehen.
-  </p>
-  <p class="stand">
-    <span>SONNENBERG Kompetenzzentrum</span>
-    <span>Baar &middot; Menzingen &middot; Kloten</span>
-    <span>Stand: August 2026</span>
-  </p>
-</header>
+{TITELSEITE}
 
 <nav class="inhalt" aria-label="Inhalt">
   <h2>Inhalt</h2>
@@ -513,6 +505,7 @@ KOERPER = r"""
     Die Bildschirmfotos stammen aus dem Demo-Modus. Angaben zu Rechtsgrundlagen in den
     Szenarien sind eine Orientierungshilfe und ersetzen keine Rechtsberatung.
   </p>
+  {ADRESSE}
 </footer>
 
 </div>
