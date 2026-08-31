@@ -485,23 +485,45 @@ davon.
 
 ## 10. Sicherung einrichten
 
-Der gesamte Datenbestand liegt in einer Datei. Ein täglicher Cron-Eintrag
-genügt:
+Der gesamte Datenbestand liegt in einer Datei. Gesichert wird mit:
+
+```bash
+cd ~/public_html/temp-gross-ict.ch/server
+npm run sicherung
+```
+
+Das legt `~/sicherung/sobe-JJJJ-MM-TT.sqlite` an und entfernt Sicherungen, die
+älter als 30 Tage sind. Ziel und Aufbewahrung lassen sich vorgeben:
+
+```bash
+npm run sicherung -- ~/sicherung 90
+```
+
+Der Server darf dabei weiterlaufen. Das Skript nutzt `VACUUM INTO`; SQLite
+erzeugt damit eine in sich stimmige Kopie, auch während geschrieben wird.
+Ein blosses Kopieren der Datei wäre riskant – die zuletzt geschriebenen Daten
+stehen im Schreibprotokoll `-wal` und fehlten in der Kopie. Das Ergebnis ist
+eine einzelne Datei ohne Begleitdateien.
+
+Als täglicher Eintrag, zusätzlich zu bestehenden Zeilen:
 
 ```bash
 crontab -e
 ```
 
 ```
-# täglich um 03:15 sichern, 30 Tage aufbewahren
-15 3 * * * cd ~/public_html/temp-gross-ict.ch/server && cp data/sobe-notfall.sqlite ~/sicherung/sobe-$(date +\%F).sqlite && find ~/sicherung -name 'sobe-*.sqlite' -mtime +30 -delete
+15 3 * * * cd ~/public_html/temp-gross-ict.ch/server && /usr/local/nodejs/24/bin/npm run sicherung >> ~/sicherung.log 2>&1
 ```
 
-Vorher einmal `mkdir -p ~/sicherung`.
+Der volle Pfad zu `npm` ist nötig, weil Cron einen kargen Suchpfad hat.
 
-Die Kopie im laufenden Betrieb kann die letzten Sekunden verpassen – für eine
-tägliche Sicherung ist das vertretbar. Vor einem Umzug oder Eingriff gilt
-weiterhin: Server beenden, dann kopieren.
+**Zurückspielen:** Anwendung im Panel anhalten, die gewünschte Sicherung nach
+`server/data/sobe-notfall.sqlite` kopieren, allfällige `-wal`- und
+`-shm`-Dateien daneben löschen, Anwendung starten.
+
+> Eine Sicherung, die auf derselben Platte liegt, hilft nicht gegen den Verlust
+> dieser Platte. Holen Sie die Dateien regelmässig auch auf einen anderen
+> Rechner.
 
 ---
 

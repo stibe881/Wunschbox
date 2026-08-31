@@ -12,7 +12,8 @@
     "serve": "bash scripts/run.sh",
     "reset-admin": "tsx src/reset-admin.ts",
     "accounts": "tsx src/accounts.ts",
-    "test": "tsx src/test.ts"
+    "test": "tsx src/test.ts",
+    "sicherung": "node scripts/sicherung.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",
