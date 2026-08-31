@@ -33,18 +33,20 @@ nachtragen – es verwendet das vorhandene Profil, und dem fehlt sie.
 
 ### Einmalig einrichten
 
-Ein einziger Build vom eigenen Rechner aus, mit Rückfragen. Dabei meldet sich
-EAS bei Apple an, trägt die Berechtigung ein und erneuert das Profil.
+Der Eintrag steht bereits in `mobile/app.json`:
 
-1. In `mobile/app.json` innerhalb von `"ios"` ergänzen:
+```json
+"entitlements": {
+  "com.apple.developer.usernotifications.time-sensitive": true
+}
+```
 
-   ```json
-   "entitlements": {
-     "com.apple.developer.usernotifications.time-sensitive": true
-   }
-   ```
+Damit ein Build gelingt, muss die Berechtigung noch im Bereitstellungsprofil
+verankert werden. Dafür genügt ein einziger Build vom eigenen Rechner aus, mit
+Rückfragen: Dabei meldet sich EAS bei Apple an, trägt die Berechtigung ein und
+erneuert das Profil.
 
-2. Vom eigenen Rechner bauen – **ohne** `--non-interactive`:
+1. Vom eigenen Rechner bauen – **ohne** `--non-interactive`:
 
    ```bash
    cd mobile
@@ -54,11 +56,11 @@ EAS bei Apple an, trägt die Berechtigung ein und erneuert das Profil.
    Bei der Frage nach den Apple-Zugangsdaten anmelden. EAS meldet dann
    «Syncing capabilities» und erstellt ein neues Profil.
 
-3. Läuft dieser Build durch, funktioniert der Update-Knopf ab sofort auch mit
+2. Läuft dieser Build durch, funktioniert der Update-Knopf ab sofort auch mit
    der Berechtigung – das erneuerte Profil wird wiederverwendet.
 
-Wird Schritt 2 übersprungen, schlägt jeder Build fehl, solange der Eintrag in
-`app.json` steht. Deshalb ist er dort derzeit **nicht** gesetzt.
+> **Bis dieser eine Build gelaufen ist, schlägt der iOS-Build über den
+> Update-Knopf fehl.** «Nur Server» ist davon nicht betroffen.
 
 ---
 
