@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-slate-100 text-slate-900 antialiased;
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgba(224, 36, 36, 0.5); }
+  70% { box-shadow: 0 0 0 12px rgba(224, 36, 36, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(224, 36, 36, 0); }
+}
+
+.alarm-pulse {
+  animation: pulse-ring 1.5s infinite;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-in {
+  animation: toast-in 0.2s ease-out;
+}
+
+:focus-visible {
+  outline: 2px solid #64748b;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alarm-pulse,
+  .animate-pulse,
+  .toast-in {
+    animation: none;
+  }
+}

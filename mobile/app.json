@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "SOBE Notfall",
+    "slug": "sonnenberg-notfall",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "plugins": [
+      "expo-notifications"
+    ],
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#0f172a",
+    "primaryColor": "#c81e1e",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ch.sonnenberg.notfall",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        },
+        "NSLocalNetworkUsageDescription": "SOBE Notfall verbindet sich mit dem Alarmserver im Schulnetz, um Benutzerkonten, Szenarien und Alarme zu laden."
+      },
+      "entitlements": {
+        "com.apple.developer.usernotifications.time-sensitive": true
+      }
+    },
+    "android": {
+      "package": "ch.sonnenberg.notfall",
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "349fb6b1-8d68-4457-b89f-d6c85eed30aa"
+      }
+    }
+  }
+}

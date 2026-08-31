@@ -1,0 +1,756 @@
+import React, { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react'
+import { Vibration } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import type { Alarm, AlarmLogEntry, Channel, Delivery, EmergencyContact, EscalationLevel, Group, Location, LoneWorkSession, Scenario, Session, User } from './types'
+import { CHANNEL_LABELS } from './types'
+import { LIVE_INITIAL_PASSWORD, SEED_CONTACTS, SEED_GROUPS, SEED_LOCATIONS, SEED_SCENARIOS, SEED_USERS } from './seed'
+import { hashPassword, randomSalt } from './auth'
+import { criticalAlertsGranted, getPushToken, notifyNow } from './notifications'
+import { ApiError, api, authToken, loadApiSettings, setAuthToken, type ServerData } from './api'
+import { authenticate, passwordProblem, verifyPassword } from './auth'
+
+export type AppMode = 'demo' | 'live'
+
+/** Erhöhen, wenn gespeicherte Passwortdaten einmalig korrigiert werden müssen */
+const AUTH_MIGRATION_VERSION = 1
+
+const MODE_KEY = 'sonnenberg-mobile-mode'
+const DATA_KEYS: Record<AppMode, string> = {
+  demo: 'sonnenberg-mobile-v1',
+  live: 'sonnenberg-mobile-live-v1',
+}
+
+export function uid(prefix: string): string {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+export interface MobileState {
+  mode: AppMode
+  /** Version der Anmelde-Migration – für einmalige Korrekturen an Passwortdaten */
+  authVersion?: number
+  /** Angemeldete Sitzung – null bedeutet: Anmeldemaske anzeigen */
+  session: Session | null
+  /**
+   * Datenbestand. Im Demo-Modus die mitgelieferten Beispieldaten, im Live-Modus
+   * der Stand des Alarmservers – damit App und Webportal dasselbe sehen.
+   */
+  users: User[]
+  groups: Group[]
+  locations: Location[]
+  scenarios: Scenario[]
+  contacts: EmergencyContact[]
+  currentUserId: string
+  alarms: Alarm[]
+  loneWorkSessions: LoneWorkSession[]
+}
+
+function initialState(mode: AppMode): MobileState {
+  // Im Live-Modus füllt der Server den Bestand; bis dahin bleibt er leer
+  const live = mode === 'live'
+  const users = live ? [] : SEED_USERS
+  return {
+    mode,
+    authVersion: AUTH_MIGRATION_VERSION,
+    session: null,
+    users,
+    groups: live ? [] : SEED_GROUPS,
+    locations: live ? [] : SEED_LOCATIONS,
+    scenarios: live ? [] : SEED_SCENARIOS,
+    contacts: live ? [] : SEED_CONTACTS,
+    currentUserId: users[0]?.id ?? '',
+    alarms: [],
+    loneWorkSessions: [],
+  }
+}
+
+// ---------- Alarm-Logik (identisch zur Web-App, Alarmserver wird lokal simuliert) ----------
+
+export function resolveRecipients(users: User[], groupIds: string[], locationIds: string[]): User[] {
+  const today = new Date().toISOString().slice(0, 10)
+  return users.filter((u) => {
+    const inGroup = groupIds.length === 0 || u.groupIds.some((g) => groupIds.includes(g))
+    const inLocation = locationIds.length === 0 || locationIds.includes(u.locationId)
+    const absent = u.absence && u.absence.from <= today && today <= u.absence.to
+    return inGroup && inLocation && !absent
+  })
+}
+
+function buildDeliveries(recipients: User[], channels: Channel[]): Delivery[] {
+  const deliveries: Delivery[] = []
+  for (const user of recipients) {
+    for (const channel of channels) {
+      deliveries.push({ id: uid('dlv'), userId: user.id, channel, status: 'pending', ack: 'none', updatedAt: Date.now() })
+    }
+  }
+  return deliveries
+}
+
+export interface TriggerOptions {
+  scenarioId: string
+  message: string
+  silent: boolean
+  requireAck: boolean
+  channels: Channel[]
+  groupIds: string[]
+  locationIds: string[]
+  triggeredByUserId: string
+  triggeredVia: Alarm['triggeredVia']
+  escalation?: EscalationLevel[]
+  /** Gezielte Empfänger (z. B. einzelnes Krisenteam-Mitglied) statt Gruppen-/Standortauflösung */
+  recipientUserIds?: string[]
+}
+
+export function createAlarm(users: User[], opts: TriggerOptions): Alarm {
+  const recipients = opts.recipientUserIds
+    ? users.filter((u) => opts.recipientUserIds!.includes(u.id))
+    : resolveRecipients(users, opts.groupIds, opts.locationIds)
+  const now = Date.now()
+  return {
+    id: uid('alarm'),
+    scenarioId: opts.scenarioId,
+    message: opts.message,
+    silent: opts.silent,
+    requireAck: opts.requireAck,
+    triggeredByUserId: opts.triggeredByUserId,
+    triggeredVia: opts.triggeredVia,
+    triggeredAt: now,
+    locationIds: opts.locationIds,
+    groupIds: opts.groupIds,
+    channels: opts.channels,
+    status: 'active',
+    escalationStage: 0,
+    escalation: opts.escalation ?? [],
+    deliveries: buildDeliveries(recipients, opts.channels),
+    log: [
+      { ts: now, message: `Alarm ausgelöst (${opts.triggeredVia}) – ${recipients.length} Empfänger über ${opts.channels.map((c) => CHANNEL_LABELS[c]).join(', ')}` },
+    ],
+  }
+}
+
+export type Action =
+  | { type: 'LOGIN'; userId: string }
+  | { type: 'LOGOUT' }
+  | { type: 'SET_PASSWORD'; userId: string; password: string; mustChange?: boolean }
+  | { type: 'SET_USER'; userId: string }
+  | { type: 'TRIGGER_ALARM'; alarm: Alarm }
+  | { type: 'END_ALARM'; alarmId: string }
+  | { type: 'ACK_ALARM'; alarmId: string; userId: string; ack: 'acknowledged' | 'declined' }
+  | { type: 'TICK'; now: number }
+  | { type: 'START_LONE_WORK'; session: LoneWorkSession }
+  | { type: 'EXTEND_LONE_WORK'; sessionId: string; minutes: number }
+  | { type: 'COMPLETE_LONE_WORK'; sessionId: string }
+  | { type: 'HYDRATE'; state: MobileState }
+  | { type: 'ADOPT_SERVER'; data: ServerData; session: Session | null }
+  | { type: 'RESET' }
+
+/** Zustellsimulation (nur Demo), Eskalation, Alleinarbeits-Timer */
+function tick(state: MobileState, now: number): MobileState {
+  let changed = false
+  const simulate = state.mode === 'demo'
+
+  const alarms = state.alarms.map((alarm) => {
+    if (alarm.status !== 'active') return alarm
+    let aChanged = false
+    let deliveries = !simulate
+      ? alarm.deliveries
+      : alarm.deliveries.map((d) => {
+          const age = now - d.updatedAt
+          if (d.status === 'pending' && age > 1200 + Math.random() * 1500) {
+            aChanged = true
+            return { ...d, status: 'sent' as const, updatedAt: now }
+          }
+          if (d.status === 'sent' && age > 1500 + Math.random() * 2500) {
+            aChanged = true
+            return { ...d, status: Math.random() < 0.04 ? ('failed' as const) : ('delivered' as const), updatedAt: now }
+          }
+          return d
+        })
+
+    const log: AlarmLogEntry[] = [...alarm.log]
+
+    // Simulierte Rückmeldungen (nur Demo): alarmierte Personen quittieren nach Zustellung
+    if (simulate && alarm.requireAck) {
+      const pendingUsers = [...new Set(deliveries.map((d) => d.userId))].filter(
+        (userId) =>
+          userId !== state.currentUserId &&
+          deliveries.some((d) => d.userId === userId && d.status === 'delivered') &&
+          deliveries.every((d) => d.userId !== userId || d.ack === 'none'),
+      )
+      for (const userId of pendingUsers) {
+        if (Math.random() < 0.06) {
+          const ack = Math.random() < 0.85 ? ('acknowledged' as const) : ('declined' as const)
+          deliveries = deliveries.map((d) => (d.userId === userId ? { ...d, ack } : d))
+          const user = state.users.find((u) => u.id === userId)
+          log.push({
+            ts: now,
+            message: `${user ? `${user.firstName} ${user.lastName}` : userId} hat ${ack === 'acknowledged' ? 'quittiert (kommt)' : 'abgelehnt (nicht verfügbar)'}`,
+          })
+          aChanged = true
+        }
+      }
+    }
+
+    // Eskalation
+    let escalationStage = alarm.escalationStage
+    const nextLevel = alarm.escalation[escalationStage]
+    const anyAck = deliveries.some((d) => d.ack === 'acknowledged')
+    if (nextLevel && !anyAck && now - alarm.triggeredAt > nextLevel.afterMinutes * 60_000) {
+      escalationStage += 1
+      const recipients = resolveRecipients(state.users, nextLevel.groupIds, alarm.locationIds)
+      deliveries = [...deliveries, ...buildDeliveries(recipients, nextLevel.channels)]
+      log.push({
+        ts: now,
+        message: `Eskalationsstufe ${escalationStage}: ${recipients.length} weitere Empfänger${nextLevel.notifyEmergencyServices ? ' – Blaulichtorganisationen benachrichtigt' : ''}`,
+      })
+      aChanged = true
+    }
+
+    if (!aChanged) return alarm
+    changed = true
+    return { ...alarm, deliveries, log, escalationStage }
+  })
+
+  // Alleinarbeits-Timer abgelaufen -> automatischer Alarm
+  let loneWorkSessions = state.loneWorkSessions
+  let newAlarms: Alarm[] = []
+  const expired = state.loneWorkSessions.filter((s) => s.status === 'running' && now > s.expiresAt)
+  if (expired.length > 0) {
+    changed = true
+    loneWorkSessions = state.loneWorkSessions.map((s) =>
+      expired.some((e) => e.id === s.id) ? { ...s, status: 'alarm' as const } : s,
+    )
+    for (const session of expired) {
+      const user = state.users.find((u) => u.id === session.userId)
+      newAlarms = [
+        createAlarm(state.users, {
+          scenarioId: 'sc-medizin',
+          message: `ALLEINARBEIT: Timer von ${user ? `${user.firstName} ${user.lastName}` : '?'} abgelaufen (${session.activity}). Keine Rückmeldung – bitte sofort prüfen!`,
+          silent: session.silent,
+          requireAck: true,
+          channels: ['push', 'sms', 'voice'],
+          groupIds: ['gr-ersthelfer', 'gr-sicherheit'],
+          locationIds: [session.locationId],
+          triggeredByUserId: session.userId,
+          triggeredVia: 'timer',
+          escalation: [{ afterMinutes: 5, channels: ['voice'], groupIds: ['gr-krisenstab'], notifyEmergencyServices: true }],
+        }),
+        ...newAlarms,
+      ]
+    }
+    Vibration.vibrate([0, 300, 150, 300])
+  }
+
+  if (!changed) return state
+  return { ...state, alarms: [...newAlarms, ...alarms], loneWorkSessions }
+}
+
+function reducer(state: MobileState, action: Action): MobileState {
+  switch (action.type) {
+    case 'LOGIN': {
+      const user = state.users.find((u) => u.id === action.userId)
+      if (!user) return state
+      return {
+        ...state,
+        session: { userId: user.id, loginAt: Date.now() },
+        currentUserId: user.id,
+        users: state.users.map((u) => (u.id === user.id ? { ...u, lastLoginAt: Date.now() } : u)),
+      }
+    }
+    case 'LOGOUT':
+      return { ...state, session: null }
+    case 'SET_PASSWORD': {
+      const salt = randomSalt()
+      const hash = hashPassword(action.password, salt)
+      return {
+        ...state,
+        users: state.users.map((u) =>
+          u.id === action.userId
+            ? { ...u, passwordSalt: salt, passwordHash: hash, mustChangePassword: action.mustChange ?? false }
+            : u,
+        ),
+      }
+    }
+    case 'SET_USER':
+      return { ...state, currentUserId: action.userId }
+    case 'TRIGGER_ALARM':
+      return { ...state, alarms: [action.alarm, ...state.alarms].slice(0, 20) }
+    case 'END_ALARM':
+      return {
+        ...state,
+        alarms: state.alarms.map((a) =>
+          a.id === action.alarmId
+            ? { ...a, status: 'ended' as const, endedAt: Date.now(), log: [...a.log, { ts: Date.now(), message: 'Alarm beendet – Entwarnung versendet.' }] }
+            : a,
+        ),
+      }
+    case 'ACK_ALARM':
+      return {
+        ...state,
+        alarms: state.alarms.map((a) =>
+          a.id === action.alarmId
+            ? { ...a, deliveries: a.deliveries.map((d) => (d.userId === action.userId ? { ...d, ack: action.ack } : d)) }
+            : a,
+        ),
+      }
+    case 'TICK':
+      return tick(state, action.now)
+    case 'START_LONE_WORK':
+      return { ...state, loneWorkSessions: [action.session, ...state.loneWorkSessions].slice(0, 20) }
+    case 'EXTEND_LONE_WORK':
+      return {
+        ...state,
+        loneWorkSessions: state.loneWorkSessions.map((s) =>
+          s.id === action.sessionId ? { ...s, expiresAt: s.expiresAt + action.minutes * 60_000 } : s,
+        ),
+      }
+    case 'COMPLETE_LONE_WORK':
+      return {
+        ...state,
+        loneWorkSessions: state.loneWorkSessions.map((s) => (s.id === action.sessionId ? { ...s, status: 'completed' as const } : s)),
+      }
+    case 'ADOPT_SERVER': {
+      // Im Live-Modus ist der Server die Wahrheit; Modus und Anmeldung bleiben lokal
+      const session = action.session
+      return {
+        ...state,
+        users: action.data.users ?? state.users,
+        groups: action.data.groups ?? state.groups,
+        locations: action.data.locations ?? state.locations,
+        scenarios: action.data.scenarios ?? state.scenarios,
+        contacts: action.data.contacts ?? state.contacts,
+        alarms: action.data.alarms ?? [],
+        loneWorkSessions: action.data.loneWorkSessions ?? [],
+        mode: 'live',
+        session,
+        currentUserId: session?.userId ?? state.currentUserId,
+      }
+    }
+    case 'HYDRATE':
+      // Fehlende Felder auffüllen, damit ein alter Stand nie zu undefined führt
+      return fuelleFehlendeFelder(action.state, action.state.mode ?? state.mode)
+    case 'RESET': {
+      const fresh = initialState(state.mode)
+      // Angemeldet bleiben, sofern das eigene Konto im frischen Bestand existiert
+      const keep = fresh.users.some((u) => u.id === state.session?.userId)
+      return keep ? { ...fresh, session: state.session, currentUserId: state.session!.userId } : fresh
+    }
+    default:
+      return state
+  }
+}
+
+// ---------- Toasts ----------
+
+export interface Toast {
+  id: number
+  message: string
+  kind: 'success' | 'alarm'
+}
+
+function toastForAction(action: Action): Toast['message'] | { message: string; kind: 'alarm' } | null {
+  switch (action.type) {
+    case 'TRIGGER_ALARM':
+      return { message: 'Alarm ausgelöst – Empfänger werden benachrichtigt', kind: 'alarm' }
+    case 'END_ALARM':
+      return 'Alarm beendet – Entwarnung versendet'
+    case 'ACK_ALARM':
+      return action.ack === 'acknowledged' ? 'Quittiert – Sie nehmen teil' : 'Als nicht verfügbar gemeldet'
+    case 'LOGOUT':
+      return 'Abgemeldet'
+    case 'SET_PASSWORD':
+      return 'Passwort gespeichert'
+    case 'START_LONE_WORK':
+      return 'Alleinarbeits-Timer gestartet'
+    case 'EXTEND_LONE_WORK':
+      return 'Lebenszeichen erhalten – Timer verlängert'
+    case 'COMPLETE_LONE_WORK':
+      return 'Alleinarbeit sicher beendet'
+    case 'RESET':
+      return 'Demo zurückgesetzt'
+    default:
+      return null
+  }
+}
+
+// ---------- Provider ----------
+
+/** Konto auf das Erstpasswort setzen, Änderung bei der nächsten Anmeldung erzwingen */
+function withInitialPassword(user: User): User {
+  const salt = randomSalt()
+  return { ...user, passwordSalt: salt, passwordHash: hashPassword(LIVE_INITIAL_PASSWORD, salt), mustChangePassword: true }
+}
+
+/**
+ * Sicherstellen, dass mindestens ein Konto anmeldefähig bleibt. Gibt es keines,
+ * erhalten alle Administratoren das Erstpasswort mit erzwungener Änderung; fehlt
+ * auch ein Administrator, wird das Konto aus der Grundkonfiguration wiederhergestellt.
+ */
+function ensureLoginPossible(users: User[]): User[] {
+  if (users.some((u) => u.passwordHash && u.passwordSalt)) return users
+  if (users.some((u) => u.role === 'admin')) {
+    return users.map((u) => (u.role === 'admin' ? withInitialPassword(u) : u))
+  }
+  const rescue = SEED_USERS.find((u) => u.role === 'admin')
+  if (!rescue) return users
+  return [withInitialPassword({ ...rescue, passwordHash: undefined, passwordSalt: undefined }), ...users.filter((u) => u.id !== rescue.id)]
+}
+
+/**
+ * Gespeicherte Stände auf die Anmeldung umstellen. Ältere Stände kennen weder
+ * Benutzerverzeichnis noch Sitzung; sie erhalten das Verzeichnis des Modus.
+ * Demo-Passwörter gelten nur im Demo-Modus; Live-Bestände, denen eine frühere
+ * Fassung ein Demo-Passwort zugewiesen hat, werden auf das Erstpasswort gesetzt.
+ */
+/**
+ * Gespeicherten Stand auf die aktuelle Form bringen.
+ *
+ * Ältere Versionen der App kannten weder Gruppen, Standorte, Szenarien noch
+ * Notrufnummern im Zustand – diese Felder fehlen dort schlicht. Ohne Auffüllen
+ * stünde beim Start `undefined` statt einer Liste, und die App stürzt beim
+ * ersten Zugriff ab.
+ */
+export function fuelleFehlendeFelder(parsed: Partial<MobileState>, mode: AppMode): MobileState {
+  const fallback = initialState(mode)
+  return {
+    ...fallback,
+    ...parsed,
+    mode,
+    users: parsed.users ?? fallback.users,
+    groups: parsed.groups ?? fallback.groups,
+    locations: parsed.locations ?? fallback.locations,
+    scenarios: parsed.scenarios ?? fallback.scenarios,
+    contacts: parsed.contacts ?? fallback.contacts,
+    alarms: parsed.alarms ?? [],
+    loneWorkSessions: parsed.loneWorkSessions ?? [],
+  }
+}
+
+function migrateAuth(roh: Partial<MobileState>, mode: AppMode): MobileState {
+  const parsed = fuelleFehlendeFelder(roh, mode)
+  const fallback = initialState(mode)
+  const seedById = new Map(SEED_USERS.map((u) => [u.id, u]))
+  let users = parsed.users?.length ? parsed.users : fallback.users
+
+  if (mode === 'demo') {
+    users = users.map((u) => {
+      if (u.passwordHash && u.passwordSalt) return u
+      const seed = seedById.get(u.id)
+      return seed?.passwordHash && seed.passwordSalt
+        ? { ...u, passwordSalt: seed.passwordSalt, passwordHash: seed.passwordHash }
+        : u
+    })
+  }
+
+  if (mode === 'live' && (parsed.authVersion ?? 0) < AUTH_MIGRATION_VERSION) {
+    const seedHashes = new Set(SEED_USERS.map((u) => u.passwordHash))
+    users = users.map((u) => (u.passwordHash && seedHashes.has(u.passwordHash) ? withInitialPassword(u) : u))
+  }
+
+  // Im Live-Modus liefert der Server die Konten – lokal wird nichts erzeugt
+  users = mode === 'demo' ? ensureLoginPossible(users) : users
+  const session = parsed.session ?? null
+  return {
+    ...parsed,
+    mode,
+    authVersion: AUTH_MIGRATION_VERSION,
+    users,
+    session: session && users.some((u) => u.id === session.userId) ? session : null,
+    // Im Live-Modus ist die Liste vor der Anmeldung leer – dann bleibt sie leer
+    currentUserId: users.some((u) => u.id === parsed.currentUserId) ? parsed.currentUserId : (users[0]?.id ?? ''),
+  }
+}
+
+async function loadStateForMode(mode: AppMode): Promise<MobileState> {
+  try {
+    const raw = await AsyncStorage.getItem(DATA_KEYS[mode])
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<MobileState>
+      if (parsed.currentUserId) return migrateAuth(parsed, mode)
+    }
+  } catch {
+    // korrupte Daten -> Ausgangszustand
+  }
+  return initialState(mode)
+}
+
+export type ServerStatus = 'lokal' | 'verbindet' | 'verbunden' | 'getrennt'
+
+interface StoreCtx {
+  state: MobileState
+  dispatch: React.Dispatch<Action>
+  switchMode: (mode: AppMode) => void
+  /** Anmelden – im Demo-Modus lokal, im Live-Modus über den Alarmserver */
+  login: (email: string, password: string) => Promise<{ ok: true } | { ok: false; error: string }>
+  logout: () => void
+  changePassword: (aktuell: string, neu: string) => Promise<{ ok: true } | { ok: false; error: string }>
+  serverStatus: ServerStatus
+  /** Bei der Anmeldung eingegebenes Passwort – nur im Arbeitsspeicher */
+  knownPassword: string | null
+  refresh: () => void
+  toasts: Toast[]
+  hydrated: boolean
+}
+
+const StoreContext = createContext<StoreCtx | null>(null)
+
+/**
+ * Eine Aktion im Live-Modus auf dem Server ausführen. Der Server ist dort die
+ * einzige Wahrheit; der neue Stand kommt anschliessend über /state zurück.
+ */
+async function serverEffekt(action: Action): Promise<boolean> {
+  switch (action.type) {
+    case 'TRIGGER_ALARM': {
+      const a = action.alarm
+      await api.triggerAlarm({
+        scenarioId: a.scenarioId, message: a.message, silent: a.silent, requireAck: a.requireAck,
+        channels: a.channels, groupIds: a.groupIds, locationIds: a.locationIds,
+        triggeredVia: 'app', escalation: a.escalation,
+        recipientUserIds: [...new Set(a.deliveries.map((d) => d.userId))],
+      })
+      return true
+    }
+    case 'END_ALARM':
+      await api.endAlarm(action.alarmId)
+      return true
+    case 'ACK_ALARM':
+      await api.ackAlarm(action.alarmId, action.ack)
+      return true
+    case 'START_LONE_WORK': {
+      const s = action.session
+      await api.startLoneWork({ activity: s.activity, durationMin: s.durationMin, locationId: s.locationId, silent: s.silent })
+      return true
+    }
+    case 'EXTEND_LONE_WORK':
+      await api.extendLoneWork(action.sessionId, action.minutes)
+      return true
+    case 'COMPLETE_LONE_WORK':
+      await api.completeLoneWork(action.sessionId)
+      return true
+    default:
+      return false
+  }
+}
+
+export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const [state, rawDispatch] = useReducer(reducer, undefined, () => initialState('demo'))
+  const stateRef = useRef(state)
+  stateRef.current = state
+  const [hydrated, setHydrated] = useState(false)
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const toastId = useRef(0)
+  const [serverStatus, setServerStatus] = useState<ServerStatus>('lokal')
+  const [knownPassword, setKnownPassword] = useState<string | null>(null)
+
+  const pushToast = useCallback((message: string, kind: Toast['kind'] = 'success') => {
+    const id = ++toastId.current
+    setToasts((t) => [...t.slice(-1), { id, message, kind }])
+    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500)
+  }, [])
+
+  /** Datenbestand vom Alarmserver holen */
+  const refresh = useCallback(async () => {
+    if (stateRef.current.mode !== 'live') return
+    if (!authToken()) {
+      setServerStatus('getrennt')
+      return
+    }
+    try {
+      const [{ user }, daten] = await Promise.all([api.me(), api.state()])
+      rawDispatch({ type: 'ADOPT_SERVER', data: daten, session: { userId: user.id, loginAt: Date.now() } })
+      setServerStatus('verbunden')
+    } catch (fehler) {
+      if (fehler instanceof ApiError && fehler.status === 401) {
+        await setAuthToken(null)
+        rawDispatch({ type: 'LOGOUT' })
+        setServerStatus('verbunden')
+      } else {
+        setServerStatus('getrennt')
+      }
+    }
+  }, [])
+
+  /** Push-Token dieses Geräts beim Alarmserver hinterlegen */
+  const registerPush = useCallback(async () => {
+    try {
+      const pushToken = await getPushToken()
+      if (!pushToken) return
+      // Der Server braucht die Stufe pro Gerät: Critical Alert nur dort, wo erlaubt
+      await api.registerPush(pushToken, await criticalAlertsGranted())
+    } catch {
+      // Push ist eine Zusatzfunktion, keine Voraussetzung
+    }
+  }, [])
+
+  const login = useCallback<StoreCtx['login']>(async (email, password) => {
+    if (stateRef.current.mode === 'demo') {
+      const ergebnis = authenticate(stateRef.current.users, email, password)
+      if (!ergebnis.ok) return { ok: false, error: ergebnis.error }
+      setKnownPassword(password)
+      rawDispatch({ type: 'LOGIN', userId: ergebnis.user.id })
+      return { ok: true }
+    }
+    try {
+      const { token } = await api.login(email, password)
+      await setAuthToken(token)
+      setKnownPassword(password)
+      await refresh()
+      // Gerät für echte Push-Nachrichten anmelden; scheitert es, bleibt die
+      // Anmeldung trotzdem gültig – Alarme erscheinen dann nur in der App
+      void registerPush()
+      return { ok: true }
+    } catch (fehler) {
+      return { ok: false, error: fehler instanceof ApiError ? fehler.message : 'Anmeldung fehlgeschlagen.' }
+    }
+  }, [refresh, registerPush])
+
+  const logout = useCallback(() => {
+    if (stateRef.current.mode === 'live') {
+      void getPushToken().then((t) => (t ? api.unregisterPush(t) : undefined)).catch(() => undefined)
+      api.logout().catch(() => {
+        // Server nicht erreichbar – lokal trotzdem abmelden
+      })
+      void setAuthToken(null)
+    }
+    setKnownPassword(null)
+    rawDispatch({ type: 'LOGOUT' })
+    pushToast('Abgemeldet')
+  }, [pushToast])
+
+  const changePassword = useCallback<StoreCtx['changePassword']>(async (aktuell, neu) => {
+    const eigen = stateRef.current.users.find((u) => u.id === stateRef.current.session?.userId)
+    if (!eigen) return { ok: false, error: 'Nicht angemeldet.' }
+
+    if (stateRef.current.mode === 'demo') {
+      if (!verifyPassword(eigen, aktuell)) return { ok: false, error: 'Das aktuelle Passwort ist falsch.' }
+      const problem = passwordProblem(neu)
+      if (problem) return { ok: false, error: problem }
+      rawDispatch({ type: 'SET_PASSWORD', userId: eigen.id, password: neu })
+      setKnownPassword(neu)
+      pushToast('Passwort gespeichert')
+      return { ok: true }
+    }
+    try {
+      await api.changePassword(aktuell, neu)
+      setKnownPassword(neu)
+      await refresh()
+      pushToast('Passwort gespeichert')
+      return { ok: true }
+    } catch (fehler) {
+      return { ok: false, error: fehler instanceof ApiError ? fehler.message : 'Passwort konnte nicht geändert werden.' }
+    }
+  }, [pushToast, refresh])
+
+  const dispatch = useCallback(
+    (action: Action) => {
+      if (stateRef.current.mode === 'live') {
+        if (action.type === 'LOGIN' || action.type === 'LOGOUT') {
+          rawDispatch(action)
+          return
+        }
+        serverEffekt(action)
+          .then((behandelt) => {
+            if (!behandelt) {
+              rawDispatch(action)
+              return
+            }
+            if (action.type === 'TRIGGER_ALARM' && !action.alarm.silent) {
+              const scenario = stateRef.current.scenarios.find((s) => s.id === action.alarm.scenarioId)
+              notifyNow(scenario ? `Alarm: ${scenario.title}` : 'Alarm ausgelöst', action.alarm.message, true)
+            }
+            const t = toastForAction(action)
+            if (t) {
+              if (typeof t === 'string') pushToast(t)
+              else pushToast(t.message, t.kind)
+            }
+            return refresh()
+          })
+          .catch((fehler) => {
+            pushToast(fehler instanceof ApiError ? fehler.message : 'Der Alarmserver hat die Aktion abgelehnt.', 'alarm')
+          })
+        return
+      }
+
+      rawDispatch(action)
+      if (action.type === 'TRIGGER_ALARM' && !action.alarm.silent) {
+        const scenario = stateRef.current.scenarios.find((s) => s.id === action.alarm.scenarioId)
+        notifyNow(scenario ? `Alarm: ${scenario.title}` : 'Alarm ausgelöst', action.alarm.message, true)
+      }
+      const t = toastForAction(action)
+      if (t) {
+        if (typeof t === 'string') pushToast(t)
+        else pushToast(t.message, t.kind)
+      }
+    },
+    [pushToast, refresh],
+  )
+
+  useEffect(() => {
+    loadApiSettings()
+      .then(() => AsyncStorage.getItem(MODE_KEY))
+      .then((stored) => loadStateForMode(stored === 'live' ? 'live' : 'demo'))
+      .then((loaded) => rawDispatch({ type: 'HYDRATE', state: loaded }))
+      .catch(() => {
+        // kein Storage verfügbar -> Demo-Ausgangszustand
+      })
+      .finally(() => setHydrated(true))
+  }, [])
+
+  useEffect(() => {
+    if (!hydrated) return
+    // Live-Daten gehören dem Server; lokal wird nur der Modus gemerkt
+    if (state.mode === 'demo') AsyncStorage.setItem(DATA_KEYS.demo, JSON.stringify(state)).catch(() => {})
+    AsyncStorage.setItem(MODE_KEY, state.mode).catch(() => {})
+  }, [state, hydrated])
+
+  const switchMode = useCallback(
+    (mode: AppMode) => {
+      if (stateRef.current.mode === mode) return
+      loadStateForMode(mode).then((loaded) => {
+        rawDispatch({ type: 'HYDRATE', state: loaded })
+        pushToast(
+          mode === 'live'
+            ? 'Live-Modus aktiv – Daten vom Alarmserver'
+            : 'Demo-Modus aktiv – Zustellung wird simuliert',
+        )
+      })
+    },
+    [pushToast],
+  )
+
+  // Im Live-Modus regelmässig abgleichen. React Native kennt kein EventSource,
+  // deshalb wird abgefragt statt abonniert – im Vordergrund alle fünf Sekunden.
+  useEffect(() => {
+    if (!hydrated || state.mode !== 'live') {
+      setServerStatus('lokal')
+      return
+    }
+    setServerStatus('verbindet')
+    void refresh()
+    if (!state.session) return
+    const interval = setInterval(() => void refresh(), 5000)
+    return () => clearInterval(interval)
+  }, [hydrated, state.mode, state.session?.userId, refresh])
+
+  // Simulation nur im Demo-Modus; im Live-Betrieb rechnet der Server
+  useEffect(() => {
+    if (state.mode !== 'demo') return
+    const interval = setInterval(() => rawDispatch({ type: 'TICK', now: Date.now() }), 1000)
+    return () => clearInterval(interval)
+  }, [state.mode])
+
+  return (
+    <StoreContext.Provider
+      value={{ state, dispatch, switchMode, login, logout, changePassword, serverStatus, knownPassword, refresh: () => void refresh(), toasts, hydrated }}
+    >
+      {children}
+    </StoreContext.Provider>
+  )
+}
+
+export function useStore() {
+  const ctx = useContext(StoreContext)
+  if (!ctx) throw new Error('useStore muss innerhalb von StoreProvider verwendet werden')
+  return ctx
+}
+
+export { SEED_GROUPS }

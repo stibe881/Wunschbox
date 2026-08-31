@@ -1,0 +1,19 @@
+# Beispiel für systemd: /etc/systemd/system/sobe-notfall.service
+# Danach:  sudo systemctl daemon-reload && sudo systemctl enable --now sobe-notfall
+[Unit]
+Description=SOBE Notfall Alarmserver
+After=network.target
+
+[Service]
+Type=simple
+User=sobe
+WorkingDirectory=/opt/sobe-notfall/server
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=3
+Environment=PORT=3001
+# Zugangstoken von expo.dev, nötig für den iOS-Build über den Update-Knopf
+# Environment=EXPO_TOKEN=...
+
+[Install]
+WantedBy=multi-user.target
