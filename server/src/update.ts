@@ -56,8 +56,12 @@ export function ladeLetztenJob(): UpdateJob | null {
   if (!roh) return null
   try {
     const job = JSON.parse(roh) as UpdateJob
-    // Ein Auftrag, der beim Neustart unterbrochen wurde, gilt als abgeschlossen
-    if (job.status === 'laufend' && !laufenderJob) {
+    // Ein gespeicherter Auftrag stammt aus einem früheren Prozess, sobald in
+    // diesem keiner mehr läuft. Dann ist er abgeschlossen: «laufend» wurde vom
+    // Neustart unterbrochen, «neustart» hat stattgefunden – sonst liefe dieser
+    // Server nicht. Ohne diese Umschreibung bliebe der Auftrag dauerhaft auf
+    // «Server startet neu» stehen und der Dialog zeigte nie wieder eine Auswahl.
+    if (!laufenderJob && (job.status === 'laufend' || job.status === 'neustart')) {
       return { ...job, status: 'erfolgreich', finishedAt: job.finishedAt ?? Date.now() }
     }
     return job
