@@ -27,9 +27,13 @@ Entitlements file defines the value "com.apple.developer.usernotifications.time-
 which is not registered for profile
 ```
 
-Grund: Der Update-Knopf baut ohne Rückfragen. In diesem Betrieb kann EAS sich
-nicht am Apple Developer Portal anmelden und die Berechtigung dort nicht
-nachtragen – es verwendet das vorhandene Profil, und dem fehlt sie.
+Grund: Der `EXPO_TOKEN` auf dem Server weist den Server gegenüber **Expo** aus,
+nicht gegenüber **Apple**. Er genügt, um einen Build zu starten. Sobald aber
+etwas im Apple Developer Portal geändert werden muss – und das Nachtragen einer
+Berechtigung ins Bereitstellungsprofil ist genau das –, verlangt Apple eine
+Anmeldung mit Zwei-Faktor-Bestätigung. Danach kann der Update-Knopf nicht
+fragen, weil er ohne Rückfragen läuft. Er verwendet deshalb das vorhandene
+Profil, und dem fehlt die Berechtigung.
 
 ### Einmalig einrichten
 
@@ -42,11 +46,16 @@ Der Eintrag steht bereits in `mobile/app.json`:
 ```
 
 Damit ein Build gelingt, muss die Berechtigung noch im Bereitstellungsprofil
-verankert werden. Dafür genügt ein einziger Build vom eigenen Rechner aus, mit
-Rückfragen: Dabei meldet sich EAS bei Apple an, trägt die Berechtigung ein und
-erneuert das Profil.
+verankert werden. Dafür genügt ein einziger Build **mit Rückfragen**: Dabei
+meldet sich EAS bei Apple an, trägt die Berechtigung ein und erneuert das
+Profil.
 
-1. Vom eigenen Rechner bauen – **ohne** `--non-interactive`:
+Wo Sie das tun, ist gleichgültig – am eigenen Rechner oder über SSH auf dem
+Server. Nötig ist nur, dass jemand dabeisitzt, der den Apple-Bestätigungscode
+eingeben kann. Am eigenen Rechner ist es meist bequemer, weil Node und die
+Abhängigkeiten der App dort schon liegen.
+
+1. Bauen – **ohne** `--non-interactive`:
 
    ```bash
    cd mobile
@@ -81,9 +90,9 @@ startet dann wie vorgesehen neu.
 
 ### Einmalig einrichten
 
-Denselben Build **einmal mit Rückfragen** vom eigenen Rechner starten. Dabei
-fragt EAS nach den Apple-Zugangsdaten, legt die Übermittlungsdaten beim Projekt
-ab und verwendet sie danach auch ohne Rückfragen:
+Denselben Build **einmal mit Rückfragen** starten. Dabei fragt EAS nach den
+Apple-Zugangsdaten, legt die Übermittlungsdaten beim Projekt ab und verwendet
+sie danach auch ohne Rückfragen:
 
 ```bash
 cd mobile
@@ -108,6 +117,32 @@ npx eas-cli submit --platform ios --latest
 ```
 
 Oder im Expo-Dashboard beim fertigen Build auf «Submit to App Store» gehen.
+
+### Ohne Zwei-Faktor: der App-Store-Connect-Schlüssel
+
+Wer die Rückfrage dauerhaft loswerden will, legt bei Apple einen
+API-Schlüssel an – der kommt ohne Zwei-Faktor-Bestätigung aus und lässt sich
+deshalb auf einem Server verwenden.
+
+1. In App Store Connect unter **Benutzer und Zugriff → Integrationen** einen
+   Schlüssel erstellen. Notieren: Issuer ID, Key ID, und die Datei `.p8`
+   herunterladen – sie lässt sich nur einmal laden.
+2. Den Schlüssel bei Expo hinterlegen:
+
+   ```bash
+   cd mobile
+   npx eas-cli credentials
+   ```
+
+   Dort iOS wählen und den Schlüssel für die Übermittlung hochladen.
+
+Danach übermittelt der Update-Knopf ohne Rückfragen. Die Datei `.p8` bleibt
+bei Expo; sie gehört nicht ins Projektverzeichnis und nicht in die
+Versionsverwaltung.
+
+Für den Build selbst bleibt der eine Durchgang mit Apple-Anmeldung nötig,
+solange sich am Bereitstellungsprofil etwas ändert – also beim Nachtragen der
+Berechtigungen oben. Danach nicht mehr.
 
 ---
 
