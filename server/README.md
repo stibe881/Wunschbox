@@ -173,8 +173,13 @@ privates Repository muss dort ein Deploy-Key (SSH) oder ein Token im
 Anmeldespeicher hinterlegt sein – sonst scheitert der Schritt mit einer
 Zugriffsmeldung im Protokoll.
 
-**iOS-Build.** Für die zweite Auswahl braucht der Server ein Zugangstoken von
-expo.dev als `EXPO_TOKEN`:
+**iOS-Build.** Der Build läuft mit `EAS_NO_VCS=1`. Ohne das verlangt eas-cli im
+nicht interaktiven Betrieb ein sauberes Git-Verzeichnis – nach `npm install`
+sind die Lock-Dateien aber häufig verändert, und der Build bräche nach allen
+anderen Schritten ab. Mit dieser Einstellung packt EAS das Arbeitsverzeichnis
+direkt und beachtet dabei weiterhin `.gitignore` und `.easignore`.
+
+Zusätzlich braucht der Server ein Zugangstoken von expo.dev als `EXPO_TOKEN`:
 
 1. Auf [expo.dev](https://expo.dev) unter *Account settings → Access tokens*
    ein Token erstellen.

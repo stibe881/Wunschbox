@@ -104,6 +104,7 @@ function fuehreAus(
   arbeitsverzeichnis: string,
   beiAusgabe: (text: string) => void,
   timeoutMs = 45 * 60_000,
+  zusatzUmgebung: Record<string, string> = {},
 ): Promise<BefehlErgebnis> {
   return new Promise((fertig) => {
     let ausgabe = ''
@@ -115,7 +116,7 @@ function fuehreAus(
 
     const kind = spawn(befehl, argumente, {
       cwd: arbeitsverzeichnis,
-      env: { ...process.env, CI: '1', npm_config_fund: 'false', npm_config_audit: 'false' },
+      env: { ...process.env, CI: '1', npm_config_fund: 'false', npm_config_audit: 'false', ...zusatzUmgebung },
       shell: false,
     })
     const uhr = setTimeout(() => {
@@ -204,6 +205,8 @@ interface SchrittDefinition {
   /** Fehler hier bricht den Auftrag nicht ab */
   optional?: boolean
   timeoutMs?: number
+  /** Zusätzliche Umgebungsvariablen nur für diesen Schritt */
+  umgebung?: Record<string, string>
 }
 
 function schrittPlan(scope: UpdateScope): SchrittDefinition[] {
@@ -246,6 +249,12 @@ function schrittPlan(scope: UpdateScope): SchrittDefinition[] {
         argumente: ['--yes', 'eas-cli', 'build', '--platform', 'ios', '--profile', 'production', '--non-interactive', '--auto-submit'],
         verzeichnis: (r) => resolve(r, 'mobile'),
         timeoutMs: 60 * 60_000,
+        // Ohne diese Einstellung verlangt eas-cli im nicht interaktiven Betrieb
+        // ein sauberes Git-Verzeichnis. Nach npm install sind die Lock-Dateien
+        // aber oft verändert, und der Build bräche nach allen anderen Schritten
+        // ab. Mit EAS_NO_VCS packt EAS das Arbeitsverzeichnis direkt und
+        // beachtet dabei weiterhin .gitignore und .easignore.
+        umgebung: { EAS_NO_VCS: '1' },
       },
     )
   }
@@ -302,6 +311,7 @@ async function abarbeiten(job: UpdateJob, plan: SchrittDefinition[]): Promise<vo
         }
       },
       definition.timeoutMs,
+      definition.umgebung,
     )
 
     schritt.ausgabe = ausgabe
