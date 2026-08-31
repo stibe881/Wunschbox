@@ -156,6 +156,18 @@ function ScenarioDetail({ scenario, onClose }: { scenario: Scenario; onClose: ()
       </div>
       <div className="grid md:grid-cols-2 gap-6">
         <div>
+          {(scenario.callGuidance?.length ?? 0) > 0 && (
+            <>
+              <h4 className="font-semibold text-slate-700 mb-2">Alarmieren – wann anrufen und was sagen</h4>
+              <ul className="space-y-1.5 mb-5">
+                {scenario.callGuidance!.map((hinweis, i) => (
+                  <li key={i} className="flex gap-2 text-sm text-slate-700">
+                    <span className="text-slate-400 shrink-0">–</span> {hinweis}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <h4 className="font-semibold text-slate-700 mb-2">Sofortmassnahmen</h4>
           <ol className="space-y-2">
             {scenario.instructions.map((step, i) => (
@@ -244,6 +256,7 @@ function ScenarioEditor({ scenario, onClose }: { scenario: Scenario; onClose: ()
       type: 'UPSERT_SCENARIO',
       scenario: {
         ...draft,
+        callGuidance: (draft.callGuidance ?? []).filter((s) => s.trim()),
         instructions: draft.instructions.filter((s) => s.trim()),
         followUp: draft.followUp.filter((s) => s.trim()),
         checklist: draft.checklist.filter((s) => s.trim()),
@@ -288,6 +301,14 @@ function ScenarioEditor({ scenario, onClose }: { scenario: Scenario; onClose: ()
             </button>
           ))}
         </div>
+      </Field>
+      <Field label="Alarmieren: wann anrufen und was sagen (eine Zeile pro Hinweis)">
+        <textarea
+          className={inputClass} rows={5}
+          placeholder="z. B. Feuerwehr 118 anrufen – bei jedem Brand, auch bei einem kleinen."
+          value={(draft.callGuidance ?? []).join('\n')}
+          onChange={(e) => setDraft({ ...draft, callGuidance: e.target.value.split('\n') })}
+        />
       </Field>
       <Field label="Sofortmassnahmen (eine pro Zeile – klar und präzise, unter Stress verständlich)">
         <textarea

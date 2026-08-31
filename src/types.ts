@@ -77,6 +77,12 @@ export interface Scenario {
   /** Verknüpfte Notfallkontakte (extern) */
   contactIds: string[]
   /**
+   * Was beim Notruf zu sagen ist und wann überhaupt einer nötig ist.
+   * Gehört in die Phase «Alarmieren» – die Sofortmassnahmen enthalten deshalb
+   * keine Anweisungen mehr zum Anrufen oder Auslösen.
+   */
+  callGuidance?: string[]
+  /**
    * Schweizer Rechtsgrundlagen und Normen, die für dieses Szenario gelten.
    * Orientierungshilfe – keine Rechtsberatung.
    */

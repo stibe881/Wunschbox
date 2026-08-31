@@ -2,17 +2,22 @@ import type { AppState, Scenario, User, Group, Location, AlarmPlan, AlarmButton,
 
 // Vorkonfigurierte Notfallszenarien für das heilpädagogische Kompetenzzentrum SONNENBERG
 /** Inhaltsversion der Standard-Szenarien – bei Erhöhung werden sie beim Laden aktualisiert */
-export const SCENARIO_CONTENT_VERSION = 3
+export const SCENARIO_CONTENT_VERSION = 4
 
 export const SEED_SCENARIOS: Scenario[] = [
   {
     id: 'sc-brand', icon: 'flame', title: 'Brand / Feuer', category: 'Gebäude & Technik', priority: 'hoch', silentDefault: false,
     defaultChannels: ['push', 'sms', 'tts'], responsibleGroupIds: ['gr-alle'], contactIds: ['ec-118', 'ec-144'],
+    callGuidance: [
+      'Feuerwehr 118 anrufen – bei jedem Brand, auch bei einem kleinen und selbst gelöschten.',
+      'In dieser Reihenfolge melden: Wer meldet (Name, Rückrufnummer), wo (Standort, Gebäude, Stockwerk, Raum), was brennt, wie viele Personen betroffen sind, ob Menschen in Gefahr sind.',
+      'Ausdrücklich sagen: Sonderschule mit Kindern, die das Gebäude nicht selbständig verlassen können.',
+      'Bei Verletzten oder Rauchgaseinwirkung zusätzlich Sanitätsnotruf 144.',
+      'Leitung offen halten, bis die Notrufzentrale das Gespräch beendet – nicht selbst auflegen.',
+    ],
     instructions: [
       'Eigenschutz zuerst: Nur handeln, solange Sie sich selbst nicht gefährden. Rauch ist gefährlicher als Feuer.',
       'Personen aus dem unmittelbaren Gefahrenbereich bringen – Türe zum Brandraum schliessen, nicht abschliessen.',
-      'Feuerwehr 118 alarmieren: Wer meldet, wo (Standort, Gebäude, Stockwerk, Raum), was brennt, wie viele Personen betroffen, Menschen in Gefahr?',
-      'Alarm in der App auslösen – alle Mitarbeitenden am betroffenen Standort werden sofort benachrichtigt.',
       'Nur einen Entstehungsbrand mit dem Handfeuerlöscher bekämpfen. Bei Rauchentwicklung im Raum: sofort raus.',
       'Klasse geschlossen über den nächsten freien Fluchtweg zum Sammelplatz führen – Klassenliste mitnehmen, keine Aufzüge benutzen.',
       'Schüler:innen mit Mobilitätseinschränkung nach dem persönlichen Evakuationsplan begleiten; im Notfall in einen sicheren Bereich hinter einer Brandschutztüre bringen und den Standort sofort der Feuerwehr melden.',
@@ -49,8 +54,13 @@ export const SEED_SCENARIOS: Scenario[] = [
   {
     id: 'sc-evak', icon: 'door-open', title: 'Evakuierung', category: 'Gebäude & Technik', priority: 'hoch', silentDefault: false,
     defaultChannels: ['push', 'sms', 'tts'], responsibleGroupIds: ['gr-alle'], contactIds: ['ec-118', 'ec-117'],
+    callGuidance: [
+      'Die Räumung kann intern angeordnet werden. Ein Notruf ist nötig, wenn ein Ereignis dahintersteht: Brand 118, Bedrohung 117, Verletzte 144.',
+      'Melden: Standort und Gebäude, Grund der Räumung, ungefähre Anzahl Personen, Sammelplatz und Zufahrt für die Einsatzkräfte.',
+      'Immer erwähnen: Sonderschule mit Kindern, die begleitet oder getragen werden müssen – das bestimmt, wie viele Einsatzkräfte aufgeboten werden.',
+      'Hat eine Blaulichtorganisation die Räumung angeordnet, gelten ihre Anweisungen; keine parallelen Aufträge an die Mitarbeitenden.',
+    ],
     instructions: [
-      'Evakuierungsalarm in der App auslösen und den betroffenen Standort wählen – alle Mitarbeitenden dort erhalten die Meldung.',
       'Unterricht oder Therapie sofort beenden. Ruhige, bestimmte Ansage: «Wir gehen jetzt gemeinsam nach draussen.»',
       'Klasse sammeln, anhand der Klassenliste zählen und die Liste mitnehmen.',
       'Schüler:innen mit besonderem Unterstützungsbedarf nach ihrem persönlichen Evakuationsplan begleiten – festgelegte Begleitperson, Tragehilfe, Evakuationsstuhl.',
@@ -88,15 +98,21 @@ export const SEED_SCENARIOS: Scenario[] = [
   {
     id: 'sc-medizin', icon: 'heart-pulse', title: 'Medizinischer Notfall', category: 'Gesundheit', priority: 'hoch', silentDefault: false,
     defaultChannels: ['push', 'voice'], responsibleGroupIds: ['gr-ersthelfer'], contactIds: ['ec-144', 'ec-145', 'ec-1414'],
+    callGuidance: [
+      'Sanitätsnotruf 144 anrufen bei gestörtem Bewusstsein oder gestörter Atmung, starker Blutung, Krampfanfall über fünf Minuten, Verdacht auf Vergiftung – und immer dann, wenn Sie unsicher sind. Unsicherheit ist ein Grund zu rufen, kein Grund zu warten.',
+      'Melden: Wo genau (Standort, Gebäude, Raum, Zufahrt), was ist passiert, wie viele Betroffene, welche Verletzungen oder Beschwerden, Rückrufnummer.',
+      'Alter und Beeinträchtigung der betroffenen Person nennen, dazu bekannte Diagnosen und Medikamente vom Notfallblatt.',
+      'Leitung offen halten und den Anweisungen der Notrufzentrale folgen – sie leitet bei Bedarf durch die Wiederbelebung.',
+      'Bei Vergiftungsverdacht Tox Info Suisse 145: Substanz, Menge und Zeitpunkt bereithalten.',
+      'Bei schwer erreichbarem Ort oder langem Anfahrtsweg zusätzlich Rega 1414.',
+    ],
     instructions: [
       'Eigenschutz und Übersicht: Gefahrenquelle beseitigen, weitere Kinder aus dem Bereich führen.',
       'Bewusstsein prüfen (ansprechen, anfassen), dann Atmung prüfen (Kopf überstrecken, 10 Sekunden hören, sehen, fühlen).',
-      'Sanitätsnotruf 144 alarmieren: Wo genau, was ist passiert, wie viele Betroffene, welche Verletzungen, Rückrufnummer. Leitung offen halten.',
-      'Alarm in der App auslösen – Ersthelfende am Standort kommen mit Notfallrucksack und Defibrillator.',
       'Keine Atmung: sofort Herzdruckmassage 30:2 beginnen, Defibrillator holen lassen und anwenden, bis der Rettungsdienst übernimmt.',
       'Bewusstlos mit normaler Atmung: stabile Seitenlage, Atmung laufend kontrollieren, warm halten.',
       'Ansprechbar: beruhigen, hinlegen oder bequem lagern, Blutungen mit Druckverband stillen, nicht allein lassen.',
-      'Bei Vergiftungsverdacht Tox Info Suisse 145 anrufen; Substanz, Menge und Zeitpunkt bereithalten. Nichts zu trinken geben, kein Erbrechen auslösen.',
+      'Bei Vergiftungsverdacht nichts zu trinken geben und kein Erbrechen auslösen; Substanz, Verpackung oder Erbrochenes für den Rettungsdienst sicherstellen.',
       'Notfallmedikamente nur nach ärztlicher Verordnung und schriftlicher Ermächtigung der Erziehungsberechtigten verabreichen – Zeitpunkt und Dosis sofort notieren.',
       'Rettungsdienst an der vereinbarten Zufahrt abholen und einweisen.',
     ],
@@ -131,15 +147,21 @@ export const SEED_SCENARIOS: Scenario[] = [
   {
     id: 'sc-gewalt', icon: 'hand', title: 'Herausforderndes Verhalten', category: 'Schüler:innen', priority: 'hoch', silentDefault: true,
     defaultChannels: ['push'], responsibleGroupIds: ['gr-paed'], contactIds: ['ec-117'],
+    callGuidance: [
+      'Hier gilt der stille Alarm: Das Deeskalationsteam wird ohne Ton und ohne Aufsehen aufgeboten. Keine laute Ansage, kein Publikum.',
+      'Polizei 117 nur, wenn Waffen im Spiel sind, Dritte unmittelbar gefährdet sind oder die Lage trotz Deeskalation entgleitet.',
+      'Beim Notruf sachlich melden: Standort und Zufahrt, wie viele Personen beteiligt sind, ob Waffen vorhanden sind, was bisher versucht wurde.',
+      'Ausdrücklich sagen, dass die betroffene Person eine kognitive Beeinträchtigung hat – das verändert das Vorgehen der Polizei vor Ort.',
+      'Bei Verletzungen zusätzlich Sanitätsnotruf 144.',
+    ],
     instructions: [
-      'Stiller Alarm in der App auslösen – das Deeskalationsteam kommt ohne Aufsehen. Keine laute Ansage, kein Publikum.',
       'Andere Schüler:innen aus dem Raum oder aus der Situation führen – Reizreduktion ist die wirksamste Sofortmassnahme.',
       'Eigenschutz: Fluchtweg für sich selbst freihalten, Abstand halten, nicht in die Enge treiben, nicht zwischen Person und Türe stellen.',
       'Ruhige, tiefe Stimme, kurze Sätze, Namen verwenden, keine Diskussion, keine Drohungen und keine Ultimaten.',
       'Reize senken: Lärm, Licht und Zuschauer reduzieren, gewohnte Bezugsperson übernimmt die Kommunikation.',
       'Individuellen Deeskalationsplan der Person anwenden, falls vorhanden – bekannte Auslöser, Signalwörter, Rückzugsort.',
       'Körperliche Intervention nur als letztes Mittel zur Abwehr einer unmittelbaren Gefahr für Leib und Leben – so kurz und so mild wie möglich, nie allein, nie in Bauchlage, Atmung immer im Blick.',
-      'Bei Waffen, anhaltender Gefahr für Dritte oder wenn die Lage entgleitet: Polizei 117 rufen und den Bereich räumen.',
+      'Entgleitet die Lage trotz allem: Bereich räumen, sich selbst in Sicherheit bringen und die Polizei beiziehen – siehe Schritt «Alarmieren».',
     ],
     followUp: [
       'Nachsorge für die betroffene Person: Rückzugsort, vertraute Bezugsperson, keine Sanktion in der Erregungsphase.',
@@ -170,13 +192,19 @@ export const SEED_SCENARIOS: Scenario[] = [
   {
     id: 'sc-person', icon: 'lock-open', title: 'Verdächtige Person auf dem Areal', category: 'Sicherheit', priority: 'hoch', silentDefault: true,
     defaultChannels: ['push'], responsibleGroupIds: ['gr-sicherheit', 'gr-krisenstab'], contactIds: ['ec-117'],
+    callGuidance: [
+      'Stiller Alarm: Sicherheitsverantwortliche und Krisenstab werden informiert, ohne dass die Person etwas bemerkt.',
+      'Polizei 117 bei Bedrohung, Waffen, aggressivem Verhalten, wenn die Person das Areal nicht verlässt oder wenn sie Kinder angesprochen hat.',
+      'Melden: Standort und Zufahrt, wo sich die Person aufhält und was sie tut, Beschreibung, ob Waffen sichtbar sind, wie viele Kinder in der Nähe sind.',
+      'Erwähnen, dass es sich um eine Schule mit Kindern mit Behinderung handelt.',
+      'Rückrufnummer angeben und erreichbar bleiben – die Polizei meldet sich für die Einweisung.',
+    ],
     instructions: [
       'Nicht allein eingreifen und die Person nicht festhalten – Beobachten und Melden geht vor Handeln.',
-      'Stillen Alarm in der App auslösen; Sicherheitsverantwortliche und Krisenstab werden ohne Aufsehen informiert.',
       'Aus sicherer Distanz beobachten und sofort notieren: Geschlecht, ungefähres Alter, Grösse, Statur, Kleidung, Auffälligkeiten, Sprache, Richtung, Fahrzeug mit Kennzeichen.',
       'Kinder unauffällig aus dem Bereich führen, Türen zu Klassenzimmern schliessen, Aussentüren nicht offen stehen lassen.',
       'Höflicher Erstkontakt nur zu zweit und nur bei ungefährlichem Eindruck: freundlich ansprechen, nach dem Anliegen fragen, zum Sekretariat begleiten.',
-      'Bei Bedrohung, Waffen, aggressivem Verhalten oder Verweigerung: Rückzug in einen abschliessbaren Raum, Polizei 117 anrufen und dort bleiben.',
+      'Bei Bedrohung, Waffen, aggressivem Verhalten oder Verweigerung: sofort zurückziehen, in einem abschliessbaren Raum einschliessen und dort bleiben, bis die Polizei eintrifft.',
       'Verlässt die Person das Areal: Fluchtrichtung beobachten, nicht verfolgen.',
     ],
     followUp: [
@@ -206,11 +234,17 @@ export const SEED_SCENARIOS: Scenario[] = [
   {
     id: 'sc-todesfall', icon: 'heart-crack', title: 'Todesfall', category: 'Organisation', priority: 'hoch', silentDefault: true,
     defaultChannels: ['push', 'voice'], responsibleGroupIds: ['gr-krisenstab'], contactIds: ['ec-144', 'ec-117', 'ec-143'],
+    callGuidance: [
+      'Bei einer leblosen Person zuerst mit der Wiederbelebung beginnen und Sanitätsnotruf 144 anrufen – den Tod stellt ausschliesslich eine Ärztin oder ein Arzt fest, nie Mitarbeitende.',
+      'Melden: Wo genau, was vorgefallen ist, seit wann die Person leblos ist, ob mit der Wiederbelebung begonnen wurde, Rückrufnummer.',
+      'Bei einem aussergewöhnlichen Todesfall – Unfall, Suizid, Gewalt oder unklare Ursache – zusätzlich Polizei 117 und deren Anweisungen abwarten.',
+      'Der stille Alarm bietet den Krisenstab auf, ohne dass Kinder etwas mitbekommen.',
+      'Keine Auskunft an Angehörige, Externe oder Medien am Telefon: Die Angehörigen werden persönlich und abgestimmt informiert.',
+    ],
     instructions: [
-      'Bei Auffinden einer leblosen Person zuerst Wiederbelebung beginnen und 144 alarmieren – der Tod wird ausschliesslich ärztlich festgestellt.',
-      'Stillen Alarm in der App auslösen; der Krisenstab wird sofort aufgeboten.',
+      'Solange kein Arzt den Tod festgestellt hat, gilt die Person als lebend: Wiederbelebung ohne Unterbrechung fortführen, bis der Rettungsdienst übernimmt.',
       'Ist der Tod ärztlich festgestellt: Fundort unverändert lassen, nichts wegräumen, nichts reinigen, niemanden hineinlassen.',
-      'Bei einem aussergewöhnlichen Todesfall – Unfall, Suizid, Gewalt oder unklare Ursache – umgehend die Polizei 117 verständigen und deren Anweisungen abwarten.',
+      'Bei einem aussergewöhnlichen Todesfall die Anweisungen der Polizei abwarten und den Bereich für sie freihalten.',
       'Kinder und Jugendliche aus dem Bereich führen und lückenlos betreuen; niemanden allein lassen.',
       'Handyverbot im betroffenen Bereich durchsetzen – keine Fotos, keine Nachrichten, keine Beiträge in sozialen Medien.',
       'Die Sprachregelung legt ausschliesslich die Schulleitung fest. Bis dahin gilt gegenüber allen Externen und Medien: keine Auskunft.',
@@ -247,11 +281,16 @@ export const SEED_SCENARIOS: Scenario[] = [
   {
     id: 'sc-wasserunfall', icon: 'droplets', title: 'Notfall im Therapiebad', category: 'Gesundheit', priority: 'hoch', silentDefault: false,
     defaultChannels: ['push', 'voice'], responsibleGroupIds: ['gr-ersthelfer'], contactIds: ['ec-144', 'ec-1414'],
+    callGuidance: [
+      'Laut um Hilfe rufen – die Rettung aus dem Wasser darf für das Alarmieren nicht unterbrochen werden. Wer zu zweit ist, teilt auf: eine Person rettet, die andere alarmiert.',
+      'Sanitätsnotruf 144 bei jedem Ertrinkungsnotfall, auch wenn die Person wieder atmet.',
+      'Melden: Therapiebad und Standort, was passiert ist, wie lange die Person unter Wasser war, ob sie atmet, ob mit der Beatmung begonnen wurde.',
+      'Die Zufahrt zum Bad genau beschreiben und jemanden zur Einweisung abstellen – der Weg ist von aussen nicht selbsterklärend.',
+      'Bei schwerer Erreichbarkeit oder langem Anfahrtsweg zusätzlich Rega 1414.',
+    ],
     instructions: [
-      'Laut um Hilfe rufen und den Alarm in der App auslösen – Ersthelfende kommen mit Notfallrucksack und Defibrillator.',
       'Person sofort aus dem Wasser holen. Rettung von aussen mit Rettungsstange oder Gurtretter hat Vorrang – nur ins Wasser springen, wenn es anders nicht geht.',
       'Alle übrigen Kinder unverzüglich aus dem Becken holen und am Beckenrand sammeln – nie unbeaufsichtigt im Wasser lassen.',
-      'Sanitätsnotruf 144 alarmieren; bei schwerer Erreichbarkeit zusätzlich Rega 1414. Standort und Zufahrt zum Bad genau angeben.',
       'Atmung prüfen. Keine normale Atmung: sofort mit fünf Beatmungen beginnen, dann Herzdruckmassage 30:2 – beim Ertrinken steht der Sauerstoffmangel im Vordergrund.',
       'Defibrillator anwenden: Brustkorb vorher abtrocknen, Person nicht auf nasser Fläche liegen lassen.',
       'Bewusstlos mit normaler Atmung: stabile Seitenlage, Wärmeerhalt mit Rettungsdecke, Atmung laufend kontrollieren.',
@@ -289,10 +328,16 @@ export const SEED_SCENARIOS: Scenario[] = [
   {
     id: 'sc-it', icon: 'server-crash', title: 'ICT-Ausfall / Cyberangriff', category: 'Gebäude & Technik', priority: 'hoch', silentDefault: false,
     defaultChannels: ['push', 'email', 'teams'], responsibleGroupIds: ['gr-it', 'gr-krisenstab'], contactIds: ['ec-117'],
+    callGuidance: [
+      'Ein Ausfall allein ist kein Fall für 112, 117 oder 144 – der Notruf gilt nur, wenn zusätzlich Personen gefährdet sind.',
+      'Zuerst intern alarmieren: ICT-Verantwortliche und Krisenstab werden über den Alarm informiert.',
+      'Fällt die App selbst aus, gilt die ausgedruckte Telefonliste im Sekretariat. Die Notrufnummern gehen über das Mobilnetz und sind vom Ausfall nicht betroffen.',
+      'Keine technischen Angaben, Zugangsdaten oder Bildschirmfotos an Unbekannte weitergeben – auch nicht an angebliche Support-Anrufe.',
+      'Meldung an das Bundesamt für Cybersicherheit und eine Strafanzeige vorbereiten; entschieden wird im Krisenstab.',
+    ],
     instructions: [
       'Bei Verdacht auf einen Angriff – Lösegeldforderung, verschlüsselte Dateien, unbekannte Zugriffe – betroffene Geräte sofort vom Netz trennen: Netzwerkkabel ziehen, WLAN ausschalten.',
       'Geräte nicht ausschalten und nichts löschen – im Arbeitsspeicher liegen Spuren, die für die Aufklärung gebraucht werden.',
-      'Alarm in der App auslösen; ICT-Verantwortliche und Krisenstab werden informiert.',
       'Reines Ausfallereignis ohne Angriffsverdacht: Umfang feststellen – einzelnes Gerät, Standort oder alle Standorte, welche Dienste betroffen.',
       'Auf Papierbetrieb umstellen: Klassenlisten, Notfallblätter, Telefonlisten und Medikamentenpläne liegen ausgedruckt im Sekretariat.',
       'Sicherstellen, dass Alarmierung und Erreichbarkeit unabhängig funktionieren: Mobiltelefone, Notrufnummern 112/117/118/144 gehen über das Mobilnetz.',
@@ -331,9 +376,14 @@ export const SEED_SCENARIOS: Scenario[] = [
   {
     id: 'sc-krise', icon: 'users', title: 'Krisenstab einberufen', category: 'Organisation', priority: 'hoch', silentDefault: false,
     defaultChannels: ['push', 'sms', 'voice', 'conference'], responsibleGroupIds: ['gr-krisenstab'], contactIds: ['ec-117', 'ec-118', 'ec-144'],
-    instructions: [
-      'Aufgebot in der App mit Quittierung auslösen – jedes Mitglied meldet zurück, ob es kommt.',
+    callGuidance: [
       'Einberufen wird bei jedem Ereignis, das eine einzelne Lehrperson oder Gruppenleitung überfordert, mehrere Standorte betrifft, Medieninteresse auslöst oder länger als einen Tag nachwirkt.',
+      'Das Aufgebot läuft mit Quittierung: Jedes Mitglied meldet zurück, ob und wann es kommt.',
+      'Wer nicht quittiert, wird telefonisch nachgefasst – die Standorttelefonliste liegt ausgedruckt im Führungsraum.',
+      'Der Notruf gehört zum auslösenden Ereignis, nicht zum Aufgebot: Läuft bereits ein Einsatz, ist 117/118/144 alarmiert – sonst zuerst dort melden.',
+      'Bei Ereignissen, welche die Institution übersteigen, Verbindung zum kantonalen Führungsstab Zug aufnehmen. Anweisungen der Einsatzleitung haben Vorrang.',
+    ],
+    instructions: [
       'Führungsraum beziehen: Sitzungszimmer Hauptsitz Baar, Rückfallort nach Absprache. Wandprotokoll und Standorttelefonliste bereitlegen.',
       'Lage in fünf Sätzen festhalten: Was ist passiert, wo, seit wann, wer ist betroffen, was ist bereits veranlasst.',
       'Rollen sofort verteilen und laut benennen: Leitung, Journalführung, Kommunikation nach aussen, Kontakt zu den Blaulichtorganisationen, Betreuung, Ablösung.',

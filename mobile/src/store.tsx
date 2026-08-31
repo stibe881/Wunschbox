@@ -3,7 +3,7 @@ import { Vibration } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import type { Alarm, AlarmLogEntry, Channel, Delivery, EmergencyContact, EscalationLevel, Group, Location, LoneWorkSession, Scenario, Session, User } from './types'
 import { CHANNEL_LABELS } from './types'
-import { LIVE_INITIAL_PASSWORD, SEED_CONTACTS, SEED_GROUPS, SEED_LOCATIONS, SEED_SCENARIOS, SEED_USERS } from './seed'
+import { LIVE_INITIAL_PASSWORD, SCENARIO_CONTENT_VERSION, SEED_CONTACTS, SEED_GROUPS, SEED_LOCATIONS, SEED_SCENARIOS, SEED_USERS } from './seed'
 import { hashPassword, randomSalt } from './auth'
 import { criticalAlertsGranted, getPushToken, notifyNow } from './notifications'
 import { ApiError, api, authToken, loadApiSettings, setAuthToken, type ServerData } from './api'
@@ -28,6 +28,8 @@ export interface MobileState {
   mode: AppMode
   /** Version der Anmelde-Migration – für einmalige Korrekturen an Passwortdaten */
   authVersion?: number
+  /** Version der Standard-Szenarien-Inhalte – für einmalige Content-Updates beim Laden */
+  scenarioContentVersion?: number
   /** Angemeldete Sitzung – null bedeutet: Anmeldemaske anzeigen */
   session: Session | null
   /**
@@ -448,11 +450,22 @@ function migrateAuth(roh: Partial<MobileState>, mode: AppMode): MobileState {
 
   // Im Live-Modus liefert der Server die Konten – lokal wird nichts erzeugt
   users = mode === 'demo' ? ensureLoginPossible(users) : users
+
+  // Einmalige Inhalts-Aktualisierung: Standard-Szenarien auf die neue Version
+  // heben, selbst erstellte Szenarien (custom) bleiben unverändert erhalten.
+  // Ohne diesen Schritt behielte ein Gerät die alten Abläufe bis zur Neuinstallation.
+  let scenarios = parsed.scenarios ?? fallback.scenarios
+  if ((parsed.scenarioContentVersion ?? 1) < SCENARIO_CONTENT_VERSION) {
+    scenarios = [...SEED_SCENARIOS, ...scenarios.filter((sc) => sc.custom)]
+  }
+
   const session = parsed.session ?? null
   return {
     ...parsed,
     mode,
     authVersion: AUTH_MIGRATION_VERSION,
+    scenarioContentVersion: SCENARIO_CONTENT_VERSION,
+    scenarios,
     users,
     session: session && users.some((u) => u.id === session.userId) ? session : null,
     // Im Live-Modus ist die Liste vor der Anmeldung leer – dann bleibt sie leer

@@ -201,6 +201,9 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
   const [alarmLocationIds, setAlarmLocationIds] = useState<string[]>([me.locationId])
   const contacts = state.contacts.filter((c) => scenario.contactIds.includes(c.id))
+  // Hinweise zum Notruf gehören in die Phase «Alarmieren» – deshalb stehen sie
+  // nicht mehr in den Sofortmassnahmen.
+  const callGuidance = scenario.callGuidance ?? []
   const responsibleGroups = state.groups.filter((g) => scenario.responsibleGroupIds.includes(g.id))
   const alarmGroupIds = responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.id) : ['gr-alle']
   const alarmRecipientCount = resolveRecipients(state.users, alarmGroupIds, alarmLocationIds).length
@@ -352,6 +355,17 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
 
       {phase === 0 && (
         <>
+          {callGuidance.length > 0 && (
+            <View style={styles.callGuidanceBox}>
+              <Text style={styles.callGuidanceTitle}>Wann anrufen und was sagen</Text>
+              {callGuidance.map((hinweis, i) => (
+                <View key={i} style={styles.callGuidanceRow}>
+                  <Text style={styles.callGuidanceBullet}>•</Text>
+                  <Text style={styles.callGuidanceText}>{hinweis}</Text>
+                </View>
+              ))}
+            </View>
+          )}
           {contacts.length > 0 && (
             <>
               <Text style={styles.sectionTitle}>Bei unmittelbarer Gefahr zuerst den Notruf wählen:</Text>
@@ -965,6 +979,11 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   h1: { fontSize: 22, fontWeight: '800', color: colors.text, marginBottom: 4 },
   sectionTitle: { fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 10, marginBottom: 4 },
+  callGuidanceBox: { backgroundColor: '#fffbeb', borderColor: '#fde68a', borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 10, gap: 6 },
+  callGuidanceTitle: { fontSize: 14, fontWeight: '700', color: '#78350f' },
+  callGuidanceRow: { flexDirection: 'row', gap: 8 },
+  callGuidanceBullet: { color: '#d97706', fontSize: 14, lineHeight: 20 },
+  callGuidanceText: { flex: 1, fontSize: 14, lineHeight: 20, color: '#78350f' },
   cardTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
   body: { fontSize: 14, color: colors.text, marginTop: 4 },
   muted: { fontSize: 14, color: colors.muted },

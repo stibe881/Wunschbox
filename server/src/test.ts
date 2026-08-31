@@ -65,6 +65,22 @@ async function main(): Promise<void> {
   pruefe('keine Demo-Benutzer im Live-Bestand', stand.body.users.length === 1)
   pruefe('Benutzerliste ohne Passwortdaten', stand.body.users.every((u: any) => !('passwordHash' in u)))
 
+  // --- Ablauf der Szenarien: Alarmieren steht in callGuidance, nicht in den Sofortmassnahmen ---
+  const aktive = stand.body.scenarios.filter((s: any) => s.active !== false)
+  pruefe('9 Szenarien für Mitarbeitende freigegeben', aktive.length === 9, `gefunden: ${aktive.length}`)
+  pruefe('jedes freigegebene Szenario hat Hinweise zum Alarmieren',
+    aktive.every((s: any) => Array.isArray(s.callGuidance) && s.callGuidance.length > 0),
+    aktive.filter((s: any) => !s.callGuidance?.length).map((s: any) => s.id).join(', '))
+
+  // Der geführte Ablauf beginnt mit «Alarmieren». Stünde derselbe Schritt noch
+  // einmal in den Sofortmassnahmen, widerspräche sich die Reihenfolge.
+  const alarmSchritte = aktive.flatMap((s: any) =>
+    s.instructions
+      .filter((i: string) => /(Alarm|Aufgebot) in der App|alarmieren:|144 alarmieren|118 alarmieren|117 anrufen|145 anrufen/i.test(i))
+      .map((i: string) => `${s.id}: ${i.slice(0, 60)}`),
+  )
+  pruefe('keine Alarmierungsschritte in den Sofortmassnahmen', alarmSchritte.length === 0, alarmSchritte.join(' | '))
+
   // --- Passwortwechsel ---
   const zuKurz = await ruf('/auth/password', {
     method: 'POST', token: adminToken,

@@ -311,6 +311,9 @@ function ScenarioView({ scenario, onBack }: { scenario: Scenario; onBack: () => 
   const [alarmLocationIds, setAlarmLocationIds] = useState<string[]>([me.locationId])
   const myLocation = state.locations.find((l) => l.id === me.locationId)
   const contacts = state.contacts.filter((c) => scenario.contactIds.includes(c.id))
+  // Hinweise zum Notruf gehören in die Phase «Alarmieren» – deshalb stehen sie
+  // nicht mehr in den Sofortmassnahmen.
+  const callGuidance = scenario.callGuidance ?? []
   const responsibleGroups = state.groups.filter((g) => scenario.responsibleGroupIds.includes(g.id))
   const alarmGroupIds = responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.id) : ['gr-alle']
   const alarmRecipientCount = resolveRecipients(state, alarmGroupIds, alarmLocationIds).length
@@ -455,6 +458,19 @@ function ScenarioView({ scenario, onBack }: { scenario: Scenario; onBack: () => 
 
       {phase === 0 && (
         <div className="space-y-3">
+          {callGuidance.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+              <div className="text-sm font-semibold text-amber-900">Wann anrufen und was sagen</div>
+              <ul className="space-y-1.5">
+                {callGuidance.map((hinweis, i) => (
+                  <li key={i} className="flex gap-2 text-sm text-amber-900">
+                    <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-amber-500 mt-1.5" />
+                    <span>{hinweis}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {contacts.length > 0 && (
             <>
               <div className="text-sm font-semibold text-slate-700">Bei unmittelbarer Gefahr zuerst den Notruf wählen:</div>
