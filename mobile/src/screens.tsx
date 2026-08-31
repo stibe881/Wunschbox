@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
 import {
   BellRing, Check, CheckCircle2, ChevronLeft, Clock, KeyRound, LogOut, MapPin, Phone, Play, Search as SearchIcon,
-  ShieldAlert, Siren, Timer, X,
+  Scale, ShieldAlert, Siren, Timer, X,
 } from 'lucide-react-native'
 import { createAlarm, resolveRecipients, uid, useStore } from './store'
 import { ScenarioIcon } from './ScenarioIcon'
@@ -10,6 +10,7 @@ import { cancelScheduled, ensurePermissions, getPushToken, remotePushAvailabilit
 import type { LoneWorkSession, Scenario, User } from './types'
 import { Badge, Card, HoldButton, colors, formatDuration, formatRelative } from './ui'
 import { MIN_PASSWORD_LENGTH, passwordProblem } from './auth'
+import { activeScenarios } from './scenarios'
 
 // ---------- Start: Alarme + SOS ----------
 
@@ -163,7 +164,7 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario) 
 export function ScenariosScreen({ onOpen }: { onOpen: (s: Scenario) => void }) {
   const { state } = useStore()
   const [search, setSearch] = useState('')
-  const filtered = state.scenarios.filter((s) => !search || s.title.toLowerCase().includes(search.toLowerCase()))
+  const filtered = activeScenarios(state.scenarios).filter((s) => !search || s.title.toLowerCase().includes(search.toLowerCase()))
 
   return (
     <ScrollView contentContainerStyle={styles.screen}>
@@ -489,6 +490,8 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
               </Text>
             </Pressable>
           ))}
+
+          {(scenario.legalBasis?.length ?? 0) > 0 && <LegalSection eintraege={scenario.legalBasis!} />}
         </>
       )}
 
@@ -507,6 +510,33 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
         </Pressable>
       </View>
     </ScrollView>
+  )
+}
+
+/** Rechtsgrundlagen – eingeklappt, damit sie im Ernstfall nicht im Weg stehen */
+function LegalSection({ eintraege }: { eintraege: string[] }) {
+  const [offen, setOffen] = useState(false)
+  return (
+    <Card>
+      <Pressable style={styles.row} onPress={() => setOffen((v) => !v)}>
+        <Scale size={15} color={colors.muted} />
+        <Text style={[styles.cardTitle, { flex: 1 }]}>Rechtsgrundlagen</Text>
+        <Text style={styles.faint}>{offen ? 'einklappen' : `${eintraege.length} Punkte`}</Text>
+      </Pressable>
+      {offen && (
+        <View style={{ marginTop: 8 }}>
+          {eintraege.map((eintrag, i) => (
+            <Text key={i} style={[styles.faint, { marginBottom: 8, lineHeight: 17 }]}>
+              § {eintrag}
+            </Text>
+          ))}
+          <Text style={[styles.faint, { fontStyle: 'italic' }]}>
+            Orientierungshilfe, keine Rechtsberatung. Verbindlich sind die kantonalen Vorgaben und das
+            Notfallkonzept der Trägerschaft.
+          </Text>
+        </View>
+      )}
+    </Card>
   )
 }
 

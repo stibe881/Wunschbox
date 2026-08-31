@@ -70,6 +70,17 @@ export interface Scenario {
   responsibleGroupIds: string[]
   /** Verknüpfte Notfallkontakte (extern) */
   contactIds: string[]
+  /**
+   * Schweizer Rechtsgrundlagen und Normen, die für dieses Szenario gelten.
+   * Orientierungshilfe – keine Rechtsberatung.
+   */
+  legalBasis?: string[]
+  /**
+   * Nur aktive Szenarien erscheinen in der App und bei der Alarmauslösung.
+   * Inaktive bleiben in der Verwaltung ausgegraut erhalten. Fehlt das Feld,
+   * gilt das Szenario als aktiv.
+   */
+  active?: boolean
   custom?: boolean
 }
 

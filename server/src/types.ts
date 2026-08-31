@@ -57,13 +57,29 @@ export interface Scenario {
   title: string
   category: string
   priority: ScenarioPriority
+  /** Sofortmassnahmen – Schritt für Schritt */
   instructions: string[]
+  /** Weiterführende Massnahmen nach der Akutphase */
   followUp: string[]
   checklist: string[]
   silentDefault: boolean
+  /** Vorauswahl der Alarmierungskanäle beim Auslösen */
   defaultChannels: Channel[]
+  /** Zuständige Gruppen – werden beim Auslösen vorausgewählt */
   responsibleGroupIds: string[]
+  /** Verknüpfte Notfallkontakte (extern) */
   contactIds: string[]
+  /**
+   * Schweizer Rechtsgrundlagen und Normen, die für dieses Szenario gelten.
+   * Orientierungshilfe – keine Rechtsberatung.
+   */
+  legalBasis?: string[]
+  /**
+   * Nur aktive Szenarien erscheinen in der App und bei der Alarmauslösung.
+   * Inaktive bleiben in der Verwaltung ausgegraut erhalten. Fehlt das Feld,
+   * gilt das Szenario als aktiv.
+   */
+  active?: boolean
   custom?: boolean
 }
 

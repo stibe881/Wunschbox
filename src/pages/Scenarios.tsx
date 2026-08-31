@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Pencil, Phone, Plus, Trash2, Users, WifiOff } from 'lucide-react'
+import { Eye, EyeOff, Pencil, Phone, Plus, Scale, Trash2, Users, WifiOff } from 'lucide-react'
 import { uid, useStore } from '../store'
 import type { Channel, Scenario, ScenarioPriority } from '../types'
 import { CHANNEL_LABELS } from '../types'
 import { Badge, Button, Card, Field, Modal, Toggle, inputClass, useConfirm } from '../components/ui'
 import { SCENARIO_ICONS, ScenarioIcon } from '../components/ScenarioIcon'
+import { isActive } from '../lib/scenarios'
 
 const CATEGORIES = ['Schüler:innen', 'Gesundheit', 'Sicherheit', 'Gebäude & Technik', 'Naturereignis', 'Organisation']
 const ALL_CHANNELS: Channel[] = ['push', 'sms', 'email', 'voice', 'conference', 'tts', 'teams']
@@ -48,8 +49,9 @@ export default function Scenarios() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Szenarien &amp; Checklisten</h1>
           <p className="text-sm text-slate-500">
-            {state.scenarios.length} Notfallszenarien für das SONNENBERG Kompetenzzentrum · Content-Management ohne technische
-            Vorkenntnisse · Änderungen werden sofort an alle Apps verteilt
+            {state.scenarios.filter(isActive).length} von {state.scenarios.length} Szenarien sind für Mitarbeitende sichtbar ·
+            Ausgegraute Szenarien bleiben erhalten, erscheinen aber weder in der App noch bei der Alarmauslösung ·
+            Änderungen werden sofort an alle Apps verteilt
           </p>
         </div>
         <Button onClick={() => setEditing(newScenario())}><Plus size={16} /> Neues Szenario</Button>
@@ -82,17 +84,21 @@ export default function Scenarios() {
       </div>
 
       <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filtered.map((s) => (
-          <Card key={s.id} className="hover:shadow transition">
-            <div className="flex items-start gap-3">
+        {filtered.map((s) => {
+          const aktiv = isActive(s)
+          return (
+          <Card key={s.id} className={aktiv ? 'hover:shadow transition' : 'transition bg-slate-50 border-dashed'}>
+            <div className={`flex items-start gap-3 ${aktiv ? '' : 'opacity-55'}`}>
               <ScenarioIcon name={s.icon} size={28} className="text-slate-500 shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-slate-800">{s.title}</div>
                 <div className="flex gap-1.5 mt-1 flex-wrap">
+                  {!aktiv && <Badge color="slate">ausgeblendet</Badge>}
                   <Badge>{s.category}</Badge>
                   <Badge color={PRIORITY_META[s.priority].color}>{PRIORITY_META[s.priority].label}</Badge>
                   {s.silentDefault && <Badge color="violet">stiller Alarm</Badge>}
                   {s.custom && <Badge color="blue">eigenes Szenario</Badge>}
+                  {(s.legalBasis?.length ?? 0) > 0 && <Badge color="green">Rechtsgrundlagen</Badge>}
                 </div>
                 <div className="text-xs text-slate-400 mt-2">
                   {s.instructions.length} Sofortmassnahmen · {s.followUp.length} Folgemassnahmen · {s.checklist.length} Checklistenpunkte
@@ -107,13 +113,21 @@ export default function Scenarios() {
             </div>
             <div className="flex gap-2 mt-4">
               <Button variant="secondary" onClick={() => setViewing(s)}>Ansehen</Button>
+              <Button
+                variant="ghost"
+                title={aktiv ? 'Für Mitarbeitende ausblenden' : 'Für Mitarbeitende einblenden'}
+                onClick={() => dispatch({ type: 'UPSERT_SCENARIO', scenario: { ...s, active: !aktiv } })}
+              >
+                {aktiv ? <Eye size={14} /> : <EyeOff size={14} />}
+              </Button>
               <Button variant="ghost" onClick={() => setEditing(s)}><Pencil size={14} /></Button>
               <Button variant="ghost" onClick={() => ask(`Szenario «${s.title}» löschen?`, () => dispatch({ type: 'DELETE_SCENARIO', scenarioId: s.id }))}>
                 <Trash2 size={14} />
               </Button>
             </div>
           </Card>
-        ))}
+          )
+        })}
         {filtered.length === 0 && (
           <div className="col-span-full text-center text-sm text-slate-400 py-8">Keine Szenarien gefunden.</div>
         )}
@@ -134,6 +148,7 @@ function ScenarioDetail({ scenario, onClose }: { scenario: Scenario; onClose: ()
   return (
     <Modal title={scenario.title} onClose={onClose} wide>
       <div className="flex flex-wrap gap-1.5 mb-4">
+        {!isActive(scenario) && <Badge color="slate">ausgeblendet – für Mitarbeitende nicht sichtbar</Badge>}
         <Badge>{scenario.category}</Badge>
         <Badge color={PRIORITY_META[scenario.priority].color}>{PRIORITY_META[scenario.priority].label}</Badge>
         {scenario.silentDefault && <Badge color="violet">stiller Alarm</Badge>}
@@ -180,6 +195,22 @@ function ScenarioDetail({ scenario, onClose }: { scenario: Scenario; onClose: ()
               </div>
             </>
           )}
+          {(scenario.legalBasis?.length ?? 0) > 0 && (
+            <>
+              <h4 className="font-semibold text-slate-700 mt-5 mb-2 flex items-center gap-1.5"><Scale size={14} /> Rechtsgrundlagen</h4>
+              <ul className="space-y-1.5">
+                {scenario.legalBasis!.map((eintrag, i) => (
+                  <li key={i} className="text-xs text-slate-600 leading-relaxed flex gap-2">
+                    <span className="text-slate-400 shrink-0">§</span> {eintrag}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                Orientierungshilfe, keine Rechtsberatung. Verbindlich sind die kantonalen Vorgaben und das
+                Notfallkonzept der Trägerschaft.
+              </p>
+            </>
+          )}
           {contacts.length > 0 && (
             <>
               <h4 className="font-semibold text-slate-700 mt-5 mb-2 flex items-center gap-1.5"><Phone size={14} /> Relevante Notrufnummern</h4>
@@ -216,6 +247,7 @@ function ScenarioEditor({ scenario, onClose }: { scenario: Scenario; onClose: ()
         instructions: draft.instructions.filter((s) => s.trim()),
         followUp: draft.followUp.filter((s) => s.trim()),
         checklist: draft.checklist.filter((s) => s.trim()),
+        legalBasis: (draft.legalBasis ?? []).filter((s) => s.trim()),
       },
     })
     onClose()
@@ -278,6 +310,25 @@ function ScenarioEditor({ scenario, onClose }: { scenario: Scenario; onClose: ()
           onChange={(e) => setDraft({ ...draft, checklist: e.target.value.split('\n') })}
         />
       </Field>
+      <Field label="Rechtsgrundlagen (eine pro Zeile) – Orientierungshilfe, keine Rechtsberatung">
+        <textarea
+          className={inputClass} rows={4}
+          placeholder="z. B. StGB Art. 128: Unterlassung der Nothilfe ist strafbar."
+          value={(draft.legalBasis ?? []).join('\n')}
+          onChange={(e) => setDraft({ ...draft, legalBasis: e.target.value.split('\n') })}
+        />
+      </Field>
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <Toggle
+          checked={draft.active !== false}
+          onChange={(v) => setDraft({ ...draft, active: v })}
+          label="Für Mitarbeitende sichtbar"
+        />
+        <p className="text-xs text-slate-500 mt-1.5">
+          Ausgeschaltet erscheint das Szenario weder in der App noch bei der Alarmauslösung. Es bleibt in der
+          Verwaltung ausgegraut erhalten und lässt sich jederzeit wieder einblenden.
+        </p>
+      </div>
       <div className="grid md:grid-cols-3 gap-4">
         <Field label="Standard-Alarmkanäle">
           <div className="space-y-1">

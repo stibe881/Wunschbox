@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ChevronDown, ChevronLeft, ChevronUp, Pencil, Search, Siren, Users } from 'lucide-react'
 import { createAlarm, resolveRecipients, useStore } from '../store'
+import { activeScenarios } from '../lib/scenarios'
 import type { AlarmPlan, Channel, Scenario } from '../types'
 import { CHANNEL_LABELS } from '../types'
 import { Badge, HoldButton, Toggle, inputClass } from '../components/ui'
@@ -82,8 +83,10 @@ export default function TriggerAlarm() {
 
   // ---------- Schritt 1: Szenario wählen ----------
   if (!scenario) {
-    const categories = [...new Set(state.scenarios.map((s) => s.category))]
-    const visibleScenarios = state.scenarios.filter(
+    // Deaktivierte Szenarien stehen nicht zur Auswahl
+    const auswaehlbar = activeScenarios(state.scenarios)
+    const categories = [...new Set(auswaehlbar.map((s) => s.category))]
+    const visibleScenarios = auswaehlbar.filter(
       (s) =>
         (!categoryFilter || s.category === categoryFilter) &&
         (!search || s.title.toLowerCase().includes(search.toLowerCase())),

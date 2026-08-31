@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowRight, BellRing, BookOpen, Check, CheckCircle2, ChevronLeft, ClipboardCheck, Clock, KeyRound, LayoutDashboard,
-  ListChecks, LogOut, MapPin, Megaphone, Phone, PhoneCall, Play, Search, ShieldAlert, Siren, Timer, User, Users, Volume2, WifiOff, X,
+  ListChecks, LogOut, MapPin, Megaphone, Phone, PhoneCall, Play, Scale, Search, ShieldAlert, Siren, Timer, User, Users, Volume2, WifiOff, X,
 } from 'lucide-react'
 import { createAlarm, resolveRecipients, uid, useStore } from '../store'
 import type { Channel, LoneWorkSession, Scenario, User as AppUser } from '../types'
@@ -10,6 +10,7 @@ import { CHANNEL_LABELS } from '../types'
 import { Badge, HoldButton, Toggle, formatDuration, formatRelative, inputClass, useConfirm } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 import { MIN_PASSWORD_LENGTH, passwordProblem } from '../lib/auth'
+import { activeScenarios } from '../lib/scenarios'
 
 type Tab = 'start' | 'szenarien' | 'alleinarbeit' | 'notruf' | 'profil'
 
@@ -269,7 +270,7 @@ function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario) => void })
 function ScenarioListTab({ onOpen }: { onOpen: (s: Scenario) => void }) {
   const { state } = useStore()
   const [search, setSearch] = useState('')
-  const filtered = state.scenarios.filter((s) => !search || s.title.toLowerCase().includes(search.toLowerCase()))
+  const filtered = activeScenarios(state.scenarios).filter((s) => !search || s.title.toLowerCase().includes(search.toLowerCase()))
 
   return (
     <div className="space-y-3">
@@ -596,6 +597,8 @@ function ScenarioView({ scenario, onBack }: { scenario: Scenario; onBack: () => 
               </label>
             ))}
           </div>
+
+          {(scenario.legalBasis?.length ?? 0) > 0 && <LegalSection eintraege={scenario.legalBasis!} />}
         </div>
       )}
 
@@ -752,6 +755,38 @@ function ContactsTab() {
 }
 
 // ---------- Profil ----------
+
+/** Rechtsgrundlagen – eingeklappt, damit sie im Ernstfall nicht im Weg stehen */
+function LegalSection({ eintraege }: { eintraege: string[] }) {
+  const [offen, setOffen] = useState(false)
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+      <button
+        className="w-full flex items-center gap-2 px-3.5 py-3 text-sm font-semibold text-slate-700"
+        onClick={() => setOffen((v) => !v)}
+      >
+        <Scale size={15} className="text-slate-400" />
+        Rechtsgrundlagen
+        <span className="ml-auto text-xs font-normal text-slate-400">{offen ? 'einklappen' : `${eintraege.length} Punkte`}</span>
+      </button>
+      {offen && (
+        <div className="px-3.5 pb-3.5">
+          <ul className="space-y-2">
+            {eintraege.map((eintrag, i) => (
+              <li key={i} className="text-xs text-slate-600 leading-relaxed flex gap-2">
+                <span className="text-slate-400 shrink-0">§</span> {eintrag}
+              </li>
+            ))}
+          </ul>
+          <p className="text-[11px] text-slate-400 mt-2.5 leading-relaxed">
+            Orientierungshilfe, keine Rechtsberatung. Verbindlich sind die kantonalen Vorgaben und das
+            Notfallkonzept der Trägerschaft.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function ProfileTab() {
   const { state, dispatch, logout } = useStore()

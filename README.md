@@ -19,6 +19,7 @@ Alarmserver, Multikanal-Alarmierung, Notfallszenarien mit Handlungsanweisungen u
 - **Alarmierungskanäle (simuliert):** Push mit Critical Alerts, SMS, E-Mail, Sprachanruf, Telefonkonferenz, Text-to-Speech-Durchsage, Microsoft Teams.
 - **Stiller Alarm** (z. B. Bedrohungslage) und **Aufgebot mit Quittierfunktion** («Ich komme» / «Nicht verfügbar»).
 - **Alarmzentrale:** Live-Monitoring mit Zustellstatus pro Empfänger und Kanal, Quittierungsübersicht, Alarmjournal, automatische Eskalationsstufen, Entwarnung.
+- **Notfallszenarien:** Neun Szenarien sind für Mitarbeitende freigeschaltet – Brand, Evakuierung, Medizinischer Notfall, Herausforderndes Verhalten, Verdächtige Person auf dem Areal, Todesfall, Notfall im Therapiebad, ICT-Ausfall und Krisenstab einberufen. Jedes führt Schritt für Schritt durch die Akutphase, die Nachbearbeitung und eine Checkliste und nennt die einschlägigen Schweizer Rechtsgrundlagen. Die übrigen Szenarien bleiben in der Verwaltung ausgegraut erhalten und lassen sich dort jederzeit wieder einblenden.
 - **Anmeldung:** E-Mail und Passwort, im Webportal wie in der App. Passwörter werden gesalzen und als SHA-256-Hash gespeichert; Administratoren vergeben und setzen Passwörter in der Benutzerverwaltung zurück, jede Person ändert ihr Passwort im Profil. Ein Erstpasswort kann mit erzwungenem Wechsel bei der nächsten Anmeldung vergeben werden. Die Prüfung der Anmeldedaten liegt vollständig in `src/lib/auth.ts` – für eine spätere SSO- oder Backend-Anbindung muss nur `authenticate()` ersetzt werden.
 - **Rollen & Portale:** Das Webportal (Verwaltung) ist Admin und Krisenstab vorbehalten – beide sehen alles und haben zusätzlich Zugriff auf die iOS-App (`mobile/`, plus Web-Vorschau über «App-Vorschau (iOS)»). Mitarbeitende haben ausschliesslich Zugriff auf die iOS-App; im Webportal sehen sie nur einen Hinweis-Bildschirm mit Verweis auf die App.
 - **App-Vorschau (iOS):** Web-Version der Mitarbeiter-App mit SOS-Taste (Halte-Geste), aktiven Alarmen mit Quittierung, offline verfügbaren Szenarien/Checklisten, eigenem Alleinarbeits-Timer und Notrufkontakten (direkt anrufbar) – öffnet in einem separaten Tab.
@@ -91,6 +92,38 @@ und «Server und iOS-App» (Letzteres stösst auch den TestFlight-Build an). Jed
 Schritt wird mit Protokoll angezeigt. Die Voraussetzungen – Dienstverwalter für
 den Neustart, Git-Zugang, `EXPO_TOKEN` – stehen in
 [`server/README.md`](server/README.md).
+
+## Szenarien und Rechtsgrundlagen
+
+Sichtbar für Mitarbeitende sind:
+
+| Szenario | Auslöseart | Zuständig |
+| --- | --- | --- |
+| Brand / Feuer | laut, alle am Standort | alle |
+| Evakuierung | laut, alle am Standort | alle |
+| Medizinischer Notfall | laut | Ersthelfende |
+| Herausforderndes Verhalten | still | pädagogisches Deeskalationsteam |
+| Verdächtige Person auf dem Areal | still | Sicherheit, Krisenstab |
+| Todesfall | still | Krisenstab |
+| Notfall im Therapiebad | laut | Ersthelfende |
+| ICT-Ausfall / Cyberangriff | laut | ICT, Krisenstab |
+| Krisenstab einberufen | laut, mit Quittierung | Krisenstab |
+
+Jedes dieser Szenarien führt unter «Rechtsgrundlagen» die einschlägigen Schweizer
+Bestimmungen und Normen auf – etwa StGB Art. 128 (Unterlassung der Nothilfe),
+ZGB Art. 383–385 (bewegungseinschränkende Massnahmen), StPO Art. 253
+(aussergewöhnlicher Todesfall), DSG Art. 24 (Meldung von Verletzungen der
+Datensicherheit), VKF-Brandschutzrichtlinie 16-15 und ArGV 3 Art. 36.
+
+> Diese Angaben sind eine Orientierungshilfe und keine Rechtsberatung.
+> Verbindlich sind die kantonalen Vorgaben, das Notfallkonzept der Trägerschaft
+> und die Beurteilung der Sicherheitsverantwortlichen. Der Text ist vor dem
+> Produktivbetrieb durch die zuständigen Stellen zu prüfen und freizugeben.
+
+Ausgeblendete Szenarien bleiben vollständig erhalten. In der Verwaltung stehen
+sie ausgegraut mit dem Vermerk «ausgeblendet»; ein Klick auf das Augensymbol
+blendet sie wieder ein. Sie erscheinen weder in der App noch bei der
+Alarmauslösung.
 
 ## Anmeldung
 
