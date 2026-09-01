@@ -128,13 +128,13 @@ export default function Integrations() {
             {integ.webhooks.map((w) => (
               <div key={w.id} className="flex items-center gap-3 rounded-lg border border-slate-100 p-3 text-sm">
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium text-slate-800 truncate" title={w.name}>{w.name}</div>
+                  <div className="font-medium text-slate-800">{w.name}</div>
                   <div className="text-xs text-slate-400 truncate">{w.url}</div>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5 justify-end shrink-0 max-w-[45%]">
-                  <Badge color={w.direction === 'inbound' ? 'blue' : 'violet'}>{w.direction === 'inbound' ? 'eingehend' : 'ausgehend'}</Badge>
-                  {w.direction === 'inbound' && <Vorbereitet />}
-                  <Badge color={w.active ? 'green' : 'slate'}>{w.active ? 'aktiv' : 'inaktiv'}</Badge>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    <Badge color={w.direction === 'inbound' ? 'blue' : 'violet'}>{w.direction === 'inbound' ? 'eingehend' : 'ausgehend'}</Badge>
+                    <Badge color={w.active ? 'green' : 'slate'}>{w.active ? 'aktiv' : 'inaktiv'}</Badge>
+                    {w.direction === 'inbound' && <Vorbereitet />}
+                  </div>
                 </div>
                 <Button variant="ghost" onClick={() => setEditingWebhook(w)}>Bearbeiten</Button>
                 <Button variant="ghost" onClick={() => dispatch({ type: 'DELETE_WEBHOOK', webhookId: w.id })}><Trash2 size={14} /></Button>
