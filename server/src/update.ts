@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { broadcast } from './events.js'
 import { getSetting, setSetting } from './db.js'
@@ -300,6 +300,31 @@ function schrittPlan(scope: UpdateScope): SchrittDefinition[] {
 }
 
 /** Build-Adresse aus der Ausgabe der EAS-CLI herausziehen */
+/**
+ * Ohne Rückfragen kann EAS die Übermittlung an TestFlight nur anstossen, wenn
+ * die App-Store-Connect-ID der App in eas.json steht (submit.production.ascAppId).
+ * Fehlt sie, wird der Build zwar angelegt, aber nie übermittelt.
+ */
+function fehltAscAppId(root: string): boolean {
+  try {
+    const eas = JSON.parse(readFileSync(resolve(root, 'mobile', 'eas.json'), 'utf8')) as {
+      submit?: { production?: { ascAppId?: string } }
+    }
+    return !eas.submit?.production?.ascAppId
+  } catch {
+    return true
+  }
+}
+
+/** Die letzten Fehlerzeilen der EAS-Ausgabe, damit der Hinweis den echten Grund nennt */
+function easFehlerzeilen(text: string): string {
+  const zeilen = text
+    .split('\n')
+    .map((z) => z.replace(/\u001b\[[0-9;]*m/g, '').trim())
+    .filter((z) => /error|✖|fehl|ascAppId|non-interactive|credentials/i.test(z))
+  return zeilen.slice(-3).join(' · ')
+}
+
 function findeBuildUrl(text: string): string | undefined {
   const treffer = text.match(/https:\/\/expo\.dev\/accounts\/[^\s)]+/g)
   return treffer?.[treffer.length - 1]
@@ -367,9 +392,18 @@ async function abarbeiten(job: UpdateJob, plan: SchrittDefinition[]): Promise<vo
       if (fehlgeschlagen && job.buildUrl) {
         fehlgeschlagen = false
         schritt.status = 'erfolgreich'
+        const grund = fehltAscAppId(repoRoot())
+          ? 'In mobile/eas.json fehlt submit.production.ascAppId (die Apple-ID der App aus App Store Connect).'
+          : easFehlerzeilen(ausgabe) || 'Grund siehe Ausgabe des Schritts.'
         job.hinweis =
-          'Der iOS-Build läuft bei Expo. Die Übermittlung an TestFlight ist nicht ' +
-          'angelaufen – dafür fehlen bei Expo die Zugangsdaten für App Store Connect. ' +
+          'Der iOS-Build läuft bei Expo, die Übermittlung an TestFlight ist aber nicht angelaufen. ' +
+          grund + ' Siehe mobile/CRITICAL-ALERTS.md, Abschnitt «Übermittlung an TestFlight».'
+        schritt.ausgabe += `\n\n[${job.hinweis}]`
+      } else if (!fehlgeschlagen && fehltAscAppId(repoRoot())) {
+        // Der Build wurde angenommen, aber ohne ascAppId legt Expo keine Übermittlung an
+        job.hinweis =
+          'Der iOS-Build läuft bei Expo. Die Übermittlung an TestFlight wird nicht anlaufen: ' +
+          'In mobile/eas.json fehlt submit.production.ascAppId (die Apple-ID der App aus App Store Connect). ' +
           'Siehe mobile/CRITICAL-ALERTS.md, Abschnitt «Übermittlung an TestFlight».'
         schritt.ausgabe += `\n\n[${job.hinweis}]`
       }

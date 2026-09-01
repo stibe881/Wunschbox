@@ -85,17 +85,38 @@ Apple-Bestätigungscode eingeben kann.
 ## Übermittlung an TestFlight
 
 Der Update-Knopf baut mit `--auto-submit`: Nach dem Build soll Expo die App
-selbständig an TestFlight übergeben. Dafür braucht Expo Zugangsdaten für App
-Store Connect. Fehlen sie, sieht es so aus:
+selbständig an TestFlight übergeben. Ohne Rückfragen braucht Expo dafür
+**zwei** Dinge:
+
+1. Die Zugangsdaten für App Store Connect beim Projekt (kommen vom einmaligen
+   interaktiven Durchgang unten oder vom API-Schlüssel).
+2. Die **Apple-ID der App** in `mobile/eas.json`. Das ist die zehnstellige
+   Nummer aus App Store Connect → App → **App-Informationen** → *Apple-ID*
+   (nicht die Bundle-ID). Sie steht auch in der Detailansicht einer früheren
+   Übermittlung im Expo-Dashboard.
+
+   ```json
+   "submit": {
+     "production": {
+       "ascAppId": "1234567890"
+     }
+   }
+   ```
+
+   Interaktiv fragt EAS diese Nummer bei Apple ab; nicht interaktiv kann es
+   das nicht und legt dann **gar keine** Übermittlung an – der Build läuft
+   trotzdem durch. Genau so sieht es aus, wenn im Expo-Dashboard neue Builds,
+   aber keine neuen Submissions erscheinen.
+
+Fehlt eines davon, sieht es so aus:
 
 - Der Build wird angelegt und läuft bei Expo durch.
-- Der Schritt danach scheitert, weil die CLI ohne Rückfragen keine Zugangsdaten
-  erfragen kann.
+- Es entsteht keine Übermittlung, oder der Schritt danach scheitert.
 - In TestFlight erscheint nichts.
 
-Das Portal erkennt diesen Fall inzwischen: Der Schritt gilt als erfolgreich,
-und darunter steht ein Hinweis auf die fehlende Übermittlung. Der Server
-startet dann wie vorgesehen neu.
+Das Portal erkennt beide Fälle: Der Schritt gilt als erfolgreich, darunter
+steht ein Hinweis mit dem Grund (fehlende `ascAppId` oder die Fehlermeldung
+von EAS). Der Server startet dann wie vorgesehen neu.
 
 ### Einmalig einrichten
 
