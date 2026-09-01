@@ -105,8 +105,10 @@ KOERPER = r"""
     <li>
       <b><span class="ui">Was jetzt zu tun ist</span> antippen.</b> Sie bekommen die
       Schritte für Empfänger &ndash; ohne Notruf und ohne erneute Auslösung, beides ist
-      bereits geschehen. Für den Krisenstab heisst das meist: Führungsraum beziehen,
-      Rolle übernehmen, unterwegs keine Auskünfte.
+      bereits geschehen. Die App filtert nach Ihren Gruppen: Als Krisenstabsmitglied
+      sehen Sie Führungsraum beziehen, Rolle übernehmen, unterwegs keine Auskünfte
+      &ndash; nicht die Schritte der Ersthelfer oder des Hausdiensts. Die lassen sich
+      einblenden, wenn Sie wissen wollen, wer gerade was tut.
     </li>
     <li>
       <b>Losfahren oder zurückrufen.</b> Wer den Alarm ausgelöst hat, steht in der

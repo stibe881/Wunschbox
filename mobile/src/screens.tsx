@@ -10,7 +10,7 @@ import { cancelScheduled, ensurePermissions, getPushToken, remotePushAvailabilit
 import type { Alarm, LoneWorkSession, Scenario, User } from './types'
 import { Badge, Card, HoldButton, colors, formatDuration, formatRelative } from './ui'
 import { MIN_PASSWORD_LENGTH, passwordProblem } from './auth'
-import { activeScenarios } from './scenarios'
+import { activeScenarios, responseStepsFor, responseStepsOf } from './scenarios'
 
 // ---------- Start: Alarme + SOS ----------
 
@@ -371,7 +371,7 @@ export function ScenarioDetailScreen({
           <Play size={16} color="#fff" />
           <Text style={styles.bigButtonText}>Geführt starten – ich habe es entdeckt</Text>
         </Pressable>
-        {(scenario.responseInstructions?.length ?? 0) > 0 && (
+        {responseStepsOf(scenario).length > 0 && (
           <Pressable style={styles.outlineButton} onPress={() => setModus('empfaenger')}>
             <Text style={styles.outlineButtonText}>Ich wurde alarmiert – was jetzt?</Text>
           </Pressable>
@@ -607,7 +607,12 @@ function EmpfaengerScreen({
   const { state, dispatch } = useStore()
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
   const [erledigt, setErledigt] = useState<Record<number, boolean>>({})
-  const schritte = scenario.responseInstructions ?? []
+  const [zeigeAndere, setZeigeAndere] = useState(false)
+  // Nur die Schritte der eigenen Gruppen – die übrigen bleiben auf Wunsch einsehbar
+  const { eigene, andere } = responseStepsFor(scenario, me.groupIds)
+  const gruppenName = (ids?: string[]) =>
+    (ids ?? []).map((id) => state.groups.find((g) => g.id === id)?.name).filter(Boolean).join(', ')
+  const meineGruppen = state.groups.filter((g) => me.groupIds.includes(g.id) && g.id !== 'gr-alle').map((g) => g.name).join(', ')
   const ausloeser = alarm ? state.users.find((u) => u.id === alarm.triggeredByUserId) : undefined
   const orte = alarm
     ? alarm.locationIds.map((id) => state.locations.find((l) => l.id === id)?.name).filter(Boolean).join(', ')
@@ -676,8 +681,10 @@ function EmpfaengerScreen({
         </Text>
       </View>
 
-      <Text style={styles.faint}>Schritte antippen, wenn erledigt:</Text>
-      {schritte.map((step, i) => (
+      <Text style={styles.faint}>
+        Ihre Schritte{meineGruppen ? ` als ${meineGruppen}` : ''} – antippen, wenn erledigt:
+      </Text>
+      {eigene.map((step, i) => (
         <Pressable
           key={i}
           style={[styles.row, { alignItems: 'flex-start', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12 }]}
@@ -686,9 +693,35 @@ function EmpfaengerScreen({
           <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: erledigt[i] ? colors.green : '#d97706', alignItems: 'center', justifyContent: 'center' }}>
             {erledigt[i] ? <Check size={14} color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>{i + 1}</Text>}
           </View>
-          <Text style={[styles.body, { flex: 1, marginTop: 0, color: erledigt[i] ? colors.faint : colors.text, textDecorationLine: erledigt[i] ? 'line-through' : 'none' }]}>{step}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.body, { marginTop: 0, color: erledigt[i] ? colors.faint : colors.text, textDecorationLine: erledigt[i] ? 'line-through' : 'none' }]}>{step.text}</Text>
+            {step.groupIds && step.groupIds.length > 0 && (
+              <Text style={{ fontSize: 11, color: '#b45309', marginTop: 2 }}>{gruppenName(step.groupIds)}</Text>
+            )}
+          </View>
         </Pressable>
       ))}
+
+      {andere.length > 0 && (
+        <View style={{ marginTop: 6 }}>
+          <Pressable onPress={() => setZeigeAndere(!zeigeAndere)}>
+            <Text style={[styles.muted, { textDecorationLine: 'underline', fontSize: 12 }]}>
+              {zeigeAndere ? 'Schritte anderer Gruppen ausblenden' : `${andere.length} Schritt${andere.length > 1 ? 'e' : ''} anderer Gruppen anzeigen`}
+            </Text>
+          </Pressable>
+          {zeigeAndere && andere.map((step, i) => (
+            <View key={i} style={[styles.row, { alignItems: 'flex-start', backgroundColor: colors.bg, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.border, borderRadius: 12, padding: 12, marginTop: 8 }]}>
+              <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>·</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.body, { marginTop: 0, color: colors.muted }]}>{step.text}</Text>
+                <Text style={{ fontSize: 11, color: colors.faint, marginTop: 2 }}>{gruppenName(step.groupIds)}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
 
       <Pressable onPress={onEntdecker} style={{ marginTop: 16 }}>
         <Text style={[styles.muted, { textDecorationLine: 'underline', textAlign: 'center' }]}>

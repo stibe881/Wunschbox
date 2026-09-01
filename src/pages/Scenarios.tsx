@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Eye, EyeOff, Pencil, Phone, Plus, Scale, Trash2, Users, WifiOff } from 'lucide-react'
 import { uid, useStore } from '../store'
-import type { Channel, Scenario, ScenarioPriority } from '../types'
+import type { Channel, ResponseStep, Scenario, ScenarioPriority } from '../types'
 import { CHANNEL_LABELS } from '../types'
 import { Badge, Button, Card, Field, Modal, Toggle, inputClass, useConfirm } from '../components/ui'
 import { SCENARIO_ICONS, ScenarioIcon } from '../components/ScenarioIcon'
-import { isActive } from '../lib/scenarios'
+import { isActive, responseStepsOf } from '../lib/scenarios'
 
 const CATEGORIES = ['Schüler:innen', 'Gesundheit', 'Sicherheit', 'Gebäude & Technik', 'Naturereignis', 'Organisation']
 const ALL_CHANNELS: Channel[] = ['push', 'sms', 'email', 'voice', 'conference', 'tts', 'teams']
@@ -101,7 +101,7 @@ export default function Scenarios() {
                   {(s.legalBasis?.length ?? 0) > 0 && <Badge color="green">Rechtsgrundlagen</Badge>}
                 </div>
                 <div className="text-xs text-slate-400 mt-2">
-                  {s.instructions.length} Sofortmassnahmen · {s.responseInstructions?.length ?? 0} für Empfänger · {s.checklist.length} Checklistenpunkte
+                  {s.instructions.length} Sofortmassnahmen · {responseStepsOf(s).length} für Empfänger · {s.checklist.length} Checklistenpunkte
                 </div>
                 {s.responsibleGroupIds.length > 0 && (
                   <div className="text-xs text-slate-400 mt-1 flex items-center gap-1">
@@ -177,14 +177,21 @@ function ScenarioDetail({ scenario, onClose }: { scenario: Scenario; onClose: ()
               </li>
             ))}
           </ol>
-          {(scenario.responseInstructions?.length ?? 0) > 0 && (
+          {responseStepsOf(scenario).length > 0 && (
             <>
               <h4 className="font-semibold text-slate-700 mt-5 mb-2">Wenn Sie diesen Alarm erhalten</h4>
               <ol className="space-y-2">
-                {scenario.responseInstructions!.map((step, i) => (
+                {responseStepsOf(scenario).map((step, i) => (
                   <li key={i} className="flex gap-2.5 text-sm">
                     <span className="shrink-0 w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">{i + 1}</span>
-                    <span className="text-slate-700 pt-0.5">{step}</span>
+                    <span className="min-w-0 pt-0.5">
+                      <span className="text-slate-700">{step.text}</span>
+                      <span className="block mt-0.5">
+                        {step.groupIds?.length
+                          ? step.groupIds.map((id) => <Badge key={id} color="violet">{state.groups.find((g) => g.id === id)?.name ?? id}</Badge>)
+                          : <Badge>alle Empfänger:innen</Badge>}
+                      </span>
+                    </span>
                   </li>
                 ))}
               </ol>
@@ -270,7 +277,9 @@ function ScenarioEditor({ scenario, onClose }: { scenario: Scenario; onClose: ()
       scenario: {
         ...draft,
         callGuidance: (draft.callGuidance ?? []).filter((s) => s.trim()),
-        responseInstructions: (draft.responseInstructions ?? []).filter((s) => s.trim()),
+        // Altes Feld ohne Gruppen wird beim Speichern endgültig abgelöst
+        responseSteps: responseStepsOf(draft).map((s) => ({ ...s, text: s.text.trim() })).filter((s) => s.text),
+        responseInstructions: undefined,
         instructions: draft.instructions.filter((s) => s.trim()),
         followUp: draft.followUp.filter((s) => s.trim()),
         checklist: draft.checklist.filter((s) => s.trim()),
@@ -331,14 +340,10 @@ function ScenarioEditor({ scenario, onClose }: { scenario: Scenario; onClose: ()
           onChange={(e) => setDraft({ ...draft, instructions: e.target.value.split('\n') })}
         />
       </Field>
-      <Field label="Empfänger: Was tun, wenn Sie diesen Alarm erhalten (eine pro Zeile – kein Notruf, keine erneute Auslösung)">
-        <textarea
-          className={inputClass} rows={5}
-          placeholder="z. B. Kein zweiter Notruf: Die Feuerwehr ist alarmiert."
-          value={(draft.responseInstructions ?? []).join('\n')}
-          onChange={(e) => setDraft({ ...draft, responseInstructions: e.target.value.split('\n') })}
-        />
-      </Field>
+      <EmpfaengerSchritteEditor
+        schritte={responseStepsOf(draft)}
+        onChange={(responseSteps) => setDraft({ ...draft, responseSteps, responseInstructions: undefined })}
+      />
       <Field label="Weiterführende Massnahmen nach der Akutphase (eine pro Zeile)">
         <textarea
           className={inputClass} rows={4}
@@ -410,5 +415,93 @@ function ScenarioEditor({ scenario, onClose }: { scenario: Scenario; onClose: ()
         <Button onClick={save} disabled={!draft.title.trim()}>Speichern &amp; sofort verteilen</Button>
       </div>
     </Modal>
+  )
+}
+
+// ---------- Empfängerschritte mit Gruppenzuordnung ----------
+
+/**
+ * Ein Schritt pro Zeile, dazu die Gruppen, für die er gilt. Ohne Gruppen gilt
+ * er für alle Empfänger:innen. So sieht jede Person in der App nur, was sie
+ * selbst betrifft – die Ersthelferin ihren Rucksack, der Hausdienst die Zufahrt.
+ */
+function EmpfaengerSchritteEditor({ schritte, onChange }: { schritte: ResponseStep[]; onChange: (s: ResponseStep[]) => void }) {
+  const { state } = useStore()
+  const gruppen = state.groups.filter((g) => g.id !== 'gr-alle')
+
+  function setze(i: number, aenderung: Partial<ResponseStep>) {
+    onChange(schritte.map((s, k) => (k === i ? { ...s, ...aenderung } : s)))
+  }
+  function gruppeUmschalten(i: number, id: string) {
+    const aktuell = schritte[i].groupIds ?? []
+    setze(i, { groupIds: aktuell.includes(id) ? aktuell.filter((g) => g !== id) : [...aktuell, id] })
+  }
+  function verschieben(i: number, richtung: -1 | 1) {
+    const ziel = i + richtung
+    if (ziel < 0 || ziel >= schritte.length) return
+    const kopie = [...schritte]
+    ;[kopie[i], kopie[ziel]] = [kopie[ziel], kopie[i]]
+    onChange(kopie)
+  }
+
+  return (
+    <div className="mb-3">
+      <span className="block text-sm font-medium text-slate-600 mb-1">
+        Empfänger: Was tun, wenn Sie diesen Alarm erhalten – kein Notruf, keine erneute Auslösung
+      </span>
+      <p className="text-xs text-slate-400 mb-2">
+        Ohne Gruppe gilt ein Schritt für alle. Mit Gruppen sehen ihn nur deren Mitglieder – die App
+        blendet einer Person die Schritte anderer Gruppen aus.
+      </p>
+      <div className="space-y-2">
+        {schritte.map((s, i) => (
+          <div key={i} className="rounded-lg border border-slate-200 bg-white p-2.5">
+            <div className="flex gap-2 items-start">
+              <span className="shrink-0 w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold mt-1">{i + 1}</span>
+              <textarea
+                className={`${inputClass} flex-1`} rows={2}
+                value={s.text}
+                onChange={(e) => setze(i, { text: e.target.value })}
+                placeholder="z. B. Kein zweiter Notruf: Die Feuerwehr ist alarmiert."
+              />
+              <div className="flex flex-col gap-1">
+                <Button type="button" variant="ghost" title="Nach oben" onClick={() => verschieben(i, -1)} disabled={i === 0}>↑</Button>
+                <Button type="button" variant="ghost" title="Nach unten" onClick={() => verschieben(i, 1)} disabled={i === schritte.length - 1}>↓</Button>
+                <Button type="button" variant="ghost" title="Entfernen" onClick={() => onChange(schritte.filter((_, k) => k !== i))}><Trash2 size={14} /></Button>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5 mt-2 pl-8">
+              <button
+                type="button"
+                onClick={() => setze(i, { groupIds: [] })}
+                className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                  !s.groupIds?.length ? 'bg-slate-800 border-slate-800 text-white' : 'bg-white border-slate-300 text-slate-500'
+                }`}
+              >
+                alle Empfänger:innen
+              </button>
+              {gruppen.map((g) => {
+                const an = s.groupIds?.includes(g.id) ?? false
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => gruppeUmschalten(i, g.id)}
+                    className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                      an ? 'bg-violet-600 border-violet-600 text-white' : 'bg-white border-slate-300 text-slate-500'
+                    }`}
+                  >
+                    {g.name}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      <Button type="button" variant="secondary" className="mt-2" onClick={() => onChange([...schritte, { text: '' }])}>
+        + Schritt hinzufügen
+      </Button>
+    </div>
   )
 }

@@ -146,7 +146,7 @@ KOERPER = r"""
     </figure>
     <figure class="geraet">
       <img src="bilder/app-03-empfaenger.webp" alt="Ansicht für Empfänger mit der Alarmmeldung, der Quittierung und den Schritten für Empfänger">
-      <figcaption><b>Abb.</b> &nbsp; Was Sie als Empfängerin oder Empfänger tun.</figcaption>
+      <figcaption><b>Abb.</b> &nbsp; Was Sie als Empfängerin oder Empfänger tun &ndash; hier für ein Mitglied der Schulsanität. Schritte anderer Gruppen sind ausgeblendet und lassen sich unten einblenden.</figcaption>
     </figure>
   </div>
   <ol class="schritte">
@@ -169,6 +169,12 @@ KOERPER = r"""
       zweiter Notruf blockiert die Leitung, ein zweiter Alarm verwirrt alle. Für
       Empfänger gilt darum ein eigener Ablauf: Klasse sammeln, Sammelplatz, zählen,
       melden. Die App zeigt Ihnen automatisch den richtigen.
+    </p>
+    <p>
+      Und sie zeigt nur <em>Ihre</em> Schritte: Wer zur Schulsanität gehört, sieht den
+      Rucksack; wer zum Hausdienst gehört, sieht die Zufahrt. Was andere Gruppen
+      gerade tun, lässt sich mit einem Tipp einblenden &ndash; hilfreich, wenn Sie
+      wissen wollen, wer die Feuerwehr einweist.
     </p>
   </div>
   <div class="hinweis hinweis--warnung">

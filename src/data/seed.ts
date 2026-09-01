@@ -2,7 +2,7 @@ import type { AppState, Scenario, User, Group, Location, AlarmPlan, AlarmButton,
 
 // Vorkonfigurierte Notfallszenarien für das heilpädagogische Kompetenzzentrum SONNENBERG
 /** Inhaltsversion der Standard-Szenarien – bei Erhöhung werden sie beim Laden aktualisiert */
-export const SCENARIO_CONTENT_VERSION = 5
+export const SCENARIO_CONTENT_VERSION = 6
 
 export const SEED_SCENARIOS: Scenario[] = [
   {
@@ -23,14 +23,17 @@ export const SEED_SCENARIOS: Scenario[] = [
       'Schüler:innen mit Mobilitätseinschränkung nach dem persönlichen Evakuationsplan begleiten; im Notfall in einen sicheren Bereich hinter einer Brandschutztüre bringen und den Standort sofort der Feuerwehr melden.',
       'Feuerwehr an der vereinbarten Zufahrt einweisen und über vermisste Personen informieren.',
     ],
-    responseInstructions: [
-      'Kein zweiter Notruf: Die Feuerwehr ist alarmiert. Anrufen nur, wenn Sie Neues wissen – Personen in Gefahr, Feuer breitet sich aus.',
-      'Am betroffenen Standort: Unterricht sofort beenden, Klasse sammeln, Klassenliste mitnehmen, über den nächsten freien Fluchtweg zum Sammelplatz.',
-      'Schüler:innen mit persönlichem Evakuationsplan nach Plan begleiten – festgelegte Begleitperson, Tragehilfe, Evakuationsstuhl.',
-      'Raum kontrollieren, auch WC und Nebenräume; Türe schliessen, nicht abschliessen.',
-      'Am Sammelplatz zählen und der Evakuationsleitung melden – auch wenn alle da sind.',
-      'An einem anderen Standort: nichts unternehmen, erreichbar bleiben, den betroffenen Standort nicht anrufen – die Leitungen werden gebraucht.',
-      'Nicht ins Gebäude zurück, bis die Feuerwehr freigibt. Weisungen der Einsatzleitung gehen allen anderen vor.',
+    responseSteps: [
+      { text: 'Kein zweiter Notruf: Die Feuerwehr ist alarmiert. Anrufen nur, wenn Sie Neues wissen – Personen in Gefahr, Feuer breitet sich aus.' },
+      { text: 'Am betroffenen Standort: Unterricht sofort beenden, Klasse sammeln, Klassenliste mitnehmen, über den nächsten freien Fluchtweg zum Sammelplatz.' },
+      { text: 'Schüler:innen mit persönlichem Evakuationsplan nach Plan begleiten – festgelegte Begleitperson, Tragehilfe, Evakuationsstuhl.' },
+      { text: 'Raum kontrollieren, auch WC und Nebenräume; Türe schliessen, nicht abschliessen.' },
+      { text: 'Evakuationshelfer: zugeteilte Etage abgehen, Räume kontrollieren, Personen mit Evakuationsplan zum Sammelplatz begleiten, danach der Evakuationsleitung Vollzug melden.', groupIds: ['gr-evak'] },
+      { text: 'Am Sammelplatz zählen und der Evakuationsleitung melden – auch wenn alle da sind.' },
+      { text: 'Ersthelfer: mit Notfallrucksack zum Sammelplatz; Verletzte und Rauchgaseinwirkung versorgen, Rettungsdienst nachfordern.', groupIds: ['gr-ersthelfer'] },
+      { text: 'Hausdienst: Feuerwehr an der Zufahrt einweisen, Schlüssel und Gebäudepläne bereithalten, Aufzüge ausser Betrieb.', groupIds: ['gr-sicherheit'] },
+      { text: 'An einem anderen Standort: nichts unternehmen, erreichbar bleiben, den betroffenen Standort nicht anrufen – die Leitungen werden gebraucht.' },
+      { text: 'Nicht ins Gebäude zurück, bis die Feuerwehr freigibt. Weisungen der Einsatzleitung gehen allen anderen vor.' },
     ],
     followUp: [
       'Am Sammelplatz anhand der Klassenliste zählen und das Ergebnis der Evakuationsleitung melden – auch dann, wenn alle da sind.',
@@ -78,15 +81,17 @@ export const SEED_SCENARIOS: Scenario[] = [
       'Räume kontrollieren (auch WC und Nebenräume), Türe schliessen und nicht abschliessen – so weiss die Einsatzleitung: Raum geräumt.',
       'Am Sammelplatz Abstand zu Zufahrten halten – die Blaulichtorganisationen brauchen freie Wege.',
     ],
-    responseInstructions: [
-      'Kein zweiter Alarm: Die Räumung ist ausgelöst. Wer sie angeordnet hat, steht in der Meldung.',
-      'Unterricht oder Therapie sofort beenden. Ruhige, bestimmte Ansage: «Wir gehen jetzt gemeinsam nach draussen.»',
-      'Klasse sammeln, anhand der Klassenliste zählen, Liste mitnehmen.',
-      'Schüler:innen mit besonderem Unterstützungsbedarf nach ihrem persönlichen Evakuationsplan begleiten.',
-      'Besucher:innen, Therapiegäste und Handwerker mitnehmen – sie kennen die Wege nicht.',
-      'Nächsten freien Fluchtweg nehmen, keine Aufzüge, nichts holen. Raum kontrollieren, Türe schliessen, nicht abschliessen.',
-      'Am Sammelplatz zählen und melden: «Klasse X, vollständig» oder «Klasse X, es fehlen N – zuletzt gesehen in …».',
-      'Rückkehr erst nach Entwarnung über die App oder durch die Einsatzleitung.',
+    responseSteps: [
+      { text: 'Kein zweiter Alarm: Die Räumung ist ausgelöst. Wer sie angeordnet hat, steht in der Meldung.' },
+      { text: 'Unterricht oder Therapie sofort beenden. Ruhige, bestimmte Ansage: «Wir gehen jetzt gemeinsam nach draussen.»' },
+      { text: 'Klasse sammeln, anhand der Klassenliste zählen, Liste mitnehmen.' },
+      { text: 'Schüler:innen mit besonderem Unterstützungsbedarf nach ihrem persönlichen Evakuationsplan begleiten.' },
+      { text: 'Evakuationshelfer: zugeteilte Etage abgehen, Räume kontrollieren, Personen mit Evakuationsplan begleiten, danach Vollzug melden.', groupIds: ['gr-evak'] },
+      { text: 'Besucher:innen, Therapiegäste und Handwerker mitnehmen – sie kennen die Wege nicht.' },
+      { text: 'Nächsten freien Fluchtweg nehmen, keine Aufzüge, nichts holen. Raum kontrollieren, Türe schliessen, nicht abschliessen.' },
+      { text: 'Am Sammelplatz zählen und melden: «Klasse X, vollständig» oder «Klasse X, es fehlen N – zuletzt gesehen in …».' },
+      { text: 'Hausdienst: Zufahrten freihalten, Einsatzkräfte einweisen, Ausweichräume bei Kälte aufschliessen.', groupIds: ['gr-sicherheit'] },
+      { text: 'Rückkehr erst nach Entwarnung über die App oder durch die Einsatzleitung.' },
     ],
     followUp: [
       'Zählung an die Evakuationsleitung melden, im festen Wortlaut: «Klasse X, vollständig» oder «Klasse X, es fehlen N – zuletzt gesehen in …».',
@@ -135,13 +140,14 @@ export const SEED_SCENARIOS: Scenario[] = [
       'Notfallmedikamente nur nach ärztlicher Verordnung und schriftlicher Ermächtigung der Erziehungsberechtigten verabreichen – Zeitpunkt und Dosis sofort notieren.',
       'Rettungsdienst an der vereinbarten Zufahrt abholen und einweisen.',
     ],
-    responseInstructions: [
-      'Kein zweiter Notruf: 144 ist alarmiert, sofern die Meldung nichts anderes sagt.',
-      'Ersthelfer:in: «Ich komme» quittieren, Notfallrucksack und Defibrillator mitnehmen, direkt zum gemeldeten Ort.',
-      'Vor Ort übernehmen und von der auslösenden Person erfragen: Was ist passiert, seit wann, was wurde bereits gemacht.',
-      'Eine Person zur vereinbarten Zufahrt schicken, um den Rettungsdienst einzuweisen.',
-      'Alle anderen: Kinder aus dem Bereich führen, Zugänge freihalten, keine Zuschauer, keine Fotos.',
-      'Wer nicht Ersthelfer:in ist und nicht in der Nähe: nichts unternehmen, erreichbar bleiben.',
+    responseSteps: [
+      { text: 'Kein zweiter Notruf: 144 ist alarmiert, sofern die Meldung nichts anderes sagt.' },
+      { text: '«Ich komme» quittieren, Notfallrucksack und Defibrillator mitnehmen, direkt zum gemeldeten Ort.', groupIds: ['gr-ersthelfer'] },
+      { text: 'Vor Ort übernehmen und von der auslösenden Person erfragen: Was ist passiert, seit wann, was wurde bereits gemacht.', groupIds: ['gr-ersthelfer'] },
+      { text: 'Eine Person zur vereinbarten Zufahrt schicken, um den Rettungsdienst einzuweisen.', groupIds: ['gr-ersthelfer', 'gr-sicherheit'] },
+      { text: 'Hausdienst: Zufahrt freihalten, Aufzug für den Rettungsdienst bereithalten, Notfallblatt aus dem Sekretariat holen.', groupIds: ['gr-sicherheit'] },
+      { text: 'Kinder aus dem Bereich führen, Zugänge freihalten, keine Zuschauer, keine Fotos.' },
+      { text: 'Wer nicht in der Nähe ist: nichts unternehmen, erreichbar bleiben.' },
     ],
     followUp: [
       'Eine Bezugsperson begleitet das Kind ins Spital; Notfallblatt mit Diagnosen, Medikamenten und Allergien mitgeben.',
@@ -190,13 +196,14 @@ export const SEED_SCENARIOS: Scenario[] = [
       'Körperliche Intervention nur als letztes Mittel zur Abwehr einer unmittelbaren Gefahr für Leib und Leben – so kurz und so mild wie möglich, nie allein, nie in Bauchlage, Atmung immer im Blick.',
       'Entgleitet die Lage trotz allem: Bereich räumen, sich selbst in Sicherheit bringen und die Polizei beiziehen – siehe Schritt «Alarmieren».',
     ],
-    responseInstructions: [
-      'Still bleiben: kein Gespräch darüber vor Kindern, keine laute Ansage, nichts in Gruppen-Chats.',
-      'Deeskalationsteam: quittieren und ohne Aufsehen zum Ort. Höchstens zwei Personen betreten den Raum – mehr Publikum verschärft die Lage.',
-      'Vor der Türe kurz absprechen: Wer spricht, wer sichert den Ausgang, wer übernimmt die übrigen Kinder.',
-      'Alle anderen: eigene Gruppe im Raum behalten, Flur freihalten, Neugierige fernhalten.',
-      'Polizei nur auf Anweisung der Person vor Ort oder der Schulleitung – nicht auf eigene Faust.',
-      'Entwarnung kommt über die App. Bis dahin bleibt der Bereich gesperrt.',
+    responseSteps: [
+      { text: 'Still bleiben: kein Gespräch darüber vor Kindern, keine laute Ansage, nichts in Gruppen-Chats.' },
+      { text: 'Quittieren und ohne Aufsehen zum Ort. Höchstens zwei Personen betreten den Raum – mehr Publikum verschärft die Lage.', groupIds: ['gr-paed'] },
+      { text: 'Vor der Türe kurz absprechen: Wer spricht, wer sichert den Ausgang, wer übernimmt die übrigen Kinder.', groupIds: ['gr-paed'] },
+      { text: 'Eigene Gruppe im Raum behalten, Flur freihalten, Neugierige fernhalten.' },
+      { text: 'Ersthelfer: in Bereitschaft bleiben, nicht in den Raum – erst auf Anforderung des Deeskalationsteams.', groupIds: ['gr-ersthelfer'] },
+      { text: 'Polizei nur auf Anweisung der Person vor Ort oder der Schulleitung – nicht auf eigene Faust.' },
+      { text: 'Entwarnung kommt über die App. Bis dahin bleibt der Bereich gesperrt.' },
     ],
     followUp: [
       'Nachsorge für die betroffene Person: Rückzugsort, vertraute Bezugsperson, keine Sanktion in der Erregungsphase.',
@@ -242,14 +249,15 @@ export const SEED_SCENARIOS: Scenario[] = [
       'Bei Bedrohung, Waffen, aggressivem Verhalten oder Verweigerung: sofort zurückziehen, in einem abschliessbaren Raum einschliessen und dort bleiben, bis die Polizei eintrifft.',
       'Verlässt die Person das Areal: Fluchtrichtung beobachten, nicht verfolgen.',
     ],
-    responseInstructions: [
-      'Still bleiben: Die Person darf nichts bemerken. Keine Durchsage, kein Hinauslaufen.',
-      'Eigene Gruppe im Raum behalten, Türe schliessen, Fenster im Erdgeschoss schliessen, Aussentüren nicht öffnen.',
-      'Kinder nicht auf den Flur oder ins Freie lassen; Pausen und Raumwechsel verschieben, bis Entwarnung kommt.',
-      'Sicherheitsverantwortliche: quittieren, Kontakt zur auslösenden Person aufnehmen, Beschreibung und Aufenthaltsort der Person übernehmen.',
-      'Niemand geht der Person nach. Beobachten aus sicherer Distanz, nichts weiter.',
-      'Bei unmittelbarer Bedrohung im eigenen Bereich: Raum abschliessen, Polizei 117, drinnen bleiben.',
-      'Normalbetrieb erst nach Entwarnung über die App.',
+    responseSteps: [
+      { text: 'Still bleiben: Die Person darf nichts bemerken. Keine Durchsage, kein Hinauslaufen.' },
+      { text: 'Eigene Gruppe im Raum behalten, Türe schliessen, Fenster im Erdgeschoss schliessen, Aussentüren nicht öffnen.' },
+      { text: 'Kinder nicht auf den Flur oder ins Freie lassen; Pausen und Raumwechsel verschieben, bis Entwarnung kommt.' },
+      { text: 'Quittieren, Kontakt zur auslösenden Person aufnehmen, Beschreibung und Aufenthaltsort der Person übernehmen.', groupIds: ['gr-sicherheit'] },
+      { text: 'Aussentüren kontrollieren und schliessen, Empfang besetzen, Zufahrt im Blick behalten; niemand geht der Person nach.', groupIds: ['gr-sicherheit'] },
+      { text: 'Krisenstab: quittieren, Lage mit dem Hausdienst abstimmen, über Polizeiaufgebot und Elterninformation entscheiden.', groupIds: ['gr-krisenstab'] },
+      { text: 'Bei unmittelbarer Bedrohung im eigenen Bereich: Raum abschliessen, Polizei 117, drinnen bleiben.' },
+      { text: 'Normalbetrieb erst nach Entwarnung über die App.' },
     ],
     followUp: [
       'Beobachtungen sofort schriftlich festhalten, solange die Erinnerung frisch ist – jede Person für sich, ohne Absprache untereinander.',
@@ -293,13 +301,14 @@ export const SEED_SCENARIOS: Scenario[] = [
       'Handyverbot im betroffenen Bereich durchsetzen – keine Fotos, keine Nachrichten, keine Beiträge in sozialen Medien.',
       'Die Sprachregelung legt ausschliesslich die Schulleitung fest. Bis dahin gilt gegenüber allen Externen und Medien: keine Auskunft.',
     ],
-    responseInstructions: [
-      'Still bleiben: nichts weitererzählen, nichts posten, keine Nachrichten an Kolleg:innen oder Eltern.',
-      'Krisenstab: quittieren, Führungsraum beziehen, Sprachregelung abwarten.',
-      'Alle anderen: Unterricht so normal wie möglich fortführen; den betroffenen Bereich nicht betreten und keine Kinder hinlassen.',
-      'Fragen von Kindern oder Eltern: «Die Schulleitung informiert.» – nicht mehr.',
-      'Medienanfragen unbeantwortet an die von der Schulleitung bezeichnete Stelle weiterleiten.',
-      'Weitere Weisungen kommen über die App oder persönlich von der Schulleitung.',
+    responseSteps: [
+      { text: 'Still bleiben: nichts weitererzählen, nichts posten, keine Nachrichten an Kolleg:innen oder Eltern.' },
+      { text: 'Quittieren, Führungsraum beziehen, Sprachregelung festlegen; Care-Team und Schulpsychologischen Dienst aufbieten.', groupIds: ['gr-krisenstab'] },
+      { text: 'Fundort unverändert lassen und den Bereich sperren; bei aussergewöhnlichem Todesfall auf die Polizei warten.', groupIds: ['gr-krisenstab', 'gr-sicherheit'] },
+      { text: 'Unterricht so normal wie möglich fortführen; den betroffenen Bereich nicht betreten und keine Kinder hinlassen.' },
+      { text: 'Fragen von Kindern oder Eltern: «Die Schulleitung informiert.» – nicht mehr.' },
+      { text: 'Medienanfragen unbeantwortet an die von der Schulleitung bezeichnete Stelle weiterleiten.' },
+      { text: 'Weitere Weisungen kommen über die App oder persönlich von der Schulleitung.' },
     ],
     followUp: [
       'Angehörige werden zuerst und persönlich informiert – nie über die Schule und nie vor der Polizei, wenn diese eingeschaltet ist.',
@@ -349,13 +358,13 @@ export const SEED_SCENARIOS: Scenario[] = [
       'Auch bei scheinbar unauffälliger Person nach Wasseraspiration: ärztliche Abklärung ist zwingend – Beschwerden können Stunden später auftreten.',
       'Bei Verdacht auf Wirbelsäulenverletzung nach Sprung oder Sturz: Kopf und Nacken achsengerecht stabilisieren, so wenig wie möglich bewegen.',
     ],
-    responseInstructions: [
-      'Kein zweiter Notruf: 144 ist alarmiert.',
-      'Ersthelfer:in: «Ich komme» quittieren, Notfallrucksack und Defibrillator mitnehmen, direkt ins Bad.',
-      'Vor Ort die Wiederbelebung übernehmen und im Wechsel weiterführen – alle zwei Minuten abwechseln; Brustkorb vor dem Defibrillator abtrocknen.',
-      'Eine Person zur Zufahrt zum Bad, um den Rettungsdienst einzuweisen – der Weg ist von aussen nicht selbsterklärend.',
-      'Übrige Kinder in den Trockenbereich, abtrocknen, warm halten, betreuen; niemand zurück ins Wasser.',
-      'Wer nicht Ersthelfer:in ist und nicht in der Nähe: nichts unternehmen, erreichbar bleiben.',
+    responseSteps: [
+      { text: 'Kein zweiter Notruf: 144 ist alarmiert.' },
+      { text: '«Ich komme» quittieren, Notfallrucksack und Defibrillator mitnehmen, direkt ins Bad.', groupIds: ['gr-ersthelfer'] },
+      { text: 'Vor Ort die Wiederbelebung übernehmen und im Wechsel weiterführen – alle zwei Minuten abwechseln; Brustkorb vor dem Defibrillator abtrocknen.', groupIds: ['gr-ersthelfer'] },
+      { text: 'Zur Zufahrt zum Bad, um den Rettungsdienst einzuweisen – der Weg ist von aussen nicht selbsterklärend.', groupIds: ['gr-sicherheit'] },
+      { text: 'Übrige Kinder in den Trockenbereich, abtrocknen, warm halten, betreuen; niemand zurück ins Wasser.' },
+      { text: 'Wer nicht in der Nähe ist: nichts unternehmen, erreichbar bleiben.' },
     ],
     followUp: [
       'Betrieb des Bades bis zur Klärung einstellen und den Zugang sperren.',
@@ -404,13 +413,14 @@ export const SEED_SCENARIOS: Scenario[] = [
       'Keine Lösegeldzahlung und keine eigenmächtigen Wiederherstellungsversuche – Entscheide trifft der Krisenstab zusammen mit den ICT-Verantwortlichen.',
       'Passwörter erst nach Absprache ändern; überstürzte Änderungen können Spuren zerstören oder Angreifer warnen.',
     ],
-    responseInstructions: [
-      'Keine eigenen Reparaturversuche: nichts neu starten, keine Passwörter ändern, nichts löschen – Anweisungen der ICT abwarten.',
-      'ICT-Verantwortliche: quittieren, betroffene Geräte vom Netz nehmen, nicht ausschalten, Spuren sichern.',
-      'Alle: auf Papierbetrieb umstellen. Klassenlisten, Notfallblätter, Telefonlisten und Medikamentenpläne liegen im Sekretariat.',
-      'Erreichbarkeit über das Mobiltelefon sicherstellen; die Notrufnummern gehen über das Mobilnetz.',
-      'Verdächtige E-Mails oder Anrufe von angeblichem Support: nicht reagieren, der ICT melden.',
-      'Nichts nach aussen kommunizieren – das macht der Krisenstab.',
+    responseSteps: [
+      { text: 'Keine eigenen Reparaturversuche: nichts neu starten, keine Passwörter ändern, nichts löschen – Anweisungen der ICT abwarten.' },
+      { text: 'Quittieren, betroffene Geräte vom Netz nehmen, nicht ausschalten, Spuren sichern; Umfang feststellen.', groupIds: ['gr-it'] },
+      { text: 'Krisenstab: Lage mit der ICT aufnehmen, über Meldungen an Datenschutzaufsicht, BACS und Polizei entscheiden.', groupIds: ['gr-krisenstab'] },
+      { text: 'Auf Papierbetrieb umstellen. Klassenlisten, Notfallblätter, Telefonlisten und Medikamentenpläne liegen im Sekretariat.' },
+      { text: 'Erreichbarkeit über das Mobiltelefon sicherstellen; die Notrufnummern gehen über das Mobilnetz.' },
+      { text: 'Verdächtige E-Mails oder Anrufe von angeblichem Support: nicht reagieren, der ICT melden.' },
+      { text: 'Nichts nach aussen kommunizieren – das macht der Krisenstab.' },
     ],
     followUp: [
       'Betroffene Systeme, Zeitpunkte und Auffälligkeiten protokollieren; Ereignisprotokolle und Sicherungen sichern.',
@@ -459,12 +469,12 @@ export const SEED_SCENARIOS: Scenario[] = [
       'Sofortmassnahmen festlegen und mit Frist und Namen verbindlich zuweisen; danach den nächsten Lagerapport terminieren.',
       'Eine einzige Sprachregelung beschliessen. Alle Auskünfte nach aussen laufen über die bezeichnete Stelle – niemand sonst gibt Auskunft.',
     ],
-    responseInstructions: [
-      'Quittieren – auch wenn Sie nicht kommen können. Die Leitung muss wissen, mit wem sie rechnen kann.',
-      'Führungsraum beziehen: Sitzungszimmer Hauptsitz Baar, Rückfallort nach Absprache.',
-      'Unterwegs keine Auskünfte, keine Nachrichten in Gruppen-Chats, keine Anrufe an Eltern.',
-      'Beim Eintreffen: Lage abholen, Rolle übernehmen, sich ins Journal eintragen lassen.',
-      'Wer nicht zum Krisenstab gehört: nichts unternehmen, Weisungen kommen über die App.',
+    responseSteps: [
+      { text: 'Quittieren – auch wenn Sie nicht kommen können. Die Leitung muss wissen, mit wem sie rechnen kann.', groupIds: ['gr-krisenstab'] },
+      { text: 'Führungsraum beziehen: Sitzungszimmer Hauptsitz Baar, Rückfallort nach Absprache.', groupIds: ['gr-krisenstab'] },
+      { text: 'Unterwegs keine Auskünfte, keine Nachrichten in Gruppen-Chats, keine Anrufe an Eltern.', groupIds: ['gr-krisenstab'] },
+      { text: 'Beim Eintreffen: Lage abholen, Rolle übernehmen, sich ins Journal eintragen lassen.', groupIds: ['gr-krisenstab'] },
+      { text: 'Wer nicht zum Krisenstab gehört: nichts unternehmen, Weisungen kommen über die App.' },
     ],
     followUp: [
       'Erziehungsberechtigte über den offiziellen Kanal informieren; Eltern-Hotline oder Informationsseite einrichten, bevor Gerüchte entstehen.',

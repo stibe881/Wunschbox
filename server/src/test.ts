@@ -83,15 +83,26 @@ async function main(): Promise<void> {
 
   // Wer einen Alarm erhält, hat ihn nicht entdeckt: Für ihn gilt ein eigener
   // Ablauf ohne Notruf und ohne erneute Auslösung.
-  pruefe('jedes freigegebene Szenario hat Anweisungen für Empfänger',
-    aktive.every((s: any) => Array.isArray(s.responseInstructions) && s.responseInstructions.length >= 3),
-    aktive.filter((s: any) => (s.responseInstructions?.length ?? 0) < 3).map((s: any) => s.id).join(', '))
+  pruefe('jedes freigegebene Szenario hat Schritte für Empfänger',
+    aktive.every((s: any) => Array.isArray(s.responseSteps) && s.responseSteps.length >= 3),
+    aktive.filter((s: any) => (s.responseSteps?.length ?? 0) < 3).map((s: any) => s.id).join(', '))
   const empfaengerLoest = aktive.flatMap((s: any) =>
-    (s.responseInstructions ?? [])
-      .filter((i: string) => /Alarm in der App auslösen|Aufgebot in der App|(118|144) (anrufen|alarmieren)/i.test(i))
-      .map((i: string) => `${s.id}: ${i.slice(0, 60)}`),
+    (s.responseSteps ?? [])
+      .filter((st: any) => /Alarm in der App auslösen|Aufgebot in der App|(118|144) (anrufen|alarmieren)/i.test(st.text))
+      .map((st: any) => `${s.id}: ${st.text.slice(0, 60)}`),
   )
   pruefe('Empfänger werden nicht zum erneuten Alarmieren angehalten', empfaengerLoest.length === 0, empfaengerLoest.join(' | '))
+
+  // Gruppenzuordnung: Jede genannte Gruppe muss existieren, und jedes Szenario
+  // braucht mindestens einen Schritt, der für alle gilt - sonst stünde jemand
+  // ohne Gruppe vor einer leeren Seite.
+  const gruppenIds = new Set(stand.body.groups.map((g: any) => g.id))
+  const fremdeGruppen = aktive.flatMap((s: any) =>
+    (s.responseSteps ?? []).flatMap((st: any) => (st.groupIds ?? []).filter((g: string) => !gruppenIds.has(g)).map((g: string) => `${s.id}: ${g}`)),
+  )
+  pruefe('Empfängerschritte verweisen nur auf vorhandene Gruppen', fremdeGruppen.length === 0, fremdeGruppen.join(', '))
+  const ohneAllgemein = aktive.filter((s: any) => !(s.responseSteps ?? []).some((st: any) => !st.groupIds?.length)).map((s: any) => s.id)
+  pruefe('jedes Szenario hat mindestens einen Schritt für alle Empfänger', ohneAllgemein.length === 0, ohneAllgemein.join(', '))
 
   // --- Passwortwechsel ---
   const zuKurz = await ruf('/auth/password', {

@@ -10,7 +10,7 @@ import { CHANNEL_LABELS } from '../types'
 import { Badge, HoldButton, Toggle, formatDuration, formatRelative, inputClass, useConfirm } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 import { MIN_PASSWORD_LENGTH, passwordProblem } from '../lib/auth'
-import { activeScenarios } from '../lib/scenarios'
+import { activeScenarios, responseStepsFor, responseStepsOf } from '../lib/scenarios'
 
 type Tab = 'start' | 'szenarien' | 'alleinarbeit' | 'notruf' | 'profil'
 
@@ -490,7 +490,7 @@ function ScenarioView({
         >
           Geführt starten – ich habe es entdeckt
         </button>
-        {(scenario.responseInstructions?.length ?? 0) > 0 && (
+        {responseStepsOf(scenario).length > 0 && (
           <button
             className="mt-2 w-full rounded-2xl bg-white border border-slate-300 text-slate-700 py-3 font-semibold"
             onClick={() => setModus('empfaenger')}
@@ -815,7 +815,12 @@ function EmpfaengerAnsicht({
   const { state, dispatch } = useStore()
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
   const [erledigt, setErledigt] = useState<Record<number, boolean>>({})
-  const schritte = scenario.responseInstructions ?? []
+  const [zeigeAndere, setZeigeAndere] = useState(false)
+  // Nur die Schritte der eigenen Gruppen – die übrigen bleiben auf Wunsch einsehbar
+  const { eigene, andere } = responseStepsFor(scenario, me.groupIds)
+  const gruppenName = (ids?: string[]) =>
+    (ids ?? []).map((id) => state.groups.find((g) => g.id === id)?.name).filter(Boolean).join(', ')
+  const meineGruppen = state.groups.filter((g) => me.groupIds.includes(g.id) && g.id !== 'gr-alle')
   const ausloeser = alarm ? state.users.find((u) => u.id === alarm.triggeredByUserId) : undefined
   const orte = alarm
     ? alarm.locationIds.map((id) => state.locations.find((l) => l.id === id)?.name).filter(Boolean).join(', ')
@@ -880,9 +885,13 @@ function EmpfaengerAnsicht({
         Kein Notruf, keine erneute Auslösung – das ist bereits geschehen. Hier steht, was <b>Sie</b> jetzt tun.
       </div>
 
-      <div className="text-xs text-slate-400 mb-1">Schritte antippen, wenn erledigt:</div>
+      <div className="text-xs text-slate-400 mb-1 flex flex-wrap items-center gap-1">
+        <span>Ihre Schritte{meineGruppen.length > 0 ? ' als' : ''}</span>
+        {meineGruppen.map((g) => <Badge key={g.id}>{g.name}</Badge>)}
+        <span>– antippen, wenn erledigt:</span>
+      </div>
       <div className="space-y-2">
-        {schritte.map((step, i) => (
+        {eigene.map((step, i) => (
           <button
             key={i}
             className="w-full flex gap-2.5 text-sm bg-white rounded-xl border border-slate-200 p-3 text-left"
@@ -891,10 +900,39 @@ function EmpfaengerAnsicht({
             <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${erledigt[i] ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-white'}`}>
               {erledigt[i] ? <Check size={14} /> : i + 1}
             </span>
-            <span className={`pt-0.5 ${erledigt[i] ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{step}</span>
+            <span className="min-w-0 pt-0.5">
+              <span className={erledigt[i] ? 'text-slate-400 line-through' : 'text-slate-700'}>{step.text}</span>
+              {step.groupIds && step.groupIds.length > 0 && (
+                <span className="block text-[11px] text-amber-700 mt-0.5">{gruppenName(step.groupIds)}</span>
+              )}
+            </span>
           </button>
         ))}
       </div>
+
+      {andere.length > 0 && (
+        <div className="mt-3">
+          <button
+            className="text-xs text-slate-500 underline underline-offset-2"
+            onClick={() => setZeigeAndere(!zeigeAndere)}
+          >
+            {zeigeAndere ? 'Schritte anderer Gruppen ausblenden' : `${andere.length} Schritt${andere.length > 1 ? 'e' : ''} anderer Gruppen anzeigen`}
+          </button>
+          {zeigeAndere && (
+            <div className="space-y-2 mt-2">
+              {andere.map((step, i) => (
+                <div key={i} className="flex gap-2.5 text-sm bg-slate-50 rounded-xl border border-dashed border-slate-300 p-3 text-slate-500">
+                  <span className="shrink-0 w-6 h-6 rounded-full bg-slate-300 text-white flex items-center justify-center text-xs font-bold">·</span>
+                  <span className="min-w-0 pt-0.5">
+                    <span>{step.text}</span>
+                    <span className="block text-[11px] text-slate-400 mt-0.5">{gruppenName(step.groupIds)}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <button className="mt-5 w-full text-sm text-slate-500 underline underline-offset-2" onClick={onEntdecker}>
         Vollständiges Szenario ansehen – für den Fall, dass Sie die Lage selbst entdecken

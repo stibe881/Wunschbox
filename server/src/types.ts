@@ -51,6 +51,13 @@ export interface Location {
 
 export type ScenarioPriority = 'hoch' | 'mittel' | 'tief'
 
+/** Ein Schritt für Empfänger:innen eines Alarms, wahlweise nur für bestimmte Gruppen */
+export interface ResponseStep {
+  text: string
+  /** Leer oder fehlend: gilt für alle Empfänger:innen */
+  groupIds?: string[]
+}
+
 export interface Scenario {
   id: string
   icon: string
@@ -79,7 +86,12 @@ export interface Scenario {
    * Was Empfänger:innen dieses Alarms tun. Sie sind nicht am Ort des
    * Geschehens und haben den Alarm von jemand anderem erhalten: kein Notruf,
    * keine erneute Auslösung – stattdessen die eigene Aufgabe.
+   *
+   * Jeder Schritt kann auf Gruppen eingeschränkt sein; die App zeigt einer
+   * Person nur die Schritte ihrer Gruppen. Ohne Gruppen gilt er für alle.
    */
+  responseSteps?: ResponseStep[]
+  /** @deprecated Vorgänger von responseSteps ohne Gruppenzuordnung; wird beim Lesen umgewandelt */
   responseInstructions?: string[]
   /**
    * Schweizer Rechtsgrundlagen und Normen, die für dieses Szenario gelten.
