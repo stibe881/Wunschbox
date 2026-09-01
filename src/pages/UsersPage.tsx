@@ -184,7 +184,7 @@ function UserEditor({ user, onClose }: { user: User; onClose: () => void }) {
 
   return (
     <Modal title={user.firstName ? `Benutzer: ${user.firstName} ${user.lastName}` : 'Neuer Benutzer'} onClose={onClose}>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Vorname">
           <input className={inputClass} value={draft.firstName} onChange={(e) => setDraft({ ...draft, firstName: e.target.value })} />
         </Field>
@@ -244,7 +244,7 @@ function UserEditor({ user, onClose }: { user: User; onClose: () => void }) {
           ))}
         </div>
       </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Ferienabwesenheit von">
           <input type="date" className={inputClass} value={absenceFrom} onChange={(e) => setAbsenceFrom(e.target.value)} />
         </Field>

@@ -12,7 +12,7 @@ export function Card({ title, actions, children, className = '' }: { title?: Rea
           {actions}
         </div>
       )}
-      <div className="p-5">{children}</div>
+      <div className="p-4 sm:p-5">{children}</div>
     </div>
   )
 }
@@ -57,15 +57,15 @@ export function Modal({ title, onClose, children, wide = false }: { title: strin
   // eigenem Stapelkontext geöffnet (etwa der Seitenleiste mit position: sticky),
   // würde ihn der später gezeichnete Hauptbereich sonst überdecken.
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/50 p-4 overflow-y-auto" onClick={onClose}>
-      <div className={`bg-white rounded-xl shadow-xl w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} mt-10`} onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/50 p-2 sm:p-4 overflow-y-auto" onClick={onClose}>
+      <div className={`bg-white rounded-xl shadow-xl w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} mt-4 sm:mt-10 mb-6`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
           <h3 className="font-semibold text-slate-800">{title}</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X size={18} />
           </button>
         </div>
-        <div className="p-5">{children}</div>
+        <div className="p-4 sm:p-5">{children}</div>
       </div>
     </div>,
     document.body,
@@ -143,8 +143,11 @@ export function Vorbereitet({ className = '' }: { className?: string }) {
 }
 
 /** Kurzer Kanalname für Abzeichen; nur Push ist tatsächlich angebunden */
+const KANAL_KURZ: Record<Channel, string> = {
+  push: 'Push', sms: 'SMS', email: 'E-Mail', voice: 'Sprachanruf', conference: 'Telefonkonferenz', tts: 'Durchsage', teams: 'Teams',
+}
 export function kanalName(c: Channel): string {
-  const kurz = CHANNEL_LABELS[c].split(' ')[0]
+  const kurz = KANAL_KURZ[c] ?? CHANNEL_LABELS[c]
   return c === 'push' ? kurz : `${kurz} (vorbereitet)`
 }
 

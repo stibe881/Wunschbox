@@ -85,7 +85,7 @@ function LocationEditor({ location, onClose }: { location: Location; onClose: ()
       <Field label="Adresse">
         <input className={inputClass} value={draft.address} onChange={(e) => setDraft({ ...draft, address: e.target.value })} />
       </Field>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Betriebstage">
           <input className={inputClass} value={draft.operatingHours.days} onChange={(e) => setDraft({ ...draft, operatingHours: { ...draft.operatingHours, days: e.target.value } })} />
         </Field>
@@ -101,7 +101,7 @@ function LocationEditor({ location, onClose }: { location: Location; onClose: ()
         Geofence hinterlegen (vorbereitet, noch nicht aktiv – die App überträgt noch keinen Standort)
       </label>
       {geoEnabled && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Field label="Breitengrad">
             <input type="number" step="0.0001" className={inputClass} value={geo.lat} onChange={(e) => setGeo({ ...geo, lat: Number(e.target.value) })} />
           </Field>

@@ -307,7 +307,7 @@ function ScenarioEditor({ scenario, onClose }: { scenario: Scenario; onClose: ()
       <Field label="Titel">
         <input className={inputClass} value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
       </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Kategorie">
           <select className={inputClass} value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>
             {CATEGORIES.map((c) => <option key={c}>{c}</option>)}

@@ -30,7 +30,7 @@ export default function Integrations() {
             <div>
               <Toggle checked={integ.smsGateway.enabled} onChange={(v) => update({ smsGateway: { ...integ.smsGateway, enabled: v } })} label={`SMS-Gateway (Anbindung Drittsysteme via SMS) – ${VORBEREITET}`} />
               {integ.smsGateway.enabled && (
-                <div className="grid grid-cols-2 gap-4 mt-2 pl-11">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2 pl-11">
                   <Field label="Provider">
                     <input className={inputClass} value={integ.smsGateway.provider} onChange={(e) => update({ smsGateway: { ...integ.smsGateway, provider: e.target.value } })} />
                   </Field>
@@ -86,7 +86,7 @@ export default function Integrations() {
             <div>
               <Toggle checked={integ.sso.enabled} onChange={(v) => update({ sso: { ...integ.sso, enabled: v } })} label={`Single Sign-On (SSO) – ${VORBEREITET}`} />
               {integ.sso.enabled && (
-                <div className="grid grid-cols-2 gap-4 mt-2 pl-11">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2 pl-11">
                   <Field label="Provider">
                     <input className={inputClass} value={integ.sso.provider} onChange={(e) => update({ sso: { ...integ.sso, provider: e.target.value } })} />
                   </Field>

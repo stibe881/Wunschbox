@@ -105,7 +105,7 @@ function ButtonEditor({ button, onClose }: { button: AlarmButton; onClose: () =>
       <Field label="Bezeichnung">
         <input className={inputClass} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
       </Field>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Typ">
           <select className={inputClass} value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value as AlarmButton['type'] })}>
             <option value="lorawan">LoRaWAN (Batterie &gt; 4 Jahre)</option>
@@ -116,7 +116,7 @@ function ButtonEditor({ button, onClose }: { button: AlarmButton; onClose: () =>
           <input className={inputClass} value={draft.serial} onChange={(e) => setDraft({ ...draft, serial: e.target.value })} />
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Standort">
           <select className={inputClass} value={draft.locationId ?? ''} onChange={(e) => setDraft({ ...draft, locationId: e.target.value || undefined })}>
             <option value="">Mobil / kein fester Standort</option>

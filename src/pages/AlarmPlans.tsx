@@ -103,7 +103,7 @@ function PlanEditor({ plan, onClose }: { plan: AlarmPlan; onClose: () => void })
 
   return (
     <Modal title={plan.name ? `Alarmplan: ${plan.name}` : 'Neuer Alarmplan'} onClose={onClose} wide>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Field label="Name">
           <input className={inputClass} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
         </Field>
@@ -114,7 +114,7 @@ function PlanEditor({ plan, onClose }: { plan: AlarmPlan; onClose: () => void })
           </select>
         </Field>
       </div>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Field label="Zielgruppen">
           <div className="space-y-1 max-h-40 overflow-y-auto">
             {state.groups.map((g) => (
@@ -174,15 +174,15 @@ function PlanEditor({ plan, onClose }: { plan: AlarmPlan; onClose: () => void })
                 />
                 Min.
               </label>
-              <label className="flex items-center gap-1.5 ml-auto">
-                <input type="checkbox" checked={esc.notifyEmergencyServices} onChange={(e) => updateEscalation(i, { notifyEmergencyServices: e.target.checked })} />
-                Blaulichtorganisationen benachrichtigen <Vorbereitet />
-              </label>
-              <Button variant="ghost" onClick={() => setDraft({ ...draft, escalation: draft.escalation.filter((_, j) => j !== i) })}>
+              <Button variant="ghost" className="ml-auto" onClick={() => setDraft({ ...draft, escalation: draft.escalation.filter((_, j) => j !== i) })}>
                 <Trash2 size={14} />
               </Button>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <label className="flex flex-wrap items-center gap-1.5 mb-3">
+              <input type="checkbox" checked={esc.notifyEmergencyServices} onChange={(e) => updateEscalation(i, { notifyEmergencyServices: e.target.checked })} />
+              Blaulichtorganisationen benachrichtigen <Vorbereitet />
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <div className="text-xs text-slate-400 mb-1">Zusätzliche Gruppen</div>
                 <div className="flex flex-wrap gap-2">
