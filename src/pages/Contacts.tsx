@@ -32,7 +32,7 @@ export default function Contacts() {
               </div>
               <div className="flex-1">
                 <div className="font-semibold text-slate-800">{c.name}</div>
-                <div className="text-2xl font-bold text-brand-600">{c.number}</div>
+                <div className="text-2xl font-bold text-alarm-600">{c.number}</div>
                 <div className="text-xs text-slate-400">{c.description}</div>
               </div>
               <Button variant="ghost" onClick={() => ask(`Kontakt «${c.name}» löschen?`, () => dispatch({ type: 'DELETE_CONTACT', contactId: c.id }))}>

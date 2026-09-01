@@ -103,6 +103,8 @@ export interface TriggerOptions {
   escalation?: EscalationLevel[]
   /** Gezielte Empfänger (z. B. einzelnes Krisenteam-Mitglied) statt Gruppen-/Standortauflösung */
   recipientUserIds?: string[]
+  /** Übung: gleiche Abläufe, als solche gekennzeichnet */
+  drill?: boolean
 }
 
 export function createAlarm(users: User[], opts: TriggerOptions): Alarm {
@@ -119,6 +121,7 @@ export function createAlarm(users: User[], opts: TriggerOptions): Alarm {
     triggeredByUserId: opts.triggeredByUserId,
     triggeredVia: opts.triggeredVia,
     triggeredAt: now,
+    drill: opts.drill || undefined,
     locationIds: opts.locationIds,
     groupIds: opts.groupIds,
     channels: opts.channels,
@@ -138,7 +141,8 @@ export type Action =
   | { type: 'SET_PASSWORD'; userId: string; password: string; mustChange?: boolean }
   | { type: 'SET_USER'; userId: string }
   | { type: 'TRIGGER_ALARM'; alarm: Alarm }
-  | { type: 'END_ALARM'; alarmId: string }
+  | { type: 'END_ALARM'; alarmId: string; note?: string }
+  | { type: 'ALARM_UPDATE'; alarmId: string; message: string; kind: 'lage' | 'fehlalarm' }
   | { type: 'ACK_ALARM'; alarmId: string; userId: string; ack: 'acknowledged' | 'declined' }
   | { type: 'TICK'; now: number }
   | { type: 'START_LONE_WORK'; session: LoneWorkSession }
@@ -277,17 +281,61 @@ function reducer(state: MobileState, action: Action): MobileState {
     }
     case 'SET_USER':
       return { ...state, currentUserId: action.userId }
-    case 'TRIGGER_ALARM':
+    case 'TRIGGER_ALARM': {
+      // Zweite Auslösung zum selben Ereignis: dem laufenden Alarm hinzufügen (wie der Server)
+      const laufend = laufenderAlarmZu(state.alarms, action.alarm)
+      if (laufend) {
+        const ausloeser = state.users.find((u) => u.id === action.alarm.triggeredByUserId)
+        const bekannt = new Set(laufend.deliveries.map((d) => d.userId))
+        const update = {
+          ts: Date.now(), kind: 'meldung' as const, byUserId: action.alarm.triggeredByUserId,
+          message: `Weitere Meldung von ${ausloeser ? `${ausloeser.firstName} ${ausloeser.lastName}` : '?'}: ${action.alarm.message}`,
+        }
+        return {
+          ...state,
+          alarms: state.alarms.map((a) =>
+            a.id !== laufend.id ? a : {
+              ...a,
+              updates: [...(a.updates ?? []), update],
+              deliveries: [...a.deliveries, ...action.alarm.deliveries.filter((d) => !bekannt.has(d.userId))],
+              log: [...a.log, { ts: update.ts, message: `Zweite Auslösung zusammengeführt: ${action.alarm.message}` }],
+            },
+          ),
+        }
+      }
       return { ...state, alarms: [action.alarm, ...state.alarms].slice(0, 20) }
+    }
     case 'END_ALARM':
       return {
         ...state,
         alarms: state.alarms.map((a) =>
           a.id === action.alarmId
-            ? { ...a, status: 'ended' as const, endedAt: Date.now(), log: [...a.log, { ts: Date.now(), message: 'Alarm beendet – Entwarnung versendet.' }] }
+            ? {
+                ...a, status: 'ended' as const, endedAt: Date.now(), endNote: action.note?.trim() || undefined,
+                log: [...a.log, { ts: Date.now(), message: `Alarm beendet – Entwarnung versendet.${action.note?.trim() ? ` «${action.note.trim()}»` : ''}` }],
+              }
             : a,
         ),
       }
+    case 'ALARM_UPDATE': {
+      const person = state.users.find((u) => u.id === state.currentUserId)
+      const name = person ? `${person.firstName} ${person.lastName}` : '?'
+      const text = action.kind === 'fehlalarm'
+        ? `FEHLALARM gemeldet von ${name}${action.message ? `: ${action.message}` : ''} – bitte auf die Entwarnung durch den Krisenstab warten.`
+        : action.message
+      return {
+        ...state,
+        alarms: state.alarms.map((a) =>
+          a.id === action.alarmId
+            ? {
+                ...a,
+                updates: [...(a.updates ?? []), { ts: Date.now(), kind: action.kind, byUserId: state.currentUserId, message: text }],
+                log: [...a.log, { ts: Date.now(), message: action.kind === 'fehlalarm' ? text : `Lagemeldung von ${name}: ${action.message}` }],
+              }
+            : a,
+        ),
+      }
+    }
     case 'ACK_ALARM':
       return {
         ...state,
@@ -353,10 +401,30 @@ export interface Toast {
   kind: 'success' | 'alarm'
 }
 
+/** Meldungen, die kein eigenes Ereignis sind (Einzelinfo, Krisenteam-Aufgebot) */
+function istNebenmeldung(message: string): boolean {
+  return message.startsWith('Info an') || message.startsWith('Krisenteam-Aufgebot')
+}
+
+/** Läuft für dieses Szenario am selben Standort bereits ein Alarm? Dann wird zusammengeführt. */
+export function laufenderAlarmZu(alarms: Alarm[], neu: Alarm): Alarm | null {
+  if (istNebenmeldung(neu.message)) return null
+  return (
+    alarms.find(
+      (a) =>
+        a.status === 'active' && a.scenarioId === neu.scenarioId && Boolean(a.drill) === Boolean(neu.drill) &&
+        !istNebenmeldung(a.message) && Date.now() - a.triggeredAt < 2 * 3600_000 &&
+        (a.locationIds.length === 0 || neu.locationIds.length === 0 || a.locationIds.some((id) => neu.locationIds.includes(id))),
+    ) ?? null
+  )
+}
+
 function toastForAction(action: Action): Toast['message'] | { message: string; kind: 'alarm' } | null {
   switch (action.type) {
     case 'TRIGGER_ALARM':
       return { message: 'Alarm ausgelöst – Empfänger werden benachrichtigt', kind: 'alarm' }
+    case 'ALARM_UPDATE':
+      return action.kind === 'fehlalarm' ? 'Fehlalarm gemeldet – der Krisenstab gibt die Entwarnung' : 'Lagemeldung gesendet'
     case 'END_ALARM':
       return 'Alarm beendet – Entwarnung versendet'
     case 'ACK_ALARM':
@@ -520,20 +588,24 @@ const StoreContext = createContext<StoreCtx | null>(null)
  * Eine Aktion im Live-Modus auf dem Server ausführen. Der Server ist dort die
  * einzige Wahrheit; der neue Stand kommt anschliessend über /state zurück.
  */
-async function serverEffekt(action: Action): Promise<boolean> {
+/** true: vom Server erledigt · 'merged': dem laufenden Alarm hinzugefügt · false: rein lokal */
+async function serverEffekt(action: Action): Promise<boolean | 'merged'> {
   switch (action.type) {
     case 'TRIGGER_ALARM': {
       const a = action.alarm
-      await api.triggerAlarm({
+      const antwort = await api.triggerAlarm({
         scenarioId: a.scenarioId, message: a.message, silent: a.silent, requireAck: a.requireAck,
         channels: a.channels, groupIds: a.groupIds, locationIds: a.locationIds,
-        triggeredVia: 'app', escalation: a.escalation,
+        triggeredVia: 'app', escalation: a.escalation, drill: a.drill,
         recipientUserIds: [...new Set(a.deliveries.map((d) => d.userId))],
       })
-      return true
+      return antwort.merged ? 'merged' : true
     }
     case 'END_ALARM':
-      await api.endAlarm(action.alarmId)
+      await api.endAlarm(action.alarmId, action.note ?? '')
+      return true
+    case 'ALARM_UPDATE':
+      await api.updateAlarm(action.alarmId, action.message, action.kind)
       return true
     case 'ACK_ALARM':
       await api.ackAlarm(action.alarmId, action.ack)
@@ -676,6 +748,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               rawDispatch(action)
               return
             }
+            if (behandelt === 'merged') {
+              pushToast('Für dieses Ereignis lief bereits ein Alarm – Ihre Meldung wurde ihm hinzugefügt', 'alarm')
+              return refresh()
+            }
             if (action.type === 'TRIGGER_ALARM' && !action.alarm.silent) {
               const scenario = stateRef.current.scenarios.find((s) => s.id === action.alarm.scenarioId)
               notifyNow(scenario ? `Alarm: ${scenario.title}` : 'Alarm ausgelöst', action.alarm.message, true)
@@ -693,6 +769,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
+      // Demo: Zusammenführen ist am Toast erkennbar
+      if (action.type === 'TRIGGER_ALARM' && laufenderAlarmZu(stateRef.current.alarms, action.alarm)) {
+        rawDispatch(action)
+        pushToast('Für dieses Ereignis lief bereits ein Alarm – Ihre Meldung wurde ihm hinzugefügt', 'alarm')
+        return
+      }
       rawDispatch(action)
       if (action.type === 'TRIGGER_ALARM' && !action.alarm.silent) {
         const scenario = stateRef.current.scenarios.find((s) => s.id === action.alarm.scenarioId)
@@ -720,8 +802,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!hydrated) return
-    // Live-Daten gehören dem Server; lokal wird nur der Modus gemerkt
-    if (state.mode === 'demo') AsyncStorage.setItem(DATA_KEYS.demo, JSON.stringify(state)).catch(() => {})
+    // Auch der Live-Stand bleibt auf dem Gerät: Ohne Empfang zeigt die App den
+    // letzten bekannten Stand – Szenarien, Kontakte, Alarme – statt einer leeren Seite.
+    AsyncStorage.setItem(DATA_KEYS[state.mode], JSON.stringify(state)).catch(() => {})
     AsyncStorage.setItem(MODE_KEY, state.mode).catch(() => {})
   }, [state, hydrated])
 

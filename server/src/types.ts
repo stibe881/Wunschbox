@@ -160,10 +160,24 @@ export interface Alarm {
   channels: Channel[]
   status: 'active' | 'ended'
   endedAt?: number
+  /** Text, der mit der Entwarnung mitgeschickt wurde */
+  endNote?: string
+  /** Übung: gleiche Abläufe, aber als solche gekennzeichnet und im Protokoll getrennt */
+  drill?: boolean
+  /** Lagemeldungen des Krisenstabs, weitere Meldungen zum selben Ereignis, Fehlalarm-Meldungen */
+  updates?: AlarmUpdate[]
   escalationStage: number
   escalation: EscalationLevel[]
   deliveries: Delivery[]
   log: AlarmLogEntry[]
+}
+
+export interface AlarmUpdate {
+  ts: number
+  message: string
+  byUserId?: string
+  /** lage: Krisenstab informiert · meldung: zweite Auslösung zusammengeführt · fehlalarm: Auslösende:r meldet Irrtum */
+  kind: 'lage' | 'meldung' | 'fehlalarm'
 }
 
 export interface AlarmButton {

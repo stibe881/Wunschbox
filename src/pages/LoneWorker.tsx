@@ -110,7 +110,7 @@ function RunningSession({ session, now }: { session: LoneWorkSession; now: numbe
   const critical = remaining < 5 * 60_000
 
   return (
-    <div className={`rounded-lg border p-3 ${critical ? 'border-brand-500 bg-brand-50' : 'border-slate-200'}`}>
+    <div className={`rounded-lg border p-3 ${critical ? 'border-alarm-500 bg-alarm-50' : 'border-slate-200'}`}>
       <div className="flex items-center gap-2">
         <div className="flex-1">
           <div className="font-medium text-slate-800 text-sm">
@@ -119,7 +119,7 @@ function RunningSession({ session, now }: { session: LoneWorkSession; now: numbe
           </div>
           <div className="text-xs text-slate-500">{session.activity} · {location?.name}</div>
         </div>
-        <div className={`text-2xl font-mono font-bold ${critical ? 'text-brand-600' : 'text-slate-800'}`}>
+        <div className={`text-2xl font-mono font-bold ${critical ? 'text-alarm-600' : 'text-slate-800'}`}>
           {formatDuration(remaining)}
         </div>
       </div>

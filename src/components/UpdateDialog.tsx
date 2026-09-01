@@ -96,7 +96,7 @@ export default function UpdateDialog({ onClose }: { onClose: () => void }) {
           )}
 
           {fehler && (
-            <div className="flex items-start gap-2 rounded-xl bg-brand-50 border border-brand-200 px-3 py-2.5 text-sm text-brand-700" role="alert">
+            <div className="flex items-start gap-2 rounded-xl bg-alarm-50 border border-alarm-200 px-3 py-2.5 text-sm text-alarm-700" role="alert">
               <AlertTriangle size={16} className="shrink-0 mt-0.5" /> {fehler}
             </div>
           )}
@@ -250,7 +250,7 @@ function JobFortschritt({
         {job.status === 'laufend' && <Loader2 size={15} className="animate-spin text-brand-600" />}
         {job.status === 'erfolgreich' && <Check size={15} className="text-emerald-600" />}
         {job.status === 'neustart' && <RefreshCw size={15} className="text-emerald-600" />}
-        {job.status === 'fehlgeschlagen' && <AlertTriangle size={15} className="text-brand-600" />}
+        {job.status === 'fehlgeschlagen' && <AlertTriangle size={15} className="text-alarm-600" />}
         <span className="font-medium text-slate-700">
           {job.status === 'laufend' && 'Aktualisierung läuft'}
           {job.status === 'erfolgreich' && 'Aktualisierung abgeschlossen'}
@@ -298,7 +298,7 @@ function JobFortschritt({
       </ul>
 
       {job.fehler && (
-        <div className="px-4 py-3 bg-brand-50 border-t border-brand-200 text-sm text-brand-700">{job.fehler}</div>
+        <div className="px-4 py-3 bg-alarm-50 border-t border-alarm-200 text-sm text-alarm-700">{job.fehler}</div>
       )}
 
       {job.hinweis && (
@@ -329,6 +329,6 @@ function JobFortschritt({
 function SchrittSymbol({ status }: { status: UpdateJob['schritte'][number]['status'] }) {
   if (status === 'laufend') return <Loader2 size={15} className="text-brand-600 animate-spin shrink-0" />
   if (status === 'erfolgreich') return <Check size={15} className="text-emerald-600 shrink-0" />
-  if (status === 'fehlgeschlagen') return <AlertTriangle size={15} className="text-brand-600 shrink-0" />
+  if (status === 'fehlgeschlagen') return <AlertTriangle size={15} className="text-alarm-600 shrink-0" />
   return <CircleDashed size={15} className="text-slate-300 shrink-0" />
 }

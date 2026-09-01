@@ -45,7 +45,8 @@ KOERPER = r"""
         <tr><th scope="row">Wofür</th><td>handeln, während es passiert</td><td>führen, sobald Sie sitzen</td></tr>
         <tr><th scope="row">Alarm auslösen</th><td>ja, mit den Vorgaben des Szenarios</td><td>ja, frei einstellbar</td></tr>
         <tr><th scope="row">Wer hat quittiert</th><td>zusammengefasst</td><td>vollständig, pro Kanal</td></tr>
-        <tr><th scope="row">Alarm beenden</th><td>nur den eigenen SOS-Alarm</td><td>jeden Alarm</td></tr>
+        <tr><th scope="row">Alarm beenden</th><td>ja, mit <span class="ui">Entwarnung geben</span></td><td>jeden Alarm, mit Hinweistext</td></tr>
+        <tr><th scope="row">Lagemeldung senden</th><td>nein</td><td>ja, an alle Empfänger</td></tr>
         <tr><th scope="row">Journal</th><td>nein</td><td>ja, mit Zeitstempeln</td></tr>
       </tbody>
     </table>
@@ -116,6 +117,14 @@ KOERPER = r"""
       Meldung.
     </li>
   </ol>
+  <p>
+    Lagemeldungen des Krisenstabs, weitere Meldungen zum selben Ereignis und ein
+    gemeldeter Fehlalarm erscheinen violett beziehungsweise gelb in der Alarmkarte,
+    die neueste zuoberst, und kommen zusätzlich als Mitteilung. Als Krisenstabsmitglied
+    können Sie einen erhaltenen Alarm auch in der App beenden:
+    <span class="ui">Entwarnung geben</span> fragt nach einem Hinweis für die
+    Empfänger, etwa zur Rückkehr.
+  </p>
   <div class="hinweis hinweis--warnung">
     <p class="marke-klein">Stille Alarme</p>
     <p>
@@ -209,14 +218,21 @@ KOERPER = r"""
   <div class="hinweis">
     <p class="marke-klein">Wenn zwei Personen dasselbe auslösen</p>
     <p>
-      Das System legt zwei getrennte Alarme an: Beide werden zugestellt, beide
-      erscheinen in der Alarmzentrale, beide müssen quittiert und beendet werden. In
-      der App sieht die zweite Person vor dem Auslösen den Hinweis, dass für dieses
-      Ereignis am selben Standort bereits ein Alarm läuft, und wird zu den Schritten
-      für Empfänger geführt. Bleiben trotzdem zwei Alarme stehen, beenden Sie den
-      überzähligen &ndash; das Journal hält beide fest.
+      Es bleibt bei einem Alarm. Läuft für das Szenario am selben Standort bereits
+      einer, führt der Server die zweite Auslösung mit ihm zusammen: Die Meldung
+      erscheint als «weitere Meldung» im Journal und bei allen Empfängern, ein neu
+      betroffener Standort wird zusätzlich alarmiert. Quittierung und Entwarnung gibt
+      es nur einmal. Die App weist die zweite Person vorher darauf hin.
     </p>
   </div>
+  <h3>Übung</h3>
+  <p>
+    Unter <span class="ui">Anpassen</span> lässt sich ein Alarm als <b>Übung</b>
+    kennzeichnen. Der Ablauf ist derselbe, aber jede Mitteilung trägt den Vorspann
+    «ÜBUNG», die App zeigt den Alarm gelb, das Protokoll führt ihn getrennt, und
+    Webhooks an Drittsysteme bleiben stumm. So üben Sie die Räumung, ohne dass jemand
+    einen Ernstfall vermutet.
+  </p>
 </section>
 
 <section id="b6">
@@ -229,9 +245,16 @@ KOERPER = r"""
     <img src="bilder/web-17-alarmzentrale-aktiv.webp" alt="Alarmzentrale mit aktivem Alarm, Empfängerliste mit Zustellstatus und Journal">
     <figcaption><b>Abb.</b> &nbsp; Links jede Person mit dem Status pro Kanal, rechts das Journal. Ein Alarm ohne Rückmeldungen ist ein Alarm, der niemanden erreicht hat &ndash; fassen Sie dann telefonisch nach.</figcaption>
   </figure>
+  <h3>Lagemeldungen</h3>
+  <p>
+    Unter jedem aktiven Alarm steht ein Eingabefeld: Was Sie dort senden, erreicht alle
+    Empfänger als Mitteilung und steht in ihrer Handlungsanweisung zuoberst &ndash;
+    «Sammelplatz Ost gesperrt, bitte Nord», «Sanität ist eingetroffen». Das ersetzt
+    den zweiten Alarm und den Rundruf.
+  </p>
   <h3>Worauf Sie achten</h3>
   <ul>
-    <li><b>Zustellung</b> heisst: die Meldung ist beim Gerät angekommen.</li>
+    <li><b>Zustellung</b> heisst: das Gerät hat die Mitteilung bestätigt &ndash; der Push-Dienst meldet den Empfang zurück. Ohne registriertes Gerät steht «fehlgeschlagen».</li>
     <li><b>Quittierung</b> heisst: ein Mensch hat sie gesehen und geantwortet. Nur darauf können Sie disponieren.</li>
     <li><b>Eskalationsstufen</b> greifen automatisch, wenn niemand quittiert. Im Journal ist zu sehen, wann welche Stufe ausgelöst hat.</li>
   </ul>
@@ -246,10 +269,18 @@ KOERPER = r"""
     beenden.
   </p>
   <p>
-    Die Entwarnung ist eine eigene Push-Mitteilung. Wer sie antippt, sieht die Schritte
-    <b>Nach der Entwarnung</b> des Szenarios: Rückkehr erst nach Freigabe, erneut
-    zählen, Vorfall festhalten, Nachsorge. Nach einem stillen Alarm bleibt auch die
-    Entwarnung ohne Ton.
+    <span class="ui">Beenden</span> fragt nach einem Hinweis für die Empfänger, etwa
+    «Rückkehr ab 10:30 über den Haupteingang». Er geht mit der Entwarnung mit und steht
+    in der App über den Schritten. Die Entwarnung ist eine eigene Push-Mitteilung. Wer
+    sie antippt, sieht die Schritte <b>Nach der Entwarnung</b> des Szenarios: Rückkehr
+    erst nach Freigabe, erneut zählen, Vorfall festhalten, Nachsorge. Nach einem stillen
+    Alarm bleibt auch die Entwarnung ohne Ton.
+  </p>
+  <p>
+    Meldet die auslösende Person einen Fehlalarm, erscheint in der Alarmzentrale die
+    Kennzeichnung <span class="ui">Fehlalarm gemeldet</span>, und der Krisenstab erhält
+    die Meldung als Mitteilung. Prüfen Sie kurz nach und beenden Sie dann &ndash;
+    Mitarbeitende können nur ihren eigenen SOS-Alarm selbst beenden.
   </p>
   <figure class="geraet">
     <img src="bilder/app-17-entwarnung.webp" alt="Ansicht Entwarnung in der App mit der beendeten Alarmmeldung und den Schritten nach der Entwarnung">

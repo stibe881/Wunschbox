@@ -16,10 +16,14 @@ const TYPE_COLORS: Record<string, 'red' | 'blue' | 'violet' | 'amber' | 'green' 
 export default function AuditLog() {
   const { state, dispatch } = useStore()
   const [typeFilter, setTypeFilter] = useState('')
+  const [uebung, setUebung] = useState<'alle' | 'ernst' | 'uebung'>('alle')
   const { ask, confirmEl } = useConfirm()
 
+  const istUebung = (nachricht: string) => nachricht.startsWith('ÜBUNG')
   const types = [...new Set(state.audit.map((e) => e.type))]
-  const entries = state.audit.filter((e) => !typeFilter || e.type === typeFilter)
+  const entries = state.audit.filter(
+    (e) => (!typeFilter || e.type === typeFilter) && (uebung === 'alle' || (uebung === 'uebung') === istUebung(e.message)),
+  )
 
   return (
     <div className="space-y-6">
@@ -46,10 +50,23 @@ export default function AuditLog() {
 
       {confirmEl}
       <Card>
-        <select className={inputClass + ' max-w-xs mb-4'} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-          <option value="">Alle Kategorien</option>
-          {types.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
+        <div className="flex flex-wrap gap-2 mb-4 items-center">
+          <select className={inputClass + ' max-w-xs'} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <option value="">Alle Kategorien</option>
+            {types.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <div className="flex gap-1">
+            {([['alle', 'Alles'], ['ernst', 'Ernstfälle'], ['uebung', 'Übungen']] as const).map(([wert, label]) => (
+              <button
+                key={wert}
+                onClick={() => setUebung(wert)}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium ${uebung === wert ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="space-y-1">
           {entries.map((e) => {
             const user = e.userId ? state.users.find((u) => u.id === e.userId) : undefined
@@ -57,6 +74,7 @@ export default function AuditLog() {
               <div key={e.id} className="flex items-start gap-3 py-2 border-b border-slate-50 last:border-0 text-sm">
                 <span className="text-xs text-slate-400 whitespace-nowrap w-32 shrink-0 mt-0.5">{formatDateTime(e.ts)}</span>
                 <Badge color={TYPE_COLORS[e.type] ?? 'slate'}>{e.type}</Badge>
+                {istUebung(e.message) && <Badge color="amber">Übung</Badge>}
                 <span className="text-slate-700 flex-1">{e.message}</span>
                 {user && <span className="text-xs text-slate-400">{user.firstName} {user.lastName}</span>}
               </div>

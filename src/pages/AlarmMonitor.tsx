@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { BellOff, CheckCircle2, ChevronDown, ChevronRight, Siren, XCircle } from 'lucide-react'
+import { BellOff, CheckCircle2, ChevronDown, ChevronRight, Megaphone, Send, Siren, XCircle } from 'lucide-react'
 import { useStore } from '../store'
 import type { Alarm, Delivery } from '../types'
 import { CHANNEL_LABELS } from '../types'
-import { Badge, Button, Card, formatDateTime, formatRelative, formatTime } from '../components/ui'
+import { Badge, Button, Card, formatDateTime, formatRelative, formatTime, inputClass, usePrompt } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 
 export default function AlarmMonitor() {
@@ -65,7 +65,25 @@ export default function AlarmMonitor() {
 
 function AlarmCard({ alarm, collapsed = false }: { alarm: Alarm; collapsed?: boolean }) {
   const { state, dispatch } = useStore()
+  const { frage, promptEl } = usePrompt()
   const [open, setOpen] = useState(!collapsed)
+  const [lage, setLage] = useState('')
+  const updates = [...(alarm.updates ?? [])].reverse()
+  function beenden() {
+    frage(
+      'Entwarnung geben',
+      'Der Alarm wird beendet und alle Empfänger erhalten die Entwarnung als Mitteilung. Hinweis für die Empfänger (optional):',
+      (text) => dispatch({ type: 'END_ALARM', alarmId: alarm.id, byUserId: state.currentUserId, note: text }),
+      'Entwarnung senden',
+      'z. B. Rückkehr ab 10:30 über den Haupteingang',
+    )
+  }
+  function lagemeldung() {
+    const text = lage.trim()
+    if (!text) return
+    dispatch({ type: 'ALARM_UPDATE', alarmId: alarm.id, message: text, kind: 'lage' })
+    setLage('')
+  }
   const scenario = state.scenarios.find((s) => s.id === alarm.scenarioId)
   const triggeredBy = state.users.find((u) => u.id === alarm.triggeredByUserId)
 
@@ -75,18 +93,21 @@ function AlarmCard({ alarm, collapsed = false }: { alarm: Alarm; collapsed?: boo
   const acked = userIds.filter((u) => alarm.deliveries.some((d) => d.userId === u && d.ack === 'acknowledged')).length
 
   return (
-    <div className={`bg-white rounded-xl border shadow-sm ${alarm.status === 'active' ? 'border-brand-500' : 'border-slate-200'}`}>
+    <div className={`bg-white rounded-xl border shadow-sm ${alarm.status === 'active' ? (alarm.drill ? 'border-amber-400' : 'border-alarm-500') : 'border-slate-200'}`}>
+      {promptEl}
       <div className="px-4 sm:px-5 py-4 flex flex-wrap items-center gap-3 cursor-pointer" onClick={() => setOpen(!open)}>
         {open ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
         <ScenarioIcon
           name={scenario?.icon ?? ''}
           size={26}
-          className={alarm.status === 'active' ? 'text-brand-600 shrink-0' : 'text-slate-400 shrink-0'}
+          className={alarm.status === 'active' ? 'text-alarm-600 shrink-0' : 'text-slate-400 shrink-0'}
         />
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-slate-800 flex items-center gap-2 flex-wrap">
             {scenario?.title}
+            {alarm.drill && <Badge color="amber">ÜBUNG</Badge>}
             {alarm.silent && <Badge color="violet">stiller Alarm</Badge>}
+            {updates.some((u) => u.kind === 'fehlalarm') && <Badge color="amber">Fehlalarm gemeldet</Badge>}
             {alarm.requireAck && <Badge color="blue">mit Quittierung</Badge>}
             {alarm.escalationStage > 0 && <Badge color="amber">Eskalationsstufe {alarm.escalationStage}</Badge>}
             <Badge color={alarm.status === 'active' ? 'red' : 'slate'}>{alarm.status === 'active' ? 'AKTIV' : 'beendet'}</Badge>
@@ -100,14 +121,50 @@ function AlarmCard({ alarm, collapsed = false }: { alarm: Alarm; collapsed?: boo
         <div className="text-right text-sm shrink-0">
           <div className="text-slate-700 font-medium">{delivered}/{alarm.deliveries.length} zugestellt</div>
           {alarm.requireAck && <div className="text-xs text-slate-500">{acked}/{userIds.length} quittiert</div>}
-          {failed > 0 && <div className="text-xs text-brand-600">{failed} fehlgeschlagen</div>}
+          {failed > 0 && <div className="text-xs text-alarm-600">{failed} fehlgeschlagen</div>}
         </div>
         {alarm.status === 'active' && (
-          <Button variant="secondary" onClick={(e) => { e.stopPropagation(); dispatch({ type: 'END_ALARM', alarmId: alarm.id, byUserId: state.currentUserId }) }}>
+          <Button variant="secondary" onClick={(e) => { e.stopPropagation(); beenden() }}>
             <BellOff size={14} /> Beenden
           </Button>
         )}
       </div>
+
+      {(alarm.status === 'active' || updates.length > 0 || alarm.endNote) && (
+        <div className="border-t border-slate-100 px-5 py-3 space-y-2">
+          {alarm.endNote && (
+            <div className="text-sm border-l-[3px] border-emerald-500 pl-2">
+              <span className="text-[11px] font-bold text-emerald-700">Entwarnung</span>
+              <div className="text-slate-700">{alarm.endNote}</div>
+            </div>
+          )}
+          {updates.map((u, i) => {
+            const von = u.byUserId ? state.users.find((x) => x.id === u.byUserId) : undefined
+            return (
+              <div key={i} className={`text-sm border-l-[3px] pl-2 ${u.kind === 'fehlalarm' ? 'border-amber-500' : 'border-violet-500'}`}>
+                <span className={`text-[11px] font-bold ${u.kind === 'fehlalarm' ? 'text-amber-700' : 'text-violet-700'}`}>
+                  {u.kind === 'fehlalarm' ? 'Fehlalarm gemeldet' : u.kind === 'meldung' ? 'Weitere Meldung' : 'Lagemeldung'} · {formatTime(u.ts)}
+                  {von ? ` · ${von.firstName} ${von.lastName}` : ''}
+                </span>
+                <div className="text-slate-700">{u.message}</div>
+              </div>
+            )
+          })}
+          {alarm.status === 'active' && (
+            <div className="flex gap-2 items-start pt-1">
+              <Megaphone size={16} className="text-violet-600 mt-2.5 shrink-0" />
+              <input
+                className={inputClass}
+                placeholder="Lagemeldung an alle Empfänger – z. B. «Sammelplatz Ost gesperrt, bitte Nord»"
+                value={lage}
+                onChange={(e) => setLage(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') lagemeldung() }}
+              />
+              <Button onClick={lagemeldung} disabled={!lage.trim()}><Send size={14} /> Senden</Button>
+            </div>
+          )}
+        </div>
+      )}
 
       {open && (
         <div className="border-t border-slate-100 px-5 py-4 grid lg:grid-cols-2 gap-6">

@@ -129,6 +129,15 @@ async function anfrage<T>(pfad: string, optionen: RequestInit = {}): Promise<T> 
   return daten as T
 }
 
+export interface Bereitschaft {
+  standorte: { id: string; name: string; personen: number; mitGeraet: number; critical: number }[]
+  ohneGeraet: { id: string; name: string; locationId: string }[]
+  tokensGesamt: number
+  letzteSicherung: { ts: number; datei: string } | null
+  pushDienst: { ok: boolean; geprueft: number } | null
+  letzterTestpush: number | null
+}
+
 export interface SetupInfo {
   /** Genau ein Administratorkonto mit unverändertem Erstpasswort */
   freshInstall: boolean
@@ -173,11 +182,18 @@ export const api = {
     anfrage<{ ok: boolean }>('/integrations', { method: 'POST', body: JSON.stringify(integrations) }),
 
   triggerAlarm: (daten: Record<string, unknown>) =>
-    anfrage<{ alarm: AppState['alarms'][number] }>('/alarms', { method: 'POST', body: JSON.stringify(daten) }),
+    anfrage<{ alarm: AppState['alarms'][number]; merged?: boolean }>('/alarms', { method: 'POST', body: JSON.stringify(daten) }),
   ackAlarm: (id: string, ack: 'acknowledged' | 'declined') =>
     anfrage<{ alarm: AppState['alarms'][number] }>(`/alarms/${id}/ack`, { method: 'POST', body: JSON.stringify({ ack }) }),
-  endAlarm: (id: string) =>
-    anfrage<{ alarm: AppState['alarms'][number] }>(`/alarms/${id}/end`, { method: 'POST' }),
+  endAlarm: (id: string, note = '') =>
+    anfrage<{ alarm: AppState['alarms'][number] }>(`/alarms/${id}/end`, { method: 'POST', body: JSON.stringify({ note }) }),
+  /** Lagemeldung (Führung) oder Fehlalarm-Meldung (auslösende Person) zu einem laufenden Alarm */
+  updateAlarm: (id: string, message: string, kind: 'lage' | 'fehlalarm') =>
+    anfrage<{ alarm: AppState['alarms'][number] }>(`/alarms/${id}/update`, { method: 'POST', body: JSON.stringify({ message, kind }) }),
+
+  /** Bereitschaft: Geräte pro Standort, Sicherung, Push-Dienst, Testmeldung */
+  bereitschaft: () => anfrage<Bereitschaft>('/bereitschaft'),
+  testpush: () => anfrage<{ ok: boolean; geraete: number }>('/bereitschaft/testpush', { method: 'POST' }),
 
   updateStatus: () => anfrage<{ version: VersionsInfo; job: UpdateJob | null }>('/update/status'),
   updateJob: () => anfrage<{ job: UpdateJob | null }>('/update/job'),

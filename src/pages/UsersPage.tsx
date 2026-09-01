@@ -276,7 +276,7 @@ function UserEditor({ user, onClose }: { user: User; onClose: () => void }) {
           <input type="checkbox" checked={mustChange} onChange={(e) => setMustChange(e.target.checked)} />
           Passwortänderung bei der nächsten Anmeldung erzwingen
         </label>
-        {passwordError && <div className="text-xs text-brand-600 mt-2">{passwordError}</div>}
+        {passwordError && <div className="text-xs text-alarm-600 mt-2">{passwordError}</div>}
       </div>
       <div className="flex justify-end gap-2 mt-5">
         <Button variant="secondary" onClick={onClose}>Abbrechen</Button>

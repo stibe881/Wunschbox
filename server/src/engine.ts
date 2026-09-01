@@ -1,10 +1,15 @@
 import { broadcast } from './events.js'
-import { sendPush } from './push.js'
+import {
+  letzterTestpush, markiereOhneGeraet, merkeTestpush, pruefeEmpfangsbestaetigungen, pruefePushDienst, sendPush,
+} from './push.js'
 import {
   addAudit, allAlarms, allLoneWork, allScenarios, allStoredUsers, buildDeliveries, createAlarm,
   integrations, resolveRecipients, saveAlarm, upsertDoc,
 } from './store.js'
-import type { Alarm, AlarmLogEntry } from './types.js'
+import type { Alarm, AlarmLogEntry, AlarmUpdate } from './types.js'
+
+/** Kennzeichnung einer Übung in Titel und Protokoll */
+export const UEBUNG = 'ÜBUNG'
 
 /**
  * Serverseitige Alarmverarbeitung. Läuft unabhängig von geöffneten Geräten:
@@ -26,13 +31,47 @@ function offeneEmpfaenger(alarm: Alarm): string[] {
 export async function alarmPush(alarm: Alarm, empfaenger?: string[]): Promise<void> {
   const szenario = allScenarios().find((s) => s.id === alarm.scenarioId)
   const ids = empfaenger ?? [...new Set(alarm.deliveries.map((d) => d.userId))]
+  const titel = szenario ? `${alarm.silent ? 'Stiller Alarm' : 'Alarm'}: ${szenario.title}` : 'Alarm ausgelöst'
+  // Ohne Gerät keine Push-Zustellung – das soll die Alarmzentrale ehrlich zeigen
+  markiereOhneGeraet(alarm.id, ids)
   await sendPush(ids, {
-    title: szenario ? `${alarm.silent ? 'Stiller Alarm' : 'Alarm'}: ${szenario.title}` : 'Alarm ausgelöst',
+    title: alarm.drill ? `${UEBUNG} – ${titel}` : titel,
     body: alarm.silent ? `${alarm.message} – Antippen: Was jetzt zu tun ist. Gerät stumm halten.` : alarm.message,
-    data: { kind: 'alarm', alarmId: alarm.id, scenarioId: alarm.scenarioId },
+    data: { kind: 'alarm', alarmId: alarm.id, scenarioId: alarm.scenarioId, drill: Boolean(alarm.drill) },
     critical: !alarm.silent,
     silent: alarm.silent,
   })
+}
+
+/**
+ * Lagemeldung, weitere Meldung oder Fehlalarm-Hinweis zu einem laufenden Alarm.
+ * Geht an alle bisherigen Empfänger; Antippen öffnet wie beim Alarm die
+ * Handlungsanweisung, wo die Meldung zuoberst steht.
+ */
+export async function lagemeldungPush(alarm: Alarm, update: AlarmUpdate, empfaenger?: string[]): Promise<void> {
+  const szenario = allScenarios().find((s) => s.id === alarm.scenarioId)
+  const ids = empfaenger ?? [...new Set(alarm.deliveries.map((d) => d.userId))]
+  const art = update.kind === 'fehlalarm' ? 'Fehlalarm gemeldet' : update.kind === 'meldung' ? 'Weitere Meldung' : 'Lagemeldung'
+  const titel = `${art}: ${szenario?.title ?? 'Alarm'}`
+  await sendPush(ids, {
+    title: alarm.drill ? `${UEBUNG} – ${titel}` : titel,
+    body: update.message,
+    data: { kind: 'alarm', alarmId: alarm.id, scenarioId: alarm.scenarioId, drill: Boolean(alarm.drill) },
+    silent: alarm.silent,
+    wichtig: true,
+  })
+}
+
+/** Testmeldung an die genannten Personen – prüft die Kette bis aufs Gerät */
+export async function testPush(userIds: string[]): Promise<number> {
+  const anzahl = await sendPush(userIds, {
+    title: 'Testmeldung SOBE Notfall',
+    body: 'Der Push-Dienst funktioniert. Diese Meldung ist kein Alarm.',
+    data: { kind: 'test' },
+    wichtig: true,
+  })
+  merkeTestpush()
+  return anzahl
 }
 
 /**
@@ -42,10 +81,13 @@ export async function alarmPush(alarm: Alarm, empfaenger?: string[]): Promise<vo
 export async function entwarnungPush(alarm: Alarm): Promise<void> {
   const szenario = allScenarios().find((s) => s.id === alarm.scenarioId)
   const ids = [...new Set([...alarm.deliveries.map((d) => d.userId), alarm.triggeredByUserId])]
+  const titel = szenario ? `Entwarnung: ${szenario.title}` : 'Entwarnung'
   await sendPush(ids, {
-    title: szenario ? `Entwarnung: ${szenario.title}` : 'Entwarnung',
-    body: 'Der Alarm ist beendet. Antippen für die nächsten Schritte.',
-    data: { kind: 'ended', alarmId: alarm.id, scenarioId: alarm.scenarioId },
+    title: alarm.drill ? `${UEBUNG} – ${titel}` : titel,
+    body: alarm.endNote?.trim()
+      ? `${alarm.endNote.trim()} – Antippen für die nächsten Schritte.`
+      : 'Der Alarm ist beendet. Antippen für die nächsten Schritte.',
+    data: { kind: 'ended', alarmId: alarm.id, scenarioId: alarm.scenarioId, drill: Boolean(alarm.drill) },
     // Auch nach einem stillen Alarm darf die Entwarnung leise bleiben
     silent: alarm.silent,
     wichtig: true,
@@ -93,7 +135,7 @@ export async function tick(): Promise<void> {
       {
         ts: jetzt,
         message: `Eskalationsstufe ${alarm.escalationStage + 1}: ${empfaenger.length} weitere Empfänger${
-          stufe.notifyEmergencyServices ? ' – Blaulichtorganisationen benachrichtigt' : ''
+          stufe.notifyEmergencyServices ? (alarm.drill ? ' – Übung: keine Blaulichtorganisationen' : ' – Blaulichtorganisationen benachrichtigt') : ''
         }`,
       },
     ]
@@ -143,6 +185,33 @@ export async function tick(): Promise<void> {
   }
 
   if (veraendert) broadcast('state')
+
+  // --- Empfangsbestätigungen, Erreichbarkeit, wöchentliche Testmeldung ---
+  await pruefeEmpfangsbestaetigungen()
+  if (jetzt - letzteDienstpruefung > 10 * 60_000) {
+    letzteDienstpruefung = jetzt
+    await pruefePushDienst()
+    await woechentlicherTestpush(jetzt)
+  }
+}
+
+let letzteDienstpruefung = 0
+
+/**
+ * Einmal pro Woche eine Testmeldung an die Administration – werktags am
+ * Vormittag, damit sie auffällt und niemanden nachts weckt.
+ */
+async function woechentlicherTestpush(jetzt: number): Promise<void> {
+  const letzter = letzterTestpush() ?? 0
+  if (jetzt - letzter < 7 * 24 * 3600_000) return
+  const lokal = new Date(jetzt)
+  const stunde = lokal.getHours()
+  const wochentag = lokal.getDay()
+  if (wochentag === 0 || wochentag === 6 || stunde < 8 || stunde > 11) return
+  const admins = allStoredUsers().filter((u) => u.role === 'admin').map((u) => u.id)
+  if (admins.length === 0) return
+  const anzahl = await testPush(admins)
+  addAudit('system', `Wöchentliche Testmeldung an ${anzahl} Gerät(e) der Administration gesendet.`)
 }
 
 export function startEngine(): NodeJS.Timeout {

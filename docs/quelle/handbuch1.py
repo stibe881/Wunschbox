@@ -116,6 +116,15 @@ KOERPER = r"""
     <figcaption><b>Abb.</b> &nbsp; Das Dashboard. Vier Kennzahlen oben, links der Zustand aller angebundenen Kanäle, rechts die jüngsten Ereignisse.</figcaption>
   </figure>
   <p>
+    Darunter die Kachel <b>Bereitschaft</b> &ndash; die Antwort auf die Frage, ob ein
+    Alarm die Leute überhaupt erreicht: pro Standort, wie viele Personen ein Gerät mit
+    der App registriert haben und wie viele Critical Alerts erlauben; ob der Push-Dienst
+    erreichbar ist; wann die letzte Sicherung lief; wann die wöchentliche Testmeldung
+    an die Administration ging. Mit <span class="ui">Testmeldung an mein Telefon</span>
+    prüfen Sie die Kette bis aufs eigene Gerät. Im Demo-Modus bleibt die Kachel leer,
+    weil es dort keine registrierten Geräte gibt.
+  </p>
+  <p>
     Ganz unten in der Seitenleiste steht, als wer Sie angemeldet sind. Im Demo-Modus
     finden Sie dort zusätzlich eine Auswahl <span class="ui">Demo-Ansicht</span>: Damit
     sehen Sie das Portal aus der Sicht einer anderen Person, ohne sich abzumelden.
@@ -160,15 +169,22 @@ KOERPER = r"""
   </p>
   <h3>Wenn zwei Personen dasselbe auslösen</h3>
   <p>
-    Jede Auslösung ist ein eigener Alarm mit eigener Zustellung, Quittierung,
-    Eskalation und Entwarnung. Zwei Auslösungen für dasselbe Ereignis ergeben zwei
-    Einträge in der Alarmzentrale, und die Empfänger erhalten beide Meldungen. Die App
-    beugt dem vor: Läuft für ein Szenario am gewählten Standort bereits ein Alarm, sieht
-    die zweite Person in der Phase «Alarmieren» einen Hinweis mit Name und Zeit und
-    wird zu den Schritten für Empfänger geführt. Der Auslöseknopf bleibt erreichbar,
-    ist aber als <span class="ui">Trotzdem zusätzlich</span> beschriftet &ndash; für den
-    Fall, dass ein weiterer Standort betroffen ist. Einen überzähligen Alarm beenden Sie
-    in der Alarmzentrale.
+    Es bleibt bei einem Alarm. Läuft für ein Szenario am gewählten Standort bereits ein
+    Alarm, führt der Server eine zweite Auslösung innerhalb von zwei Stunden mit ihm
+    zusammen: Die neue Meldung erscheint als «weitere Meldung» im Journal und bei allen
+    Empfängern, neu gewählte Standorte werden zusätzlich alarmiert, Quittierung und
+    Entwarnung gibt es nur einmal. Die App zeigt der zweiten Person vorher einen Hinweis
+    mit Name und Zeit; ihr Auslöseknopf heisst dann <span class="ui">Meldung zum
+    laufenden Alarm ergänzen</span>. Übungen und Ernstfälle werden nie zusammengeführt.
+  </p>
+  <h3>Übung</h3>
+  <p>
+    Unter <span class="ui">Anpassen</span> steht der Schalter <b>Übung</b>. Der Ablauf
+    bleibt derselbe: Zustellung, Quittierung, Eskalation, Entwarnung. Aber jede
+    Mitteilung trägt den Vorspann «ÜBUNG», die App kennzeichnet den Alarm gelb, das
+    Protokoll führt Übungen getrennt (Filter <span class="ui">Übungen</span>), und
+    Webhooks an Drittsysteme wie eine Brandmeldeanlage bleiben stumm. Damit lässt sich
+    die vorgeschriebene jährliche Räumungsübung mit dem echten System durchführen.
   </p>
   <h3>Der Knopf in der App</h3>
   <p>
@@ -190,6 +206,21 @@ KOERPER = r"""
     <img src="bilder/web-17-alarmzentrale-aktiv.webp" alt="Alarmzentrale mit einem aktiven Alarm, Empfängerliste mit Zustellstatus und Alarmjournal">
     <figcaption><b>Abb.</b> &nbsp; Links jede Empfängerin und jeder Empfänger mit dem Status pro Kanal, rechts das Journal mit Zeitstempeln. Der Knopf <span class="ui">Beenden</span> gibt Entwarnung an alle.</figcaption>
   </figure>
+  <h3>Lagemeldung und Entwarnung</h3>
+  <p>
+    Unter jedem aktiven Alarm steht ein Eingabefeld für Lagemeldungen. Was Sie dort
+    senden, erreicht alle Empfänger als Mitteilung und steht in ihrer
+    Handlungsanweisung zuoberst. <span class="ui">Beenden</span> fragt nach einem
+    Hinweis, der mit der Entwarnung mitgeht &ndash; etwa «Rückkehr ab 10:30 über den
+    Haupteingang». Beides steht danach im Journal.
+  </p>
+  <p>
+    «Zugestellt» bedeutet: Das Gerät hat den Empfang bestätigt. Der Server holt dazu die
+    Quittungen beim Push-Dienst ab. «Gesendet» heisst, der Push-Dienst hat die Meldung
+    angenommen; «fehlgeschlagen» steht bei Personen ohne registriertes Gerät oder wenn
+    die App deinstalliert wurde. Meldet die auslösende Person einen Fehlalarm, erscheint
+    die Kennzeichnung <span class="ui">Fehlalarm gemeldet</span>.
+  </p>
   <div class="hinweis hinweis--gut">
     <p class="marke-klein">Für die Nachbearbeitung</p>
     <p>
@@ -209,7 +240,7 @@ KOERPER = r"""
   </p>
   <figure class="bild-breit">
     <img src="bilder/web-07-szenarien.webp" alt="Übersicht der Szenarien als Karten mit Kategorie, Priorität und Anzahl der Massnahmen">
-    <figcaption><b>Abb.</b> &nbsp; Die Szenarienübersicht. Zehn Szenarien sind für Mitarbeitende freigegeben &ndash; darunter Amok / Bedrohungslage mit stiller Voreinstellung &ndash;, die übrigen sind ausgeblendet und lassen sich mit dem Augensymbol wieder einblenden.</figcaption>
+    <figcaption><b>Abb.</b> &nbsp; Die Szenarienübersicht. Elf Szenarien sind für Mitarbeitende freigegeben &ndash; darunter Amok / Bedrohungslage mit stiller Voreinstellung und Vermisste:r Schüler:in, auf das der Alarmplan «Suchaktion» verweist &ndash;, die übrigen sind ausgeblendet und lassen sich mit dem Augensymbol wieder einblenden.</figcaption>
   </figure>
 
   <h3>Ein Szenario ansehen</h3>
@@ -474,7 +505,10 @@ KOERPER = r"""
         <tr><th scope="row">Alarm quittieren</th><td class="ja">ja</td><td class="ja">ja</td><td class="ja">ja</td></tr>
         <tr><th scope="row">Alleinarbeits-Timer</th><td class="ja">ja</td><td class="ja">ja</td><td class="ja">ja</td></tr>
         <tr><th scope="row">Webportal öffnen</th><td class="nein">nein</td><td class="ja">ja</td><td class="ja">ja</td></tr>
-        <tr><th scope="row">Alarm beenden</th><td class="nein">nein</td><td class="ja">ja</td><td class="ja">ja</td></tr>
+        <tr><th scope="row">Alarm beenden</th><td class="nein">nur den eigenen SOS-Alarm</td><td class="ja">ja</td><td class="ja">ja</td></tr>
+        <tr><th scope="row">Fehlalarm melden</th><td class="ja">eigener Alarm</td><td class="ja">ja</td><td class="ja">ja</td></tr>
+        <tr><th scope="row">Lagemeldung senden</th><td class="nein">nein</td><td class="ja">ja</td><td class="ja">ja</td></tr>
+        <tr><th scope="row">Übung auslösen</th><td class="nein">nein</td><td class="ja">ja</td><td class="ja">ja</td></tr>
         <tr><th scope="row">Szenarien, Alarmpläne, Kontakte, Alarmknöpfe</th><td class="nein">nein</td><td class="ja">ja</td><td class="ja">ja</td></tr>
         <tr><th scope="row">Benutzer, Gruppen, Standorte</th><td class="nein">nein</td><td class="nein">nein</td><td class="ja">ja</td></tr>
         <tr><th scope="row">Integrationen</th><td class="nein">nein</td><td class="nein">nein</td><td class="ja">ja</td></tr>

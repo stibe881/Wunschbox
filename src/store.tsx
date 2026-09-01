@@ -43,7 +43,8 @@ export type Action =
   | { type: 'UPSERT_PLAN'; plan: AlarmPlan }
   | { type: 'DELETE_PLAN'; planId: string }
   | { type: 'TRIGGER_ALARM'; alarm: Alarm; audit: string }
-  | { type: 'END_ALARM'; alarmId: string; byUserId: string }
+  | { type: 'END_ALARM'; alarmId: string; byUserId: string; note?: string }
+  | { type: 'ALARM_UPDATE'; alarmId: string; message: string; kind: 'lage' | 'fehlalarm' }
   | { type: 'ACK_ALARM'; alarmId: string; userId: string; ack: 'acknowledged' | 'declined' }
   | { type: 'TICK'; now: number }
   | { type: 'UPSERT_BUTTON'; button: AlarmButton }
@@ -111,6 +112,26 @@ export interface TriggerOptions {
   escalation?: EscalationLevel[]
   /** Gezielte Empfänger (z. B. einzelnes Krisenteam-Mitglied) statt Gruppen-/Standortauflösung */
   recipientUserIds?: string[]
+  /** Übung: gleiche Abläufe, als solche gekennzeichnet und im Protokoll getrennt */
+  drill?: boolean
+}
+
+/** Meldungen, die kein eigenes Ereignis sind (Einzelinfo, Krisenteam-Aufgebot) */
+function istNebenmeldung(message: string): boolean {
+  return message.startsWith('Info an') || message.startsWith('Krisenteam-Aufgebot')
+}
+
+/** Läuft für dieses Szenario am selben Standort bereits ein Alarm? Dann wird zusammengeführt. */
+export function laufenderAlarmZu(alarms: Alarm[], neu: Alarm): Alarm | null {
+  if (istNebenmeldung(neu.message)) return null
+  return (
+    alarms.find(
+      (a) =>
+        a.status === 'active' && a.scenarioId === neu.scenarioId && Boolean(a.drill) === Boolean(neu.drill) &&
+        !istNebenmeldung(a.message) && Date.now() - a.triggeredAt < 2 * 3600_000 &&
+        (a.locationIds.length === 0 || neu.locationIds.length === 0 || a.locationIds.some((id) => neu.locationIds.includes(id))),
+    ) ?? null
+  )
 }
 
 export function createAlarm(state: AppState, opts: TriggerOptions): Alarm {
@@ -128,6 +149,7 @@ export function createAlarm(state: AppState, opts: TriggerOptions): Alarm {
     triggeredByUserId: opts.triggeredByUserId,
     triggeredVia: opts.triggeredVia,
     triggeredAt: now,
+    drill: opts.drill || undefined,
     locationIds: opts.locationIds,
     groupIds: opts.groupIds,
     channels: opts.channels,
@@ -338,18 +360,70 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case 'DELETE_PLAN':
       return { ...state, plans: state.plans.filter((p) => p.id !== action.planId), audit: audit(state, 'admin', 'Alarmplan gelöscht') }
-    case 'TRIGGER_ALARM':
-      return { ...state, alarms: [action.alarm, ...state.alarms], audit: audit(state, 'alarm', action.audit, action.alarm.triggeredByUserId) }
-    case 'END_ALARM':
+    case 'TRIGGER_ALARM': {
+      const praefix = action.alarm.drill ? 'ÜBUNG: ' : ''
+      // Zweite Auslösung zum selben Ereignis: dem laufenden Alarm hinzufügen (wie der Server)
+      const laufend = laufenderAlarmZu(state.alarms, action.alarm)
+      if (laufend) {
+        const ausloeser = state.users.find((u) => u.id === action.alarm.triggeredByUserId)
+        const bekannt = new Set(laufend.deliveries.map((d) => d.userId))
+        const update = {
+          ts: Date.now(), kind: 'meldung' as const, byUserId: action.alarm.triggeredByUserId,
+          message: `Weitere Meldung von ${ausloeser ? `${ausloeser.firstName} ${ausloeser.lastName}` : '?'}: ${action.alarm.message}`,
+        }
+        return {
+          ...state,
+          alarms: state.alarms.map((a) =>
+            a.id !== laufend.id ? a : {
+              ...a,
+              locationIds: a.locationIds.length === 0 ? [] : [...new Set([...a.locationIds, ...action.alarm.locationIds])],
+              updates: [...(a.updates ?? []), update],
+              deliveries: [...a.deliveries, ...action.alarm.deliveries.filter((d) => !bekannt.has(d.userId))],
+              log: [...a.log, { ts: update.ts, message: `Zweite Auslösung zusammengeführt: ${action.alarm.message}` }],
+            },
+          ),
+          audit: audit(state, 'alarm', `${praefix}Weitere Meldung zum laufenden Alarm: ${action.alarm.message}`, action.alarm.triggeredByUserId),
+        }
+      }
+      return { ...state, alarms: [action.alarm, ...state.alarms], audit: audit(state, 'alarm', praefix + action.audit, action.alarm.triggeredByUserId) }
+    }
+    case 'END_ALARM': {
+      const note = action.note?.trim() || undefined
+      const betroffen = state.alarms.find((a) => a.id === action.alarmId)
       return {
         ...state,
         alarms: state.alarms.map((a) =>
           a.id === action.alarmId
-            ? { ...a, status: 'ended' as const, endedAt: Date.now(), log: [...a.log, { ts: Date.now(), message: 'Alarm beendet – Entwarnung an alle Empfänger versendet.' }] }
+            ? {
+                ...a, status: 'ended' as const, endedAt: Date.now(), endNote: note,
+                log: [...a.log, { ts: Date.now(), message: `Alarm beendet – Entwarnung an alle Empfänger versendet.${note ? ` «${note}»` : ''}` }],
+              }
             : a,
         ),
-        audit: audit(state, 'alarm', 'Alarm beendet (Entwarnung)', action.byUserId),
+        audit: audit(state, 'alarm', `${betroffen?.drill ? 'ÜBUNG: ' : ''}Alarm beendet (Entwarnung)${note ? `: ${note}` : ''}`, action.byUserId),
       }
+    }
+    case 'ALARM_UPDATE': {
+      const person = state.users.find((u) => u.id === state.currentUserId)
+      const name = person ? `${person.firstName} ${person.lastName}` : '?'
+      const text = action.kind === 'fehlalarm'
+        ? `FEHLALARM gemeldet von ${name}${action.message ? `: ${action.message}` : ''} – bitte auf die Entwarnung durch den Krisenstab warten.`
+        : action.message
+      const betroffen = state.alarms.find((a) => a.id === action.alarmId)
+      return {
+        ...state,
+        alarms: state.alarms.map((a) =>
+          a.id === action.alarmId
+            ? {
+                ...a,
+                updates: [...(a.updates ?? []), { ts: Date.now(), kind: action.kind, byUserId: state.currentUserId, message: text }],
+                log: [...a.log, { ts: Date.now(), message: action.kind === 'fehlalarm' ? text : `Lagemeldung von ${name}: ${action.message}` }],
+              }
+            : a,
+        ),
+        audit: audit(state, 'alarm', `${betroffen?.drill ? 'ÜBUNG: ' : ''}${action.kind === 'fehlalarm' ? 'Fehlalarm gemeldet' : 'Lagemeldung'}: ${action.message || '(ohne Text)'}`, state.currentUserId),
+      }
+    }
     case 'ACK_ALARM':
       return {
         ...state,
@@ -504,7 +578,9 @@ interface Toast {
 function toastForAction(action: Action): Toast['message'] | { message: string; kind: 'alarm' } | null {
   switch (action.type) {
     case 'TRIGGER_ALARM':
-      return { message: 'Alarm ausgelöst – Empfänger werden benachrichtigt', kind: 'alarm' }
+      return { message: action.alarm.drill ? 'Übung gestartet – Empfänger werden als Übung benachrichtigt' : 'Alarm ausgelöst – Empfänger werden benachrichtigt', kind: 'alarm' }
+    case 'ALARM_UPDATE':
+      return action.kind === 'fehlalarm' ? 'Fehlalarm gemeldet – der Krisenstab gibt die Entwarnung' : 'Lagemeldung an alle Empfänger gesendet'
     case 'END_ALARM':
       return 'Alarm beendet – Entwarnung versendet'
     case 'ACK_ALARM':
@@ -680,7 +756,7 @@ function sendOutboundWebhooks(state: AppState, alarm: Alarm) {
  * Zustand angewendet, sondern verschickt; der neue Stand kommt anschliessend
  * über /state zurück. Gibt true zurück, wenn die Aktion behandelt wurde.
  */
-async function serverEffekt(action: Action, state: AppState): Promise<boolean> {
+async function serverEffekt(action: Action, state: AppState): Promise<boolean | 'merged'> {
   switch (action.type) {
     case 'UPSERT_USER': {
       const u = action.user
@@ -760,16 +836,19 @@ async function serverEffekt(action: Action, state: AppState): Promise<boolean> {
     }
     case 'TRIGGER_ALARM': {
       const a = action.alarm
-      await api.triggerAlarm({
+      const antwort = await api.triggerAlarm({
         scenarioId: a.scenarioId, message: a.message, silent: a.silent, requireAck: a.requireAck,
         channels: a.channels, groupIds: a.groupIds, locationIds: a.locationIds,
-        triggeredVia: a.triggeredVia, planId: a.planId, escalation: a.escalation,
+        triggeredVia: a.triggeredVia, planId: a.planId, escalation: a.escalation, drill: a.drill,
         recipientUserIds: [...new Set(a.deliveries.map((d) => d.userId))],
       })
-      return true
+      return antwort.merged ? 'merged' : true
     }
     case 'END_ALARM':
-      await api.endAlarm(action.alarmId)
+      await api.endAlarm(action.alarmId, action.note ?? '')
+      return true
+    case 'ALARM_UPDATE':
+      await api.updateAlarm(action.alarmId, action.message, action.kind)
       return true
     case 'ACK_ALARM':
       await api.ackAlarm(action.alarmId, action.ack)
@@ -988,6 +1067,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               rawDispatch(action)
               return
             }
+            if (behandelt === 'merged') {
+              pushToast('Für dieses Ereignis lief bereits ein Alarm – die Meldung wurde ihm hinzugefügt', 'alarm')
+              return refresh()
+            }
             const t = toastForAction(action)
             if (t) {
               if (typeof t === 'string') pushToast(t)
@@ -1001,6 +1084,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return
       }
 
+      // Demo: Zusammenführen ist am Toast erkennbar
+      if (action.type === 'TRIGGER_ALARM' && laufenderAlarmZu(stateRef.current.alarms, action.alarm)) {
+        rawDispatch(action)
+        pushToast('Für dieses Ereignis lief bereits ein Alarm – die Meldung wurde ihm hinzugefügt', 'alarm')
+        return
+      }
       rawDispatch(action)
       const t = toastForAction(action)
       if (t) {

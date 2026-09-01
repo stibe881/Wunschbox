@@ -159,7 +159,7 @@ function Root() {
       {toasts.length > 0 && (
         <View style={styles.toastWrap} pointerEvents="none">
           {toasts.map((t) => (
-            <View key={t.id} style={[styles.toast, t.kind === 'alarm' && { backgroundColor: colors.brand }]}>
+            <View key={t.id} style={[styles.toast, t.kind === 'alarm' && { backgroundColor: colors.alarm }]}>
               {t.kind === 'alarm'
                 ? <Siren size={15} color="#fff" />
                 : <CheckCircle2 size={15} color="#34d399" />}
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: colors.brandLight,
+    backgroundColor: colors.alarmLight,
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 7,
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: colors.brandLight,
+    backgroundColor: colors.alarmLight,
     paddingHorizontal: 16,
     paddingVertical: 9,
   },
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -5,
     right: -9,
-    backgroundColor: colors.brandLight,
+    backgroundColor: colors.alarmLight,
     borderRadius: 8,
     minWidth: 15,
     height: 15,

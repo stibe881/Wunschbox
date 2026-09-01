@@ -38,7 +38,7 @@ KOERPER = r"""
     <li><b>Bei unmittelbarer Gefahr gilt zuerst der Notruf</b>: 118 Feuerwehr, 144 Sanität, 117 Polizei. Die App ersetzt ihn nicht, sie hilft beim Melden.</li>
     <li><b>Jede angemeldete Person darf alarmieren.</b> Sie brauchen keine Erlaubnis und müssen niemanden fragen. Der Knopf <span class="ui">Alarm auslösen</span> steht oben rechts &ndash; auf jeder Seite der App.</li>
     <li><b>Eine Mitteilung antippen genügt.</b> Kommt ein Alarm oder eine Entwarnung als Push-Mitteilung, öffnet das Antippen direkt die Schritte, die für Sie gelten.</li>
-    <li><b>Die App funktioniert auch ohne Empfang.</b> Alle Handlungsanweisungen sind auf dem Gerät gespeichert.</li>
+    <li><b>Die App funktioniert auch ohne Empfang.</b> Der letzte Stand vom Alarmserver bleibt auf dem Gerät: Szenarien, Nummern und die laufenden Alarme. Ohne Verbindung steht oben «getrennt», die Anweisungen bleiben lesbar.</li>
   </ul>
   <div class="hinweis hinweis--gut">
     <p class="marke-klein">Im Zweifel auslösen</p>
@@ -128,11 +128,12 @@ KOERPER = r"""
   <div class="hinweis">
     <p class="marke-klein">Fehlalarm ausgelöst?</p>
     <p>
-      Melden Sie sich kurz beim Krisenstab oder der Schulleitung &ndash; nur diese
-      können einen Alarm beenden. Der Knopf
-      <span class="ui">Entwarnung &ndash; mir geht es gut</span> wird Ihnen zwar
-      angezeigt, ist aber der Führung vorbehalten und wird abgewiesen.
-      Ein Anruf genügt, und niemand nimmt Ihnen den Irrtum übel.
+      Den eigenen SOS-Alarm beenden Sie selbst: <span class="ui">Entwarnung &ndash; mir
+      geht es gut</span>. Alle Alarmierten erhalten sofort die Entwarnung. Haben Sie
+      dagegen ein Szenario irrtümlich ausgelöst, tippen Sie auf
+      <span class="ui">Fehlalarm melden</span>: Alle Empfänger und der Krisenstab sehen
+      Ihre Meldung, und der Krisenstab gibt die Entwarnung. Niemand nimmt Ihnen den
+      Irrtum übel.
     </p>
   </div>
 </section>
@@ -192,6 +193,20 @@ KOERPER = r"""
     </p>
   </div>
 
+  <h3>Lagemeldungen</h3>
+  <p>
+    Während der Alarm läuft, kann der Krisenstab Lagemeldungen schicken, etwa
+    «Sammelplatz Ost gesperrt, bitte Nord». Sie kommen als eigene Mitteilung an und
+    stehen violett in der Alarmkarte und in der Handlungsanweisung, die neueste
+    zuoberst. Hat eine zweite Person dasselbe Ereignis gemeldet, erscheint ihre Meldung
+    dort ebenfalls &ndash; ein zweiter Alarm entsteht nicht.
+  </p>
+  <p>
+    Trägt eine Mitteilung den Vorspann <b>ÜBUNG</b>, ist es eine angekündigte Übung.
+    Verhalten Sie sich wie im Ernstfall; in der App ist der Alarm gelb als Übung
+    gekennzeichnet.
+  </p>
+
   <h3>Stiller Alarm</h3>
   <p>
     Manche Alarme kommen <em>still</em>: Die Mitteilung erscheint auf dem
@@ -246,11 +261,11 @@ KOERPER = r"""
     <p class="marke-klein">Wenn schon jemand alarmiert hat</p>
     <p>
       Entdecken zwei Personen denselben Brand, löst die erste aus &ndash; und die zweite
-      sieht in Phase 1 den violetten Hinweis mit Name und Zeit. Dann genügt
+      sieht in Phase 1 den violetten Hinweis mit Name und Zeit. Meist genügt dann
       <span class="ui">Was jetzt zu tun ist</span>: Sie wechseln in die Schritte für
-      Empfänger. Halten Sie den roten Knopf nur, wenn ein weiterer Standort betroffen
-      ist oder Sie wesentlich Neues wissen. Ein zweiter Alarm ist kein Fehler, aber
-      alle erhalten dieselbe Meldung doppelt und müssen doppelt quittieren.
+      Empfänger. Halten Sie trotzdem den Knopf, entsteht kein zweiter Alarm: Ihre
+      Meldung wird dem laufenden Alarm als «weitere Meldung» hinzugefügt, und ein neu
+      gewählter Standort wird zusätzlich alarmiert. Niemand muss doppelt quittieren.
     </p>
   </div>
   <figure class="geraet">
@@ -272,6 +287,10 @@ KOERPER = r"""
     <figure class="geraet">
       <img src="bilder/app-05b-phase1-unten.webp" alt="Unterer Teil der Phase Alarmieren mit Standortwahl und dem Knopf zum internen Alarmieren">
       <figcaption><b>Abb.</b> &nbsp; Standort wählen, dann halten.</figcaption>
+    </figure>
+    <figure class="geraet">
+      <img src="bilder/app-05c-ausgeloest.webp" alt="Grüner Statuskasten nach dem Auslösen mit Zustellzahlen und dem Knopf Fehlalarm melden">
+      <figcaption><b>Abb.</b> &nbsp; Nach dem Auslösen: Zustellung, Quittierungen und der Weg zurück, falls es ein Irrtum war.</figcaption>
     </figure>
   </div>
 
@@ -328,8 +347,8 @@ KOERPER = r"""
     findet sich im Ernstfall schneller zurecht.
   </p>
   <figure class="geraet">
-    <img src="bilder/app-09-szenarienliste.webp" alt="Liste der zehn freigegebenen Szenarien">
-    <figcaption><b>Abb.</b> &nbsp; Die zehn Szenarien: Brand, Evakuierung, medizinischer Notfall, herausforderndes Verhalten, verdächtige Person, Todesfall, Notfall im Therapiebad, ICT-Ausfall, Krisenstab einberufen, Amok / Bedrohungslage.</figcaption>
+    <img src="bilder/app-09-szenarienliste.webp" alt="Liste der elf freigegebenen Szenarien">
+    <figcaption><b>Abb.</b> &nbsp; Die elf Szenarien: Brand, Evakuierung, medizinischer Notfall, herausforderndes Verhalten, verdächtige Person, Todesfall, Notfall im Therapiebad, ICT-Ausfall, Krisenstab einberufen, vermisste:r Schüler:in, Amok / Bedrohungslage.</figcaption>
   </figure>
 </section>
 
@@ -423,10 +442,17 @@ KOERPER = r"""
 
   <h4>Zwei Personen lösen dasselbe Ereignis aus. Was passiert?</h4>
   <p>
-    Beide Alarme werden zugestellt, alle Empfänger sehen zwei Meldungen und
-    quittieren beide. Damit das selten vorkommt, zeigt die App in Phase 1 einen
-    Hinweis, sobald für dasselbe Ereignis am selben Standort schon ein Alarm läuft.
-    Wer ihn sieht, wechselt zu <span class="ui">Was jetzt zu tun ist</span>.
+    Es bleibt bei einem Alarm. Die zweite Auslösung wird dem laufenden Alarm als
+    «weitere Meldung» hinzugefügt; alle Empfänger sehen sie als Lagemeldung, und ein
+    neu betroffener Standort wird zusätzlich alarmiert. Die App zeigt in Phase 1
+    ausserdem einen Hinweis, sobald für dasselbe Ereignis schon ein Alarm läuft.
+  </p>
+
+  <h4>Ich habe keinen Empfang. Sehe ich noch etwas?</h4>
+  <p>
+    Ja. Die App behält den letzten Stand vom Alarmserver auf dem Gerät. Szenarien,
+    Notrufnummern und die zuletzt bekannten Alarme bleiben lesbar; oben steht
+    «getrennt». Sobald wieder Verbindung besteht, gleicht sie ab.
   </p>
 
   <h4>Ich habe mein Passwort vergessen.</h4>

@@ -7,7 +7,7 @@ import {
 import { createAlarm, resolveRecipients, uid, useStore } from '../store'
 import type { Alarm, Channel, LoneWorkSession, Scenario, User as AppUser } from '../types'
 import { CHANNEL_LABELS } from '../types'
-import { Badge, HoldButton, Toggle, formatDuration, formatRelative, inputClass, useConfirm } from '../components/ui'
+import { Badge, HoldButton, Toggle, formatDuration, formatRelative, inputClass, useConfirm, usePrompt } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 import { MIN_PASSWORD_LENGTH, passwordProblem } from '../lib/auth'
 import { activeScenarios, allClearStepsOf, responseStepsFor, responseStepsOf } from '../lib/scenarios'
@@ -69,7 +69,7 @@ export default function UserApp() {
           </div>
         </div>
         <button
-          className="shrink-0 flex items-center gap-1.5 rounded-full bg-brand-600 text-white text-xs font-bold px-3 py-1.5 active:scale-95 transition"
+          className="shrink-0 flex items-center gap-1.5 rounded-full bg-alarm-600 text-white text-xs font-bold px-3 py-1.5 active:scale-95 transition"
           onClick={() => { setOpenScenario(null); setAlarmWahl(true) }}
           aria-label="Alarm auslösen"
         >
@@ -80,7 +80,7 @@ export default function UserApp() {
       {myAlarms.length > 0 && tab !== 'start' && !alarmWahl && (
         <button
           onClick={() => { setTab('start'); setOpenScenario(null) }}
-          className="bg-brand-600 text-white text-sm font-semibold px-4 py-2 flex items-center gap-2 alarm-pulse"
+          className="bg-alarm-600 text-white text-sm font-semibold px-4 py-2 flex items-center gap-2 alarm-pulse"
         >
           <BellRing size={15} className="animate-pulse" />
           {myAlarms.length} aktiver Alarm{myAlarms.length > 1 ? 'e' : ''} – antippen
@@ -128,7 +128,7 @@ export default function UserApp() {
               <span className="relative">
                 <Icon size={20} />
                 {key === 'start' && myAlarms.length > 0 && (
-                  <span className="absolute -top-1.5 -right-2 bg-brand-600 text-white text-[9px] font-bold rounded-full min-w-[15px] h-[15px] px-0.5 flex items-center justify-center">
+                  <span className="absolute -top-1.5 -right-2 bg-alarm-600 text-white text-[9px] font-bold rounded-full min-w-[15px] h-[15px] px-0.5 flex items-center justify-center">
                     {myAlarms.length}
                   </span>
                 )}
@@ -144,9 +144,36 @@ export default function UserApp() {
 
 // ---------- Start: Alarme + SOS ----------
 
+/** Meldungen zum laufenden Alarm, neueste zuoberst */
+function Lagemeldungen({ alarm }: { alarm: Alarm }) {
+  const updates = [...(alarm.updates ?? [])].reverse()
+  if (updates.length === 0) return null
+  return (
+    <div className="mt-2 space-y-1.5">
+      {updates.map((u, i) => (
+        <div key={i} className={`border-l-[3px] pl-2 ${u.kind === 'fehlalarm' ? 'border-amber-500' : 'border-violet-500'}`}>
+          <div className={`text-[11px] font-bold ${u.kind === 'fehlalarm' ? 'text-amber-700' : 'text-violet-700'}`}>
+            {u.kind === 'fehlalarm' ? 'Fehlalarm gemeldet' : u.kind === 'meldung' ? 'Weitere Meldung' : 'Lagemeldung'} · {formatRelative(u.ts)}
+          </div>
+          <div className="text-sm text-slate-700">{u.message}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const FEHLALARM_TEXT = 'Alle Empfänger und der Krisenstab erhalten Ihre Meldung; die Entwarnung gibt der Krisenstab. Kurze Begründung (optional):'
+const ENTWARNUNG_TEXT = 'Der Alarm wird beendet und alle Empfänger erhalten die Entwarnung. Hinweis für die Empfänger (optional):'
+
 function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Alarm, modus?: 'empfaenger' | 'entwarnung') => void }) {
   const { state, dispatch } = useStore()
   const { ask, confirmEl } = useConfirm()
+  const { frage, promptEl } = usePrompt()
+  const istFuehrung = (state.users.find((u) => u.id === state.currentUserId)?.role ?? 'mitarbeiter') !== 'mitarbeiter'
+  const fehlalarmMelden = (alarmId: string) =>
+    frage('Fehlalarm melden', FEHLALARM_TEXT, (text) => dispatch({ type: 'ALARM_UPDATE', alarmId, message: text, kind: 'fehlalarm' }), 'Melden')
+  const entwarnungGeben = (alarmId: string) =>
+    frage('Entwarnung geben', ENTWARNUNG_TEXT, (text) => dispatch({ type: 'END_ALARM', alarmId, byUserId: state.currentUserId, note: text }), 'Entwarnung senden', 'z. B. Rückkehr ab 10:30 über den Haupteingang')
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
   const mySos = state.alarms.filter((a) => a.status === 'active' && a.triggeredByUserId === me.id)
   const myAlarms = state.alarms.filter(
@@ -181,17 +208,23 @@ function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Ala
   return (
     <div className="space-y-4">
       {confirmEl}
+      {promptEl}
       {mySos.map((a) => {
         const delivered = a.deliveries.filter((d) => d.status === 'delivered').length
         const helpers = [...new Set(a.deliveries.filter((d) => d.ack === 'acknowledged').map((d) => d.userId))]
           .map((id) => state.users.find((u) => u.id === id))
           .filter(Boolean)
+        const istSos = a.message.startsWith('SOS-Alarm')
+        const scenario = state.scenarios.find((s) => s.id === a.scenarioId)
+        const fehlalarmGemeldet = (a.updates ?? []).some((u) => u.kind === 'fehlalarm')
         return (
-          <div key={a.id} className="rounded-2xl border-2 border-brand-500 bg-white p-4 alarm-pulse">
-            <div className="flex items-center gap-2 font-bold text-brand-700">
-              <Siren size={18} className="animate-pulse" /> Ihr Alarm ist aktiv
+          <div key={a.id} className="rounded-2xl border-2 border-alarm-500 bg-white p-4 alarm-pulse">
+            <div className="flex items-center gap-2 font-bold text-alarm-700">
+              <Siren size={18} className="animate-pulse" /> {istSos ? 'Ihr SOS-Alarm ist aktiv' : `Ihr Alarm ist aktiv${scenario ? ` · ${scenario.title}` : ''}`}
+              {a.drill && <Badge color="amber">ÜBUNG</Badge>}
               <span className="ml-auto text-xs font-normal text-slate-400">{formatRelative(a.triggeredAt)}</span>
             </div>
+            <Lagemeldungen alarm={a} />
             <div className="mt-2.5 text-sm text-slate-700">
               {delivered}/{a.deliveries.length} Benachrichtigungen zugestellt
             </div>
@@ -211,14 +244,26 @@ function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Ala
                 <span className="text-slate-500">Warten auf Rückmeldung der Einsatzkräfte…</span>
               )}
             </div>
-            <button
-              className="mt-3 w-full rounded-xl border border-slate-300 text-slate-700 py-2.5 text-sm font-semibold"
-              onClick={() =>
-                ask('Entwarnung geben und den Alarm beenden?', () => dispatch({ type: 'END_ALARM', alarmId: a.id, byUserId: me.id }), 'Entwarnung geben')
-              }
-            >
-              Entwarnung – mir geht es gut
-            </button>
+            {istSos ? (
+              <button
+                className="mt-3 w-full rounded-xl border border-slate-300 text-slate-700 py-2.5 text-sm font-semibold"
+                onClick={() =>
+                  ask('Entwarnung geben und den SOS-Alarm beenden?', () => dispatch({ type: 'END_ALARM', alarmId: a.id, byUserId: me.id }), 'Entwarnung geben')
+                }
+              >
+                Entwarnung – mir geht es gut
+              </button>
+            ) : istFuehrung ? (
+              <button className="mt-3 w-full rounded-xl border border-slate-300 text-slate-700 py-2.5 text-sm font-semibold" onClick={() => entwarnungGeben(a.id)}>
+                Entwarnung geben
+              </button>
+            ) : fehlalarmGemeldet ? (
+              <div className="mt-3 text-xs text-center text-slate-500">Fehlalarm gemeldet – der Krisenstab gibt die Entwarnung.</div>
+            ) : (
+              <button className="mt-3 w-full rounded-xl border border-slate-300 text-slate-700 py-2.5 text-sm font-semibold" onClick={() => fehlalarmMelden(a.id)}>
+                Fehlalarm melden
+              </button>
+            )}
           </div>
         )
       })}
@@ -227,14 +272,16 @@ function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Ala
         const scenario = state.scenarios.find((s) => s.id === a.scenarioId)
         const myAck = a.deliveries.find((d) => d.userId === me.id)?.ack ?? 'none'
         return (
-          <div key={a.id} className={`rounded-2xl border-2 p-4 bg-white ${a.silent ? 'border-violet-400' : 'border-brand-500 alarm-pulse'}`}>
+          <div key={a.id} className={`rounded-2xl border-2 p-4 bg-white ${a.silent ? 'border-violet-400' : 'border-alarm-500 alarm-pulse'}`}>
             <div className="flex items-center gap-2 font-bold text-slate-800">
-              <BellRing size={18} className={a.silent ? 'text-violet-600' : 'text-brand-600 animate-pulse'} />
+              <BellRing size={18} className={a.silent ? 'text-violet-600' : 'text-alarm-600 animate-pulse'} />
               <ScenarioIcon name={scenario?.icon ?? ''} size={18} className="text-slate-500" />
               <span className="flex-1">{scenario?.title}</span>
+              {a.drill && <Badge color="amber">ÜBUNG</Badge>}
               {a.silent && <Badge color="violet">still</Badge>}
             </div>
             <p className="text-sm text-slate-700 mt-2">{a.message}</p>
+            <Lagemeldungen alarm={a} />
             {!a.silent && (
               <div className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-1">
                 <Volume2 size={12} /> Critical Alert – auch bei stummgeschaltetem Gerät hörbar
@@ -270,6 +317,11 @@ function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Ala
                   ? <Badge color="green"><CheckCircle2 size={12} /> quittiert – Sie nehmen teil</Badge>
                   : <Badge>als nicht verfügbar gemeldet</Badge>}
               </div>
+            )}
+            {istFuehrung && (
+              <button className="mt-3 w-full rounded-xl border border-slate-300 text-slate-700 py-2.5 text-sm font-semibold" onClick={() => entwarnungGeben(a.id)}>
+                Entwarnung geben
+              </button>
             )}
           </div>
         )
@@ -370,7 +422,7 @@ function AlarmAuswahl({ onPick, onBack }: { onPick: (s: Scenario) => void; onBac
             className="rounded-2xl bg-white border border-slate-200 p-3.5 text-left active:scale-[0.98] transition"
           >
             <div className="flex items-center justify-between">
-              <ScenarioIcon name={s.icon} size={22} className={s.priority === 'hoch' ? 'text-brand-600' : 'text-slate-500'} />
+              <ScenarioIcon name={s.icon} size={22} className={s.priority === 'hoch' ? 'text-alarm-600' : 'text-slate-500'} />
               {s.silentDefault && <Badge color="violet">still</Badge>}
             </div>
             <div className="font-semibold text-sm text-slate-800 mt-2 leading-snug">{s.title}</div>
@@ -410,7 +462,7 @@ function ScenarioListTab({ onOpen }: { onOpen: (s: Scenario) => void }) {
             className="rounded-2xl border border-slate-200 bg-white p-3.5 text-left active:scale-[0.98] transition"
             onClick={() => onOpen(s)}
           >
-            <ScenarioIcon name={s.icon} size={22} className={s.priority === 'hoch' ? 'text-brand-600' : 'text-slate-500'} />
+            <ScenarioIcon name={s.icon} size={22} className={s.priority === 'hoch' ? 'text-alarm-600' : 'text-slate-500'} />
             <div className="text-sm font-semibold text-slate-800 leading-tight mt-1.5">{s.title}</div>
             <div className="text-[11px] text-slate-400 mt-0.5">{s.category}</div>
           </button>
@@ -431,6 +483,7 @@ function ScenarioView({
   startPhase?: number | null
 }) {
   const { state, dispatch } = useStore()
+  const { frage, promptEl } = usePrompt()
   const [modus, setModus] = useState<ScenarioModus>(startModus)
   const [phase, setPhase] = useState<number | null>(startPhase)
   const [checkedSteps, setCheckedSteps] = useState<Record<number, boolean>>({})
@@ -537,6 +590,16 @@ function ScenarioView({
         <div className="text-emerald-700 mt-1">
           {delivered}/{alarm.deliveries.length} zugestellt · {acked} quittiert – Live-Status auf dem Start-Tab.
         </div>
+        {(alarm.updates ?? []).some((u) => u.kind === 'fehlalarm') ? (
+          <div className="text-xs text-emerald-700 mt-2">Fehlalarm gemeldet – der Krisenstab gibt die Entwarnung.</div>
+        ) : (
+          <button
+            className="mt-2 w-full rounded-xl border border-emerald-600 text-emerald-800 py-2 text-sm font-semibold"
+            onClick={() => frage('Fehlalarm melden', FEHLALARM_TEXT, (text) => dispatch({ type: 'ALARM_UPDATE', alarmId: alarm.id, message: text, kind: 'fehlalarm' }), 'Melden')}
+          >
+            Fehlalarm melden
+          </button>
+        )}
       </div>
     )
   }
@@ -638,6 +701,7 @@ function ScenarioView({
   // ---------- Einzelne Phase ----------
   return (
     <div>
+      {promptEl}
       <button className="flex items-center gap-1 text-sm text-slate-500 mb-3" onClick={() => setPhase(null)}>
         <ChevronLeft size={16} /> Übersicht
       </button>
@@ -662,7 +726,7 @@ function ScenarioView({
             <>
               <div className="text-sm font-semibold text-slate-700">Bei unmittelbarer Gefahr zuerst den Notruf wählen:</div>
               {contacts.map((c) => (
-                <a key={c.id} href={`tel:${c.number}`} className="flex items-center gap-3 rounded-xl bg-brand-600 text-white px-4 py-3 active:scale-[0.99] transition">
+                <a key={c.id} href={`tel:${c.number}`} className="flex items-center gap-3 rounded-xl bg-alarm-600 text-white px-4 py-3 active:scale-[0.99] transition">
                   <Phone size={18} />
                   <span className="flex-1 font-semibold text-sm">{c.name} anrufen</span>
                   <span className="font-bold text-lg">{c.number}</span>
@@ -709,7 +773,7 @@ function ScenarioView({
               </div>
               <p className="text-violet-900">
                 {fremderAusloeser ? `${fremderAusloeser.firstName} ${fremderAusloeser.lastName}` : 'Jemand'} hat {formatRelative(fremderAlarm.triggeredAt)} alarmiert.
-                Ein zweiter Alarm ist nur nötig, wenn ein weiterer Standort betroffen ist oder Sie wesentlich Neues wissen – sonst erhalten alle dieselbe Meldung doppelt.
+                Wenn Sie trotzdem auslösen, entsteht kein zweiter Alarm: Ihre Meldung wird dem laufenden hinzugefügt, und neu gewählte Standorte werden zusätzlich alarmiert.
               </p>
               <button
                 className="w-full rounded-xl bg-slate-800 text-white py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5"
@@ -728,7 +792,7 @@ function ScenarioView({
               hint="Zum Alarmieren gedrückt halten"
               className="w-full"
             >
-              <Siren size={20} /> {fremderAlarm ? 'Trotzdem zusätzlich: ' : ''}{responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(' & ') : 'Alle'} alarmieren ({alarmRecipientCount})
+              <Siren size={20} /> {fremderAlarm ? `Meldung zum laufenden Alarm ergänzen (${alarmRecipientCount})` : `${responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(' & ') : 'Alle'} alarmieren (${alarmRecipientCount})`}
             </HoldButton>
           )}
         </div>
@@ -879,9 +943,9 @@ function LoneWorkTab() {
     const critical = remaining < 5 * 60_000
     return (
       <div className="space-y-4">
-        <div className={`rounded-2xl border-2 bg-white p-5 text-center ${critical ? 'border-brand-500' : 'border-slate-200'}`}>
+        <div className={`rounded-2xl border-2 bg-white p-5 text-center ${critical ? 'border-alarm-500' : 'border-slate-200'}`}>
           <div className="text-sm text-slate-500">{running.activity}</div>
-          <div className={`text-5xl font-mono font-bold my-3 ${critical ? 'text-brand-600' : 'text-slate-800'}`}>
+          <div className={`text-5xl font-mono font-bold my-3 ${critical ? 'text-alarm-600' : 'text-slate-800'}`}>
             {formatDuration(remaining)}
           </div>
           <div className="text-xs text-slate-400 mb-4">
@@ -1001,6 +1065,12 @@ function EntwarnungAnsicht({
             <span>Beendet {formatRelative(alarm.endedAt ?? alarm.triggeredAt)}{beendetDurch ? ` durch ${beendetDurch}` : ''}</span>
             {orte && <span className="flex items-center gap-1"><MapPin size={11} /> {orte}</span>}
           </div>
+          {alarm.endNote && (
+            <div className="mt-2 border-l-[3px] border-emerald-500 pl-2">
+              <div className="text-[11px] font-bold text-emerald-700">Hinweis des Krisenstabs</div>
+              <div className="text-sm text-slate-700">{alarm.endNote}</div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="rounded-2xl bg-white border border-slate-200 p-3 mb-3 text-xs text-slate-500">
@@ -1074,7 +1144,8 @@ function EmpfaengerAnsicht({
       </div>
 
       {alarm ? (
-        <div className={`rounded-2xl border-2 p-4 bg-white mb-3 ${alarm.silent ? 'border-violet-400' : 'border-brand-500'}`}>
+        <div className={`rounded-2xl border-2 p-4 bg-white mb-3 ${alarm.silent ? 'border-violet-400' : 'border-alarm-500'}`}>
+          {alarm.drill && <div className="mb-1"><Badge color="amber">ÜBUNG – kein Ernstfall</Badge></div>}
           <p className="text-sm text-slate-700">{alarm.message}</p>
           <div className="text-xs text-slate-500 mt-2 flex flex-wrap gap-x-3 gap-y-1">
             {ausloeser && <span>Ausgelöst von {ausloeser.firstName} {ausloeser.lastName}</span>}
@@ -1082,6 +1153,7 @@ function EmpfaengerAnsicht({
             {orte && <span className="flex items-center gap-1"><MapPin size={11} /> {orte}</span>}
             {alarm.silent && <Badge color="violet">still</Badge>}
           </div>
+          <Lagemeldungen alarm={alarm} />
           {alarm.requireAck && myAck === 'none' && (
             <div className="flex gap-2 mt-3">
               <button
@@ -1191,7 +1263,7 @@ function ContactsTab() {
             <div className="text-sm font-semibold text-slate-800">{c.name}</div>
             <div className="text-xs text-slate-400 truncate">{c.description}</div>
           </div>
-          <span className="text-xl font-bold text-brand-600">{c.number}</span>
+          <span className="text-xl font-bold text-alarm-600">{c.number}</span>
         </a>
       ))}
       <div className="text-xs text-center text-slate-400 pt-1">Antippen ruft direkt an.</div>
@@ -1378,7 +1450,7 @@ function PasswordCard() {
         value={next} onChange={(e) => { setNext(e.target.value); setError(null) }} />
       <input type="password" autoComplete="new-password" className={inputClass} placeholder="Neues Passwort wiederholen"
         value={repeat} onChange={(e) => { setRepeat(e.target.value); setError(null) }} />
-      {error && <div className="text-xs text-brand-600">{error}</div>}
+      {error && <div className="text-xs text-alarm-600">{error}</div>}
       <div className="flex gap-2 pt-1">
         <button className="flex-1 rounded-xl bg-slate-100 text-slate-600 py-2.5 text-sm font-semibold" onClick={() => { setOpen(false); setError(null) }}>
           Abbrechen

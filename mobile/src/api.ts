@@ -103,10 +103,14 @@ export const api = {
     anfrage<{ ok: boolean }>('/auth/password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }),
   state: () => anfrage<ServerData>('/state'),
   triggerAlarm: (daten: Record<string, unknown>) =>
-    anfrage<{ alarm: AppState['alarms'][number] }>('/alarms', { method: 'POST', body: JSON.stringify(daten) }),
+    anfrage<{ alarm: AppState['alarms'][number]; merged?: boolean }>('/alarms', { method: 'POST', body: JSON.stringify(daten) }),
+  /** Lagemeldung (Führung) oder Fehlalarm-Meldung (auslösende Person) zu einem laufenden Alarm */
+  updateAlarm: (id: string, message: string, kind: 'lage' | 'fehlalarm') =>
+    anfrage<{ alarm: AppState['alarms'][number] }>(`/alarms/${id}/update`, { method: 'POST', body: JSON.stringify({ message, kind }) }),
   ackAlarm: (id: string, ack: 'acknowledged' | 'declined') =>
     anfrage<{ alarm: AppState['alarms'][number] }>(`/alarms/${id}/ack`, { method: 'POST', body: JSON.stringify({ ack }) }),
-  endAlarm: (id: string) => anfrage<{ alarm: AppState['alarms'][number] }>(`/alarms/${id}/end`, { method: 'POST' }),
+  endAlarm: (id: string, note = '') =>
+    anfrage<{ alarm: AppState['alarms'][number] }>(`/alarms/${id}/end`, { method: 'POST', body: JSON.stringify({ note }) }),
   startLoneWork: (daten: Record<string, unknown>) =>
     anfrage<{ session: AppState['loneWorkSessions'][number] }>('/lone-work', { method: 'POST', body: JSON.stringify(daten) }),
   extendLoneWork: (id: string, minutes: number) =>

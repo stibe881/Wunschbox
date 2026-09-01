@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
 import {
   BellRing, Check, CheckCircle2, ChevronLeft, Clock, KeyRound, LogOut, MapPin, Phone, Play, Search as SearchIcon,
   Scale, ShieldAlert, ShieldCheck, Siren, Timer, X,
@@ -13,6 +13,55 @@ import { MIN_PASSWORD_LENGTH, passwordProblem } from './auth'
 import { activeScenarios, allClearStepsOf, responseStepsFor, responseStepsOf } from './scenarios'
 
 // ---------- Start: Alarme + SOS ----------
+
+type Dispatch = ReturnType<typeof useStore>['dispatch']
+
+/** Text abfragen – iOS kennt Alert.prompt, Android bekommt eine Bestätigung ohne Text */
+function frageText(titel: string, text: string, knopf: string, weiter: (eingabe: string) => void) {
+  if (Platform.OS === 'ios') {
+    Alert.prompt(titel, text, [{ text: 'Abbrechen', style: 'cancel' }, { text: knopf, onPress: (e?: string) => weiter((e ?? '').trim()) }], 'plain-text')
+  } else {
+    Alert.alert(titel, text, [{ text: 'Abbrechen', style: 'cancel' }, { text: knopf, onPress: () => weiter('') }])
+  }
+}
+
+/** Auslösende Person meldet einen Irrtum – der Krisenstab entwarnt */
+export function fehlalarmMelden(dispatch: Dispatch, alarmId: string) {
+  frageText(
+    'Fehlalarm melden',
+    'Alle Empfänger und der Krisenstab erhalten Ihre Meldung; die Entwarnung gibt der Krisenstab. Kurze Begründung (optional):',
+    'Melden',
+    (text) => dispatch({ type: 'ALARM_UPDATE', alarmId, message: text, kind: 'fehlalarm' }),
+  )
+}
+
+/** Führung beendet den Alarm – mit einem Satz, der in der Entwarnung mitgeht */
+export function entwarnungGeben(dispatch: Dispatch, alarmId: string) {
+  frageText(
+    'Entwarnung geben',
+    'Der Alarm wird beendet und alle Empfänger erhalten die Entwarnung. Hinweis für die Empfänger (optional), z. B. Rückkehr ab 10:30 über den Haupteingang:',
+    'Entwarnung senden',
+    (text) => dispatch({ type: 'END_ALARM', alarmId, note: text }),
+  )
+}
+
+/** Meldungen zum laufenden Alarm, neueste zuoberst */
+function Lagemeldungen({ alarm }: { alarm: Alarm }) {
+  const updates = [...(alarm.updates ?? [])].reverse()
+  if (updates.length === 0) return null
+  return (
+    <View style={{ marginTop: 8, gap: 6 }}>
+      {updates.map((u, i) => (
+        <View key={i} style={{ borderLeftWidth: 3, borderLeftColor: u.kind === 'fehlalarm' ? colors.amber : colors.violet, paddingLeft: 8 }}>
+          <Text style={[styles.faint, { color: u.kind === 'fehlalarm' ? colors.amber : colors.violet, fontWeight: '700' }]}>
+            {u.kind === 'fehlalarm' ? 'Fehlalarm gemeldet' : u.kind === 'meldung' ? 'Weitere Meldung' : 'Lagemeldung'} · {formatRelative(u.ts)}
+          </Text>
+          <Text style={[styles.body, { marginTop: 0 }]}>{u.message}</Text>
+        </View>
+      ))}
+    </View>
+  )
+}
 
 /** Wie lange eine Entwarnung auf dem Start-Tab stehen bleibt */
 const ENTWARNUNG_SICHTBAR_MS = 12 * 60 * 60_000
@@ -60,13 +109,20 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario, 
         const helpers = [...new Set(a.deliveries.filter((d) => d.ack === 'acknowledged').map((d) => d.userId))]
           .map((id) => state.users.find((u) => u.id === id))
           .filter(Boolean)
+        const istSos = a.message.startsWith('SOS-Alarm')
+        const istFuehrung = me.role !== 'mitarbeiter'
+        const scenario = state.scenarios.find((s) => s.id === a.scenarioId)
         return (
-          <Card key={a.id} style={{ borderColor: colors.brandLight, borderWidth: 2 }}>
+          <Card key={a.id} style={{ borderColor: colors.alarmLight, borderWidth: 2 }}>
             <View style={styles.row}>
-              <Siren size={18} color={colors.brand} />
-              <Text style={[styles.cardTitle, { color: colors.brand, flex: 1 }]}>Ihr Alarm ist aktiv</Text>
+              <Siren size={18} color={colors.alarm} />
+              <Text style={[styles.cardTitle, { color: colors.alarm, flex: 1 }]}>
+                {istSos ? 'Ihr SOS-Alarm ist aktiv' : `Ihr Alarm ist aktiv${scenario ? ` · ${scenario.title}` : ''}`}
+              </Text>
+              {a.drill && <Badge label="ÜBUNG" color="amber" />}
               <Text style={styles.faint}>{formatRelative(a.triggeredAt)}</Text>
             </View>
+            <Lagemeldungen alarm={a} />
             <Text style={styles.body}>{delivered}/{a.deliveries.length} Benachrichtigungen zugestellt</Text>
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${a.deliveries.length ? (delivered / a.deliveries.length) * 100 : 0}%` }]} />
@@ -81,17 +137,29 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario, 
             ) : (
               <Text style={[styles.muted, { marginTop: 8 }]}>Warten auf Rückmeldung der Einsatzkräfte…</Text>
             )}
-            <Pressable
-              style={styles.outlineButton}
-              onPress={() =>
-                Alert.alert('Entwarnung', 'Entwarnung geben und den Alarm beenden?', [
-                  { text: 'Abbrechen', style: 'cancel' },
-                  { text: 'Entwarnung geben', style: 'destructive', onPress: () => dispatch({ type: 'END_ALARM', alarmId: a.id }) },
-                ])
-              }
-            >
-              <Text style={styles.outlineButtonText}>Entwarnung – mir geht es gut</Text>
-            </Pressable>
+            {istSos ? (
+              <Pressable
+                style={styles.outlineButton}
+                onPress={() =>
+                  Alert.alert('Entwarnung', 'Entwarnung geben und den SOS-Alarm beenden?', [
+                    { text: 'Abbrechen', style: 'cancel' },
+                    { text: 'Entwarnung geben', style: 'destructive', onPress: () => dispatch({ type: 'END_ALARM', alarmId: a.id }) },
+                  ])
+                }
+              >
+                <Text style={styles.outlineButtonText}>Entwarnung – mir geht es gut</Text>
+              </Pressable>
+            ) : istFuehrung ? (
+              <Pressable style={styles.outlineButton} onPress={() => entwarnungGeben(dispatch, a.id)}>
+                <Text style={styles.outlineButtonText}>Entwarnung geben</Text>
+              </Pressable>
+            ) : (a.updates ?? []).some((u) => u.kind === 'fehlalarm') ? (
+              <Text style={[styles.faint, { marginTop: 10, textAlign: 'center' }]}>Fehlalarm gemeldet – der Krisenstab gibt die Entwarnung.</Text>
+            ) : (
+              <Pressable style={styles.outlineButton} onPress={() => fehlalarmMelden(dispatch, a.id)}>
+                <Text style={styles.outlineButtonText}>Fehlalarm melden</Text>
+              </Pressable>
+            )}
           </Card>
         )
       })}
@@ -100,13 +168,15 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario, 
         const scenario = state.scenarios.find((s) => s.id === a.scenarioId)
         const myAck = a.deliveries.find((d) => d.userId === me.id)?.ack ?? 'none'
         return (
-          <Card key={a.id} style={{ borderColor: a.silent ? colors.violet : colors.brandLight, borderWidth: 2 }}>
+          <Card key={a.id} style={{ borderColor: a.silent ? colors.violet : colors.alarmLight, borderWidth: 2 }}>
             <View style={styles.row}>
-              <BellRing size={18} color={a.silent ? colors.violet : colors.brand} />
+              <BellRing size={18} color={a.silent ? colors.violet : colors.alarm} />
               <Text style={[styles.cardTitle, { flex: 1 }]}>{scenario?.title}</Text>
+              {a.drill && <Badge label="ÜBUNG" color="amber" />}
               {a.silent && <Badge label="still" color="violet" />}
             </View>
             <Text style={styles.body}>{a.message}</Text>
+            <Lagemeldungen alarm={a} />
             {scenario && (
               <Pressable style={styles.darkButton} onPress={() => onOpenScenario(scenario, a)}>
                 <Text style={styles.darkButtonText}>Was jetzt zu tun ist</Text>
@@ -137,6 +207,11 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario, 
                   color={myAck === 'acknowledged' ? 'green' : 'slate'}
                 />
               </View>
+            )}
+            {me.role !== 'mitarbeiter' && (
+              <Pressable style={styles.outlineButton} onPress={() => entwarnungGeben(dispatch, a.id)}>
+                <Text style={styles.outlineButtonText}>Entwarnung geben</Text>
+              </Pressable>
             )}
           </Card>
         )
@@ -228,7 +303,7 @@ export function AlarmAuswahlScreen({ onPick, onBack }: { onPick: (s: Scenario) =
         {szenarien.map((s) => (
           <Pressable key={s.id} style={styles.tile} onPress={() => onPick(s)}>
             <View style={[styles.row, { justifyContent: 'space-between' }]}>
-              <ScenarioIcon name={s.icon} size={22} color={s.priority === 'hoch' ? colors.brand : colors.muted} />
+              <ScenarioIcon name={s.icon} size={22} color={s.priority === 'hoch' ? colors.alarm : colors.muted} />
               {s.silentDefault && <Badge label="still" color="violet" />}
             </View>
             <Text style={styles.tileTitle}>{s.title}</Text>
@@ -265,7 +340,7 @@ export function ScenariosScreen({ onOpen }: { onOpen: (s: Scenario) => void }) {
       <View style={styles.grid}>
         {filtered.map((s) => (
           <Pressable key={s.id} style={styles.tile} onPress={() => onOpen(s)}>
-            <ScenarioIcon name={s.icon} size={22} color={s.priority === 'hoch' ? colors.brand : colors.muted} />
+            <ScenarioIcon name={s.icon} size={22} color={s.priority === 'hoch' ? colors.alarm : colors.muted} />
             <Text style={styles.tileTitle}>{s.title}</Text>
             <Text style={styles.faint}>{s.category}</Text>
           </Pressable>
@@ -402,6 +477,13 @@ export function ScenarioDetailScreen({
         <Text style={{ color: '#047857', fontSize: 13, marginTop: 4 }}>
           {delivered}/{alarm.deliveries.length} zugestellt · {acked} quittiert – Live-Status auf dem Start-Tab.
         </Text>
+        {(alarm.updates ?? []).some((u) => u.kind === 'fehlalarm') ? (
+          <Text style={[styles.faint, { marginTop: 8 }]}>Fehlalarm gemeldet – der Krisenstab gibt die Entwarnung.</Text>
+        ) : (
+          <Pressable style={[styles.outlineButton, { marginTop: 8 }]} onPress={() => fehlalarmMelden(dispatch, alarm.id)}>
+            <Text style={styles.outlineButtonText}>Fehlalarm melden</Text>
+          </Pressable>
+        )}
       </View>
     )
   }
@@ -569,7 +651,7 @@ export function ScenarioDetailScreen({
               </View>
               <Text style={[styles.body, { marginTop: 0 }]}>
                 {fremderAusloeser ? `${fremderAusloeser.firstName} ${fremderAusloeser.lastName}` : 'Jemand'} hat {formatRelative(fremderAlarm.triggeredAt)} alarmiert.
-                Ein zweiter Alarm ist nur nötig, wenn ein weiterer Standort betroffen ist oder Sie wesentlich Neues wissen – sonst erhalten alle dieselbe Meldung doppelt.
+                Wenn Sie trotzdem auslösen, entsteht kein zweiter Alarm: Ihre Meldung wird dem laufenden hinzugefügt, und neu gewählte Standorte werden zusätzlich alarmiert.
               </Text>
               <Pressable style={[styles.darkButton, { marginTop: 4 }]} onPress={() => setModus('empfaenger')}>
                 <Text style={styles.darkButtonText}>Was jetzt zu tun ist</Text>
@@ -580,7 +662,9 @@ export function ScenarioDetailScreen({
             <AlarmStatus alarm={myScenarioAlarm} />
           ) : (
             <HoldButton
-              label={`${fremderAlarm ? 'Trotzdem zusätzlich: ' : ''}${responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(' & ') : 'Alle'} alarmieren (${alarmRecipientCount})`}
+              label={fremderAlarm
+                ? `Meldung zum laufenden Alarm ergänzen (${alarmRecipientCount})`
+                : `${responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(' & ') : 'Alle'} alarmieren (${alarmRecipientCount})`}
               hint="Zum Alarmieren gedrückt halten"
               onTrigger={triggerGroupAlarm}
             />
@@ -773,6 +857,12 @@ function EntwarnungScreen({
             {beendetDurch ? ` durch ${beendetDurch}` : ''}
             {orte ? ` · ${orte}` : ''}
           </Text>
+          {alarm.endNote && (
+            <View style={{ marginTop: 8, borderLeftWidth: 3, borderLeftColor: colors.green, paddingLeft: 8 }}>
+              <Text style={[styles.faint, { color: colors.green, fontWeight: '700' }]}>Hinweis des Krisenstabs</Text>
+              <Text style={[styles.body, { marginTop: 0 }]}>{alarm.endNote}</Text>
+            </View>
+          )}
         </Card>
       ) : (
         <Card>
@@ -850,12 +940,18 @@ function EmpfaengerScreen({
 
       {alarm ? (
         <Card style={{ borderColor: alarm.silent ? colors.violet : colors.brandLight, borderWidth: 2 }}>
+          {alarm.drill && (
+            <View style={{ alignSelf: 'flex-start', marginBottom: 4 }}>
+              <Badge label="ÜBUNG – kein Ernstfall" color="amber" />
+            </View>
+          )}
           <Text style={styles.body}>{alarm.message}</Text>
           <Text style={styles.faint}>
             {ausloeser ? `Ausgelöst von ${ausloeser.firstName} ${ausloeser.lastName} · ` : ''}
             {formatRelative(alarm.triggeredAt)}
             {orte ? ` · ${orte}` : ''}
           </Text>
+          <Lagemeldungen alarm={alarm} />
           {alarm.requireAck && myAck === 'none' && (
             <View style={[styles.row, { marginTop: 8, gap: 8 }]}>
               <Pressable
@@ -999,9 +1095,9 @@ export function LoneWorkScreen() {
     const critical = remaining < 5 * 60_000
     return (
       <ScrollView contentContainerStyle={styles.screen}>
-        <Card style={{ alignItems: 'center', borderWidth: 2, borderColor: critical ? colors.brandLight : colors.border }}>
+        <Card style={{ alignItems: 'center', borderWidth: 2, borderColor: critical ? colors.alarmLight : colors.border }}>
           <Text style={styles.muted}>{running.activity}</Text>
-          <Text style={[styles.countdown, critical && { color: colors.brand }]}>{formatDuration(remaining)}</Text>
+          <Text style={[styles.countdown, critical && { color: colors.alarm }]}>{formatDuration(remaining)}</Text>
           <Text style={[styles.faint, { textAlign: 'center', marginBottom: 14 }]}>
             {critical ? 'Bald läuft der Timer ab – Lebenszeichen geben!' : 'Läuft der Timer ab, wird automatisch alarmiert.'}
           </Text>
@@ -1252,7 +1348,7 @@ export function ProfileScreen() {
             <View
               style={{
                 width: 8, height: 8, borderRadius: 4,
-                backgroundColor: serverStatus === 'verbunden' ? colors.green : serverStatus === 'getrennt' ? colors.brand : '#f59e0b',
+                backgroundColor: serverStatus === 'verbunden' ? colors.green : serverStatus === 'getrennt' ? colors.alarm : '#f59e0b',
               }}
             />
             <Text style={[styles.cardTitle, { flex: 1 }]}>
@@ -1352,7 +1448,7 @@ function PasswordCard() {
         style={styles.input} placeholder="Neues Passwort wiederholen" placeholderTextColor={colors.faint}
         secureTextEntry autoCapitalize="none" value={repeat} onChangeText={(t) => { setRepeat(t); setError(null) }}
       />
-      {error && <Text style={[styles.faint, { color: colors.brand, marginTop: 8 }]}>{error}</Text>}
+      {error && <Text style={[styles.faint, { color: colors.alarm, marginTop: 8 }]}>{error}</Text>}
       <View style={[styles.row, { marginTop: 12 }]}>
         <Pressable style={[styles.outlineButton, { flex: 1, marginTop: 0 }]} onPress={() => { setOpen(false); setError(null) }}>
           <Text style={styles.outlineButtonText}>Abbrechen</Text>
@@ -1396,7 +1492,7 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   tile: { width: '48%', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 16, padding: 13, gap: 3, flexGrow: 1 },
   tileTitle: { fontSize: 14, fontWeight: '700', color: colors.text },
-  callButton: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.brandLight, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, marginTop: 6 },
+  callButton: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.alarmLight, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, marginTop: 6 },
   callButtonText: { color: '#fff', fontWeight: '700', flex: 1, fontSize: 14 },
   callButtonNumber: { color: '#fff', fontWeight: '800', fontSize: 18 },
   stepRow: { flexDirection: 'row', gap: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 11, marginBottom: 8 },

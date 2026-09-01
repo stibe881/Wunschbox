@@ -128,7 +128,7 @@ export default function LoginScreen() {
         </label>
 
         {error && (
-          <div className="flex items-start gap-2 rounded-xl bg-brand-600/15 border border-brand-600/40 px-3 py-2.5 text-sm text-brand-200" role="alert">
+          <div className="flex items-start gap-2 rounded-xl bg-alarm-600/15 border border-alarm-600/40 px-3 py-2.5 text-sm text-alarm-200" role="alert">
             <AlertTriangle size={16} className="shrink-0 mt-0.5" />
             {error}
           </div>
@@ -240,7 +240,7 @@ export default function LoginScreen() {
             >
               <ServerIcon size={12} />
               Alarmserver: {serverUrl()}
-              {serverErreichbar === false && <span className="text-brand-400 font-semibold">nicht erreichbar</span>}
+              {serverErreichbar === false && <span className="text-alarm-400 font-semibold">nicht erreichbar</span>}
               {serverErreichbar === true && <span className="text-emerald-500 font-semibold">verbunden</span>}
             </button>
           )}
@@ -310,7 +310,7 @@ export function ForcePasswordChange({ user }: { user: User }) {
         </label>
 
         {error && (
-          <div className="flex items-start gap-2 rounded-xl bg-brand-600/15 border border-brand-600/40 px-3 py-2.5 text-sm text-brand-200" role="alert">
+          <div className="flex items-start gap-2 rounded-xl bg-alarm-600/15 border border-alarm-600/40 px-3 py-2.5 text-sm text-alarm-200" role="alert">
             <AlertTriangle size={16} className="shrink-0 mt-0.5" /> {error}
           </div>
         )}

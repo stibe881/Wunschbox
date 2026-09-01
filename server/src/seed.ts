@@ -11,7 +11,7 @@ import type { Scenario, Group, Location, AlarmPlan, AlarmButton, EmergencyContac
 
 // Vorkonfigurierte Notfallszenarien für das heilpädagogische Kompetenzzentrum SONNENBERG
 /** Inhaltsversion der Standard-Szenarien – bei Erhöhung werden sie beim Laden aktualisiert */
-export const SCENARIO_CONTENT_VERSION = 7
+export const SCENARIO_CONTENT_VERSION = 8
 
 export const SEED_SCENARIOS: Scenario[] = [
   {
@@ -610,16 +610,40 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['Auslöser entfernt', 'Notfallplan angewendet', 'EpiPen dokumentiert', '144 alarmiert', 'Eltern informiert', 'Pen ersetzt', 'Auslöser abgeklärt'],
   },
   {
-    id: 'sc-vermisst', icon: 'search', title: 'Vermisste:r Schüler:in / Weglaufen', category: 'Schüler:innen', priority: 'hoch', active: false, silentDefault: false,
+    id: 'sc-vermisst', icon: 'search', title: 'Vermisste:r Schüler:in / Weglaufen', category: 'Schüler:innen', priority: 'hoch', silentDefault: false,
     defaultChannels: ['push', 'sms'], responsibleGroupIds: ['gr-alle'], contactIds: ['ec-117'],
+    callGuidance: [
+      'Zuerst den Suchalarm in der App auslösen – alle am Standort erhalten Beschreibung und Suchauftrag. In der Meldung: Name, Alter, Kleidung, letzter Ort und Zeit.',
+      'Polizei 117 sofort anrufen, wenn das Kind in Gefahr ist (Gewässer, Bahn, Strasse in der Nähe, Weglauftendenz bekannt, kalte Witterung) – sonst spätestens nach 15 Minuten ohne Erfolg.',
+      'Melden: Name und Alter, Beschreibung und Kleidung, letzter Ort und Zeit, Besonderheiten (spricht nicht, reagiert nicht auf Zuruf, Lieblingsorte, Medikamente).',
+      'Ausdrücklich sagen: Kind mit Beeinträchtigung aus einer Sonderschule – es kann sich nicht selbst helfen.',
+      'Leitung offen halten und eine Rückrufnummer nennen, die während der Suche besetzt bleibt.',
+    ],
     instructions: [
       'Uhrzeit notieren: Wann und wo wurde das Kind zuletzt gesehen?',
-      'Suchalarm in der App auslösen – alle am Standort erhalten Beschreibung und Auftrag.',
       'Beschreibung durchgeben: Kleidung, Aussehen, Verhaltensmuster (Weglauftendenz, reagiert nicht auf Zuruf, Lieblingsorte).',
       'Gefahrenstellen zuerst absuchen: Strasse, Bushaltestelle, Gewässer, Bahngleise.',
       'Danach systematisch: Gebäude (WC, Verstecke, Keller), Aussenareal, bekannte Rückzugsorte.',
       'Aufsicht der übrigen Kinder lückenlos sicherstellen, bevor Personal zur Suche abgezogen wird.',
-      'Nach spätestens 15 Minuten ohne Erfolg: Polizei 117 anrufen – nicht länger warten.',
+      'Suchprotokoll beginnen: wer sucht wo, seit wann – Doppelspurigkeit vermeiden.',
+    ],
+    responseSteps: [
+      { text: 'Beschreibung aus der Meldung merken: Name, Kleidung, letzter Ort. Sofort die eigene Umgebung prüfen – Raum, Gang, WC, Garderobe.' },
+      { text: 'Eigene Klasse zählen und zusammenhalten; niemand verlässt die Gruppe. Wer Kinder betreut, sucht nicht selbst, sondern hält die Augen offen.' },
+      { text: 'Ohne Betreuungsaufgabe: bei der Suchleitung melden und einen Bereich übernehmen – nicht auf eigene Faust losgehen.' },
+      { text: 'Fund oder Sichtung sofort über die App-Meldung oder per Anruf an die Suchleitung – nicht das Kind allein zurückbringen, wenn es sich wehrt: bei ihm bleiben und Hilfe holen.' },
+      { text: 'Hausdienst: Aussentüren und Tore kontrollieren, Areal abschreiten, Zufahrt und Parkplatz prüfen, Kameras sichten falls vorhanden.', groupIds: ['gr-sicherheit'] },
+      { text: 'Evakuationshelfer: Gebäude systematisch nach Suchplan absuchen – Keller, Technikräume, Verstecke – und jeden geprüften Raum melden.', groupIds: ['gr-evak'] },
+      { text: 'Pädagogisches Team: Lieblingsorte und Rückzugsorte des Kindes nennen, Bezugsperson zur Suche schicken; das Kind reagiert eher auf eine bekannte Stimme.', groupIds: ['gr-paed'] },
+      { text: 'Krisenstab: Suchleitung übernehmen, Protokoll führen, Polizei und Eltern über die Schulleitung informieren, Suchbereiche zuteilen.', groupIds: ['gr-krisenstab'] },
+      { text: 'An einem anderen Standort: Beschreibung beachten, Umgebung im Blick behalten, erreichbar bleiben.' },
+    ],
+    allClearSteps: [
+      'Das Kind ist gefunden: ruhig begleiten, kurz medizinisch prüfen lassen, keine Vorwürfe im Moment der Rückkehr.',
+      'Suchende zurückrufen und zählen – niemand bleibt unbemerkt draussen.',
+      'Übrige Kinder beruhigen und zum Tagesablauf zurückkehren; die Klasse des Kindes braucht ein kurzes Gespräch.',
+      'Suchprotokoll abschliessen und der Schulleitung übergeben; Polizei über den Fund informieren, falls sie aufgeboten war.',
+      'Aufsichtskonzept und individuelle Weglaufprävention innerhalb einer Woche überprüfen.',
     ],
     followUp: [
       'Schulleitung informiert die Eltern/Erziehungsberechtigten parallel zur Suche.',
@@ -627,7 +651,7 @@ export const SEED_SCENARIOS: Scenario[] = [
       'Nach dem Auffinden: kurz medizinisch prüfen, ruhig zurückbegleiten – keine Vorwürfe im Moment der Rückkehr.',
       'Vorfall auswerten: Aufsichtskonzept und individuelle Weglaufprävention anpassen.',
     ],
-    checklist: ['Letzter Standort + Zeit erfasst', 'Suchalarm ausgelöst', 'Beschreibung verteilt', 'Gefahrenstellen abgesucht', 'Aufsicht geregelt', '117 nach 15 Min.', 'Eltern informiert', 'Suchprotokoll geführt'],
+    checklist: ['Letzter Standort + Zeit erfasst', 'Suchalarm ausgelöst', 'Beschreibung verteilt', 'Gefahrenstellen abgesucht', 'Aufsicht geregelt', '117 nach 15 Min. oder sofort bei Gefahr', 'Eltern informiert', 'Suchprotokoll geführt'],
   },
   {
     id: 'sc-amok', icon: 'shield-alert', title: 'Amok / Bedrohungslage', category: 'Sicherheit', priority: 'hoch', silentDefault: true,

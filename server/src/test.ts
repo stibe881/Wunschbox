@@ -67,7 +67,10 @@ async function main(): Promise<void> {
 
   // --- Ablauf der Szenarien: Alarmieren steht in callGuidance, nicht in den Sofortmassnahmen ---
   const aktive = stand.body.scenarios.filter((s: any) => s.active !== false)
-  pruefe('10 Szenarien für Mitarbeitende freigegeben', aktive.length === 10, `gefunden: ${aktive.length}`)
+  pruefe('11 Szenarien für Mitarbeitende freigegeben', aktive.length === 11, `gefunden: ${aktive.length}`)
+  pruefe('Alarmpläne verweisen nur auf freigegebene Szenarien',
+    stand.body.plans.every((p: any) => !p.scenarioId || aktive.some((s: any) => s.id === p.scenarioId)),
+    stand.body.plans.filter((p: any) => p.scenarioId && !aktive.some((s: any) => s.id === p.scenarioId)).map((p: any) => p.id).join(', '))
   pruefe('Amok / Bedrohungslage ist freigegeben und still', aktive.some((s: any) => s.id === 'sc-amok' && s.silentDefault === true))
   pruefe('jedes freigegebene Szenario hat Hinweise zum Alarmieren',
     aktive.every((s: any) => Array.isArray(s.callGuidance) && s.callGuidance.length > 0),
@@ -195,14 +198,72 @@ async function main(): Promise<void> {
   pruefe('Alarm ausgelöst', alarm.status === 200 && alarm.body.alarm.status === 'active')
   const alarmId: string = alarm.body.alarm.id
   pruefe('Empfänger wurden aufgelöst', alarm.body.alarm.deliveries.length > 0)
+  pruefe('Antwort nennt, ob zusammengeführt wurde', alarm.body.merged === false)
+
+  // --- Zweite Auslösung zum selben Ereignis wird zusammengeführt ---
+  const zweite = await ruf('/alarms', {
+    method: 'POST', token: adminToken,
+    body: JSON.stringify({
+      scenarioId: 'sc-medizin', message: 'Zweite Meldung: Person ist ansprechbar', silent: false,
+      requireAck: true, channels: ['push'], groupIds: ['gr-alle'], locationIds: ['loc-baar'], triggeredVia: 'web',
+    }),
+  })
+  pruefe('zweite Auslösung wird zusammengeführt', zweite.status === 200 && zweite.body.merged === true && zweite.body.alarm.id === alarmId)
+  pruefe('weitere Meldung steht beim laufenden Alarm',
+    (zweite.body.alarm.updates ?? []).some((u: any) => u.kind === 'meldung' && u.message.includes('Person ist ansprechbar')))
+  const aktiveAlarme = (await ruf('/state', { token: adminToken })).body.alarms.filter((a: any) => a.status === 'active')
+  pruefe('kein zweiter Alarm angelegt', aktiveAlarme.length === 1, `aktiv: ${aktiveAlarme.length}`)
+
+  // --- Lagemeldung und Fehlalarm ---
+  const lage = await ruf(`/alarms/${alarmId}/update`, { method: 'POST', token: adminToken, body: JSON.stringify({ message: 'Sanität ist eingetroffen.' }) })
+  pruefe('Krisenstab/Administration kann Lagemeldungen senden', lage.status === 200 && lage.body.alarm.updates.some((u: any) => u.kind === 'lage'))
+  pruefe('Mitarbeitende können keine Lagemeldung senden',
+    (await ruf(`/alarms/${alarmId}/update`, { method: 'POST', token: peterToken, body: JSON.stringify({ message: 'x' }) })).status === 403)
+  const fehl = await ruf(`/alarms/${alarmId}/update`, { method: 'POST', token: peterToken, body: JSON.stringify({ kind: 'fehlalarm', message: 'War nur ein Sturz ohne Verletzung' }) })
+  pruefe('Auslösende Person kann Fehlalarm melden', fehl.status === 200 && fehl.body.alarm.updates.some((u: any) => u.kind === 'fehlalarm'))
 
   const quittiert = await ruf(`/alarms/${alarmId}/ack`, { method: 'POST', token: peterToken, body: JSON.stringify({ ack: 'acknowledged' }) })
   pruefe('Quittierung gespeichert', quittiert.body.alarm.deliveries.some((d: any) => d.userId === peterId && d.ack === 'acknowledged'))
 
   pruefe('Mitarbeitende dürfen Alarme nicht beenden',
     (await ruf(`/alarms/${alarmId}/end`, { method: 'POST', token: peterToken })).status === 403)
-  const beendet = await ruf(`/alarms/${alarmId}/end`, { method: 'POST', token: adminToken })
+  const beendet = await ruf(`/alarms/${alarmId}/end`, { method: 'POST', token: adminToken, body: JSON.stringify({ note: 'Rückkehr ab 10:30 über den Haupteingang.' }) })
   pruefe('Administration beendet den Alarm', beendet.status === 200 && beendet.body.alarm.status === 'ended')
+  pruefe('Entwarnung trägt den Text mit', beendet.body.alarm.endNote === 'Rückkehr ab 10:30 über den Haupteingang.')
+  pruefe('Lagemeldung auf beendetem Alarm wird abgewiesen',
+    (await ruf(`/alarms/${alarmId}/update`, { method: 'POST', token: adminToken, body: JSON.stringify({ message: 'zu spät' }) })).status === 409)
+
+  // --- Eigener SOS-Alarm darf selbst beendet werden ---
+  const sos = await ruf('/alarms', {
+    method: 'POST', token: peterToken,
+    body: JSON.stringify({
+      scenarioId: 'sc-medizin', message: 'SOS-Alarm von Peter Muster (App) – Standort: Hauptsitz Baar', silent: false,
+      requireAck: true, channels: ['push'], groupIds: ['gr-ersthelfer'], locationIds: ['loc-baar'], triggeredVia: 'app',
+    }),
+  })
+  pruefe('SOS-Alarm ausgelöst', sos.status === 200 && sos.body.merged === false)
+  pruefe('Auslösende Person beendet den eigenen SOS-Alarm',
+    (await ruf(`/alarms/${sos.body.alarm.id}/end`, { method: 'POST', token: peterToken })).status === 200)
+
+  // --- Übung ---
+  const uebung = await ruf('/alarms', {
+    method: 'POST', token: adminToken,
+    body: JSON.stringify({
+      scenarioId: 'sc-evak', message: 'Räumungsübung Hauptsitz', drill: true,
+      requireAck: true, channels: ['push'], groupIds: ['gr-alle'], locationIds: ['loc-baar'], triggeredVia: 'web',
+    }),
+  })
+  pruefe('Übung wird als solche gespeichert', uebung.status === 200 && uebung.body.alarm.drill === true)
+  const protokoll = (await ruf('/state', { token: adminToken })).body.audit
+  pruefe('Übung im Protokoll gekennzeichnet', protokoll.some((e: any) => e.message.startsWith('ÜBUNG: Alarm ausgelöst')))
+  pruefe('Übung beendet', (await ruf(`/alarms/${uebung.body.alarm.id}/end`, { method: 'POST', token: adminToken })).status === 200)
+
+  // --- Bereitschaft ---
+  const bereit = await ruf('/bereitschaft', { token: adminToken })
+  pruefe('Bereitschaftsübersicht abrufbar', bereit.status === 200 && Array.isArray(bereit.body.standorte) && bereit.body.standorte.length === 3)
+  pruefe('Bereitschaft nennt Personen ohne Gerät', Array.isArray(bereit.body.ohneGeraet))
+  pruefe('Bereitschaft ist Führung vorbehalten', (await ruf('/bereitschaft', { token: peterToken })).status === 403)
+  pruefe('Testmeldung auslösbar', (await ruf('/bereitschaft/testpush', { method: 'POST', token: adminToken })).status === 200)
 
   // --- Gemeinsamer Datenbestand: das eigentliche Ziel ---
   const standPeter = await ruf('/state', { token: peterToken })

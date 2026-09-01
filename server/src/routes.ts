@@ -5,16 +5,19 @@ import {
 } from './auth.js'
 import { addClient } from './events.js'
 import { broadcast } from './events.js'
-import { alarmPush, ausgehendeWebhooks, entwarnungPush } from './engine.js'
-import { registerPushToken, removePushToken } from './push.js'
+import { UEBUNG, alarmPush, ausgehendeWebhooks, entwarnungPush, lagemeldungPush, testPush } from './engine.js'
+import { geraeteProPerson, letzterTestpush, pushDienstStatus, registerPushToken, removePushToken } from './push.js'
+import { readdirSync, statSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { aktuellerJob, starteUpdate, updateLaeuft, versionsInfo, type UpdateScope } from './update.js'
 import { ensureAdmin } from './setup.js'
 import {
-  addAudit, allLoneWork, allStoredUsers, createAlarm, deleteDoc, deleteUser, findAlarm, findStoredUser,
+  addAudit, allAlarms, allGroups, allLocations, allLoneWork, allStoredUsers, createAlarm, deleteDoc, deleteUser, findAlarm, findStoredUser,
   findStoredUserByEmail, fullState, saveAlarm, saveIntegrations, uid, upsertDoc, upsertGroup,
   upsertLocation, upsertUser,
 } from './store.js'
-import type { AckStatus, Alarm, Role, StoredUser } from './types.js'
+import type { AckStatus, Alarm, AlarmUpdate, Role, StoredUser } from './types.js'
 
 export const router = Router()
 
@@ -338,30 +341,205 @@ router.post('/integrations', auth, adminOnly, (req, res) => {
 
 // ---------- Alarme ----------
 
+/** Meldungen, die kein eigenes Ereignis sind (Einzelinfo, Krisenteam-Aufgebot) */
+function istNebenmeldung(message: string): boolean {
+  return message.startsWith('Info an') || message.startsWith('Krisenteam-Aufgebot')
+}
+
+/** Wie lange eine zweite Auslösung noch als dasselbe Ereignis gilt */
+const ZUSAMMENFUEHREN_MS = 2 * 3600_000
+
+/**
+ * Läuft für dieses Szenario bereits ein Alarm am selben Standort, ist die neue
+ * Auslösung eine weitere Meldung zum selben Ereignis – kein zweiter Alarm.
+ */
+function laufenderAlarmZu(neu: Alarm): Alarm | null {
+  if (istNebenmeldung(neu.message)) return null
+  return (
+    allAlarms().find(
+      (a) =>
+        a.status === 'active' && a.scenarioId === neu.scenarioId && Boolean(a.drill) === Boolean(neu.drill) &&
+        !istNebenmeldung(a.message) && Date.now() - a.triggeredAt < ZUSAMMENFUEHREN_MS &&
+        (a.locationIds.length === 0 || neu.locationIds.length === 0 || a.locationIds.some((id) => neu.locationIds.includes(id))),
+    ) ?? null
+  )
+}
+
 router.post('/alarms', auth, async (req: AuthRequest, res) => {
   const o = req.body ?? {}
-  const alarm = createAlarm({
-    scenarioId: String(o.scenarioId ?? ''),
-    message: String(o.message ?? ''),
-    silent: Boolean(o.silent),
-    requireAck: Boolean(o.requireAck),
-    channels: Array.isArray(o.channels) && o.channels.length ? o.channels : ['push'],
-    groupIds: Array.isArray(o.groupIds) ? o.groupIds : [],
-    locationIds: Array.isArray(o.locationIds) ? o.locationIds : [],
-    triggeredByUserId: req.user!.id,
-    triggeredVia: o.triggeredVia ?? 'app',
-    planId: o.planId,
-    escalation: o.escalation,
-    recipientUserIds: o.recipientUserIds,
-  })
-  saveAlarm(alarm)
   const ausloeser = req.user!
-  addAudit('alarm', `Alarm ausgelöst von ${ausloeser.firstName} ${ausloeser.lastName}: ${alarm.message}`, ausloeser.id)
+  const alarm: Alarm = {
+    ...createAlarm({
+      scenarioId: String(o.scenarioId ?? ''),
+      message: String(o.message ?? ''),
+      silent: Boolean(o.silent),
+      requireAck: Boolean(o.requireAck),
+      channels: Array.isArray(o.channels) && o.channels.length ? o.channels : ['push'],
+      groupIds: Array.isArray(o.groupIds) ? o.groupIds : [],
+      locationIds: Array.isArray(o.locationIds) ? o.locationIds : [],
+      triggeredByUserId: ausloeser.id,
+      triggeredVia: o.triggeredVia ?? 'app',
+      planId: o.planId,
+      escalation: o.escalation,
+      recipientUserIds: o.recipientUserIds,
+    }),
+    drill: Boolean(o.drill) || undefined,
+  }
+  const praefix = alarm.drill ? `${UEBUNG}: ` : ''
+
+  // --- Zweite Auslösung zum selben Ereignis: zusammenführen ---
+  const laufend = laufenderAlarmZu(alarm)
+  if (laufend) {
+    const jetzt = Date.now()
+    const bekannt = new Set(laufend.deliveries.map((d) => d.userId))
+    const neueEmpfaenger = [...new Set(alarm.deliveries.map((d) => d.userId))].filter((id) => !bekannt.has(id))
+    const neueOrte = alarm.locationIds.filter((id) => !laufend.locationIds.includes(id))
+    const update: AlarmUpdate = {
+      ts: jetzt,
+      kind: 'meldung',
+      byUserId: ausloeser.id,
+      message: `Weitere Meldung von ${ausloeser.firstName} ${ausloeser.lastName}: ${alarm.message}`,
+    }
+    const zusammengefuehrt: Alarm = {
+      ...laufend,
+      locationIds: laufend.locationIds.length === 0 ? [] : [...laufend.locationIds, ...neueOrte],
+      updates: [...(laufend.updates ?? []), update],
+      deliveries: [...laufend.deliveries, ...alarm.deliveries.filter((d) => neueEmpfaenger.includes(d.userId))],
+      log: [
+        ...laufend.log,
+        {
+          ts: jetzt,
+          message: `Zweite Auslösung von ${ausloeser.firstName} ${ausloeser.lastName} zusammengeführt${
+            neueEmpfaenger.length ? ` – ${neueEmpfaenger.length} zusätzliche Empfänger` : ''
+          }: ${alarm.message}`,
+        },
+      ],
+    }
+    saveAlarm(zusammengefuehrt)
+    addAudit('alarm', `${praefix}Weitere Meldung zum laufenden Alarm von ${ausloeser.firstName} ${ausloeser.lastName}: ${alarm.message}`, ausloeser.id)
+    broadcast('state')
+    res.json({ alarm: zusammengefuehrt, merged: true })
+    if (neueEmpfaenger.length) await alarmPush(zusammengefuehrt, neueEmpfaenger)
+    await lagemeldungPush(zusammengefuehrt, update, [...bekannt])
+    return
+  }
+
+  saveAlarm(alarm)
+  addAudit('alarm', `${praefix}Alarm ausgelöst von ${ausloeser.firstName} ${ausloeser.lastName}: ${alarm.message}`, ausloeser.id)
   broadcast('state')
   // Versand nach der Antwort – ein langsamer Push darf die Auslösung nicht bremsen
-  res.json({ alarm })
+  res.json({ alarm, merged: false })
   await alarmPush(alarm)
-  await ausgehendeWebhooks(alarm)
+  if (!alarm.drill) await ausgehendeWebhooks(alarm)
+})
+
+/**
+ * Lagemeldung des Krisenstabs oder Fehlalarm-Meldung der auslösenden Person.
+ * Beides geht als Push an alle Empfänger und steht in der Handlungsanweisung.
+ */
+router.post('/alarms/:id/update', auth, async (req: AuthRequest, res) => {
+  const alarm = findAlarm(req.params.id)
+  if (!alarm) {
+    res.status(404).json({ error: 'Alarm nicht gefunden.' })
+    return
+  }
+  if (alarm.status !== 'active') {
+    res.status(409).json({ error: 'Der Alarm ist bereits beendet.' })
+    return
+  }
+  const person = req.user!
+  const istFuehrung = person.role === 'admin' || person.role === 'krisenstab'
+  const istAusloeser = alarm.triggeredByUserId === person.id
+  if (!istFuehrung && !istAusloeser) {
+    res.status(403).json({ error: 'Lagemeldungen sind Krisenstab, Administration und der auslösenden Person vorbehalten.' })
+    return
+  }
+  const text = String(req.body?.message ?? '').trim()
+  const kind: AlarmUpdate['kind'] = req.body?.kind === 'fehlalarm' ? 'fehlalarm' : 'lage'
+  if (kind === 'lage' && !istFuehrung) {
+    res.status(403).json({ error: 'Lagemeldungen sind Krisenstab und Administration vorbehalten.' })
+    return
+  }
+  if (kind === 'lage' && !text) {
+    res.status(400).json({ error: 'Bitte eine Meldung eingeben.' })
+    return
+  }
+  const jetzt = Date.now()
+  const name = `${person.firstName} ${person.lastName}`
+  const update: AlarmUpdate = {
+    ts: jetzt,
+    kind,
+    byUserId: person.id,
+    message: kind === 'fehlalarm'
+      ? `FEHLALARM gemeldet von ${name}${text ? `: ${text}` : ''} – bitte auf die Entwarnung durch den Krisenstab warten.`
+      : text,
+  }
+  const aktualisiert: Alarm = {
+    ...alarm,
+    updates: [...(alarm.updates ?? []), update],
+    log: [...alarm.log, { ts: jetzt, message: kind === 'fehlalarm' ? update.message : `Lagemeldung von ${name}: ${text}` }],
+  }
+  saveAlarm(aktualisiert)
+  addAudit('alarm', `${alarm.drill ? `${UEBUNG}: ` : ''}${kind === 'fehlalarm' ? 'Fehlalarm gemeldet' : 'Lagemeldung'} von ${name}: ${text || '(ohne Text)'}`, person.id)
+  broadcast('state')
+  res.json({ alarm: aktualisiert })
+  // Ein gemeldeter Fehlalarm geht zusätzlich an den Krisenstab, damit jemand entwarnt
+  const empfaenger = new Set(aktualisiert.deliveries.map((d) => d.userId))
+  if (kind === 'fehlalarm') {
+    const krisenGruppen = allGroups().filter((g) => g.isCrisisTeam).map((g) => g.id)
+    for (const u of allStoredUsers()) if (u.groupIds.some((g) => krisenGruppen.includes(g))) empfaenger.add(u.id)
+  }
+  await lagemeldungPush(aktualisiert, update, [...empfaenger])
+})
+
+/** Bereitschaft: Geräte pro Standort, Sicherung, Push-Dienst, letzte Testmeldung */
+router.get('/bereitschaft', auth, staffOnly, (_req, res) => {
+  const geraete = geraeteProPerson()
+  const personen = allStoredUsers()
+  const standorte = allLocations().map((l) => {
+    const dort = personen.filter((u) => u.locationId === l.id)
+    return {
+      id: l.id,
+      name: l.name,
+      personen: dort.length,
+      mitGeraet: dort.filter((u) => geraete.has(u.id)).length,
+      critical: dort.filter((u) => geraete.get(u.id)?.critical).length,
+    }
+  })
+  const ohneGeraet = personen
+    .filter((u) => !geraete.has(u.id))
+    .map((u) => ({ id: u.id, name: `${u.firstName} ${u.lastName}`, locationId: u.locationId }))
+  res.json({
+    standorte,
+    ohneGeraet,
+    tokensGesamt: [...geraete.values()].reduce((s, g) => s + g.geraete, 0),
+    letzteSicherung: letzteSicherung(),
+    pushDienst: pushDienstStatus(),
+    letzterTestpush: letzterTestpush(),
+  })
+})
+
+/** Jüngste Sicherungsdatei im Sicherungsordner (siehe scripts/sicherung.mjs) */
+function letzteSicherung(): { ts: number; datei: string } | null {
+  const ordner = resolve(process.env.SOBE_BACKUP_DIR ?? join(homedir(), 'sicherung'))
+  try {
+    let beste: { ts: number; datei: string } | null = null
+    for (const name of readdirSync(ordner)) {
+      if (!/^sobe-.*\.sqlite$/.test(name)) continue
+      const ts = statSync(join(ordner, name)).mtimeMs
+      if (!beste || ts > beste.ts) beste = { ts, datei: name }
+    }
+    return beste
+  } catch {
+    return null
+  }
+}
+
+/** Testmeldung an die eigenen Geräte – prüft die Kette bis aufs Telefon */
+router.post('/bereitschaft/testpush', auth, staffOnly, async (req: AuthRequest, res) => {
+  const anzahl = await testPush([req.user!.id])
+  addAudit('system', `Testmeldung an ${anzahl} Gerät(e) von ${req.user!.firstName} ${req.user!.lastName} gesendet.`, req.user!.id)
+  res.json({ ok: true, geraete: anzahl })
 })
 
 router.post('/alarms/:id/ack', auth, (req: AuthRequest, res) => {
@@ -400,21 +578,33 @@ router.post('/alarms/:id/ack', auth, (req: AuthRequest, res) => {
   res.json({ alarm: aktualisiert })
 })
 
-router.post('/alarms/:id/end', auth, staffOnly, async (req: AuthRequest, res) => {
+/** Ein SOS-Alarm darf von der Person beendet werden, die ihn ausgelöst hat («mir geht es gut») */
+function istEigenerSos(alarm: Alarm, person: StoredUser): boolean {
+  return alarm.triggeredByUserId === person.id && alarm.message.startsWith('SOS-Alarm')
+}
+
+router.post('/alarms/:id/end', auth, async (req: AuthRequest, res) => {
   const alarm = findAlarm(req.params.id)
   if (!alarm) {
     res.status(404).json({ error: 'Alarm nicht gefunden.' })
     return
   }
   const person = req.user!
+  const istFuehrung = person.role === 'admin' || person.role === 'krisenstab'
+  if (!istFuehrung && !istEigenerSos(alarm, person)) {
+    res.status(403).json({ error: 'Alarme beenden dürfen Administration und Krisenstab – oder die auslösende Person ihren eigenen SOS-Alarm.' })
+    return
+  }
+  const note = String(req.body?.note ?? '').trim()
   const beendet: Alarm = {
     ...alarm,
     status: 'ended',
     endedAt: Date.now(),
-    log: [...alarm.log, { ts: Date.now(), message: `Alarm beendet durch ${person.firstName} ${person.lastName} – Entwarnung versendet.` }],
+    endNote: note || undefined,
+    log: [...alarm.log, { ts: Date.now(), message: `Alarm beendet durch ${person.firstName} ${person.lastName} – Entwarnung versendet.${note ? ` «${note}»` : ''}` }],
   }
   saveAlarm(beendet)
-  addAudit('alarm', `Alarm beendet: ${alarm.message}`, person.id)
+  addAudit('alarm', `${alarm.drill ? `${UEBUNG}: ` : ''}Alarm beendet: ${alarm.message}${note ? ` – Entwarnung: ${note}` : ''}`, person.id)
   broadcast('state')
   res.json({ alarm: beendet })
   // Ein bereits beendeter Alarm soll nicht bei jedem Klick erneut «entwarnen»

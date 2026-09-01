@@ -9,9 +9,14 @@ export const colors = {
   text: '#1e293b',
   muted: '#64748b',
   faint: '#94a3b8',
-  brand: '#c81e1e',
-  brandLight: '#e02424',
-  brandBg: '#fff1f1',
+  // Hausfarbe aus dem Corporate Design (Petrol) – Kopf, Reiter, Akzente
+  brand: '#1c504b',
+  brandLight: '#2a6a63',
+  brandBg: '#eaf2f1',
+  // Alarmrot bleibt dem Alarmieren vorbehalten: SOS, Auslöseknöpfe, aktive Alarme, Notruf
+  alarm: '#c81e1e',
+  alarmLight: '#e02424',
+  alarmBg: '#fff1f1',
   green: '#059669',
   greenBg: '#d1fae5',
   violet: '#7c3aed',
@@ -24,7 +29,7 @@ export function Badge({ label, color = 'slate' }: { label: string; color?: 'slat
   const map = {
     slate: { bg: '#f1f5f9', fg: '#475569' },
     green: { bg: colors.greenBg, fg: colors.green },
-    red: { bg: colors.brandBg, fg: colors.brand },
+    red: { bg: colors.alarmBg, fg: colors.alarm },
     violet: { bg: colors.violetBg, fg: colors.violet },
     amber: { bg: colors.amberBg, fg: colors.amber },
   }[color]
@@ -104,7 +109,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   holdButton: {
-    backgroundColor: colors.brandLight,
+    backgroundColor: colors.alarmLight,
     borderRadius: 18,
     paddingVertical: 20,
     alignItems: 'center',
@@ -116,7 +121,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: colors.brand,
+    backgroundColor: colors.alarm,
   },
   holdLabel: {
     color: '#fff',

@@ -147,7 +147,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               <item.icon size={16} />
               {item.label}
               {item.to === '/monitor' && activeAlarms.length > 0 && (
-                <span className="ml-auto bg-brand-600 text-white text-xs rounded-full px-1.5 py-0.5 alarm-pulse">{activeAlarms.length}</span>
+                <span className="ml-auto bg-alarm-600 text-white text-xs rounded-full px-1.5 py-0.5 alarm-pulse">{activeAlarms.length}</span>
               )}
             </NavLink>
           ),
@@ -176,7 +176,7 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             <div className="mt-2 flex items-center gap-1.5 text-[11px]">
               <span
                 className={`w-1.5 h-1.5 rounded-full ${
-                  serverStatus === 'verbunden' ? 'bg-emerald-500' : serverStatus === 'getrennt' ? 'bg-brand-500' : 'bg-amber-500'
+                  serverStatus === 'verbunden' ? 'bg-emerald-500' : serverStatus === 'getrennt' ? 'bg-alarm-500' : 'bg-amber-500'
                 }`}
               />
               <span className="text-slate-500">
@@ -299,14 +299,14 @@ export default function App() {
             <AlertTriangle className="text-brand-500" size={18} /> SOBE Notfall <ModeBadge mode={state.mode} />
           </span>
           {activeAlarms.length > 0 && location.pathname !== '/monitor' && (
-            <NavLink to="/monitor" className="ml-auto bg-brand-600 text-white text-xs font-semibold rounded-full px-2.5 py-1 alarm-pulse">
+            <NavLink to="/monitor" className="ml-auto bg-alarm-600 text-white text-xs font-semibold rounded-full px-2.5 py-1 alarm-pulse">
               {activeAlarms.length} Alarm{activeAlarms.length > 1 ? 'e' : ''}
             </NavLink>
           )}
         </header>
 
         {activeAlarms.length > 0 && (
-          <div className="hidden lg:flex bg-brand-600 text-white px-6 py-2 text-sm font-medium items-center gap-2">
+          <div className="hidden lg:flex bg-alarm-600 text-white px-6 py-2 text-sm font-medium items-center gap-2">
             <Siren size={16} className="animate-pulse" />
             {activeAlarms.length} aktiver Alarm{activeAlarms.length > 1 ? 'e' : ''} –{' '}
             <NavLink to="/monitor" className="underline">

@@ -24,6 +24,7 @@ export default function TriggerAlarm() {
   const [locationIds, setLocationIds] = useState<string[]>([])
   const [silent, setSilent] = useState(false)
   const [requireAck, setRequireAck] = useState(false)
+  const [drill, setDrill] = useState(false)
   const [adjustOpen, setAdjustOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
@@ -76,8 +77,9 @@ export default function TriggerAlarm() {
       triggeredVia: 'web',
       planId: planId || undefined,
       escalation: plan?.escalation ?? [],
+      drill,
     })
-    dispatch({ type: 'TRIGGER_ALARM', alarm, audit: `Alarm ausgelöst: ${scenario.title} (${recipients.length} Empfänger)` })
+    dispatch({ type: 'TRIGGER_ALARM', alarm, audit: `${drill ? 'Übung' : 'Alarm'} ausgelöst: ${scenario.title} (${recipients.length} Empfänger)` })
     navigate('/monitor')
   }
 
@@ -141,7 +143,7 @@ export default function TriggerAlarm() {
               className="rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition active:scale-[0.98] hover:border-brand-500"
             >
               <div className="flex items-start justify-between">
-                <ScenarioIcon name={s.icon} size={26} className={s.priority === 'hoch' ? 'text-brand-600' : 'text-slate-500'} />
+                <ScenarioIcon name={s.icon} size={26} className={s.priority === 'hoch' ? 'text-alarm-600' : 'text-slate-500'} />
                 {s.silentDefault && <Badge color="violet">still</Badge>}
               </div>
               <div className="font-semibold text-slate-800 leading-tight mt-2">{s.title}</div>
@@ -196,6 +198,7 @@ export default function TriggerAlarm() {
             {channels.map((c) => <Badge key={c} color="blue">{CHANNEL_LABELS[c].split(' ')[0]}</Badge>)}
             {silent && <Badge color="violet">stiller Alarm</Badge>}
             {requireAck && <Badge color="green">mit Quittierung</Badge>}
+            {drill && <Badge color="amber">ÜBUNG</Badge>}
           </div>
           {state.mode === 'live' && !state.integrations.smsGateway.enabled && !state.integrations.voip.enabled && (
             <div className="text-xs text-amber-700 pt-1">
@@ -250,6 +253,7 @@ export default function TriggerAlarm() {
             <div className="flex flex-col gap-3">
               <Toggle checked={silent} onChange={setSilent} label="Stiller Alarm (keine Signaltöne)" />
               <Toggle checked={requireAck} onChange={setRequireAck} label="Aufgebot mit Quittierfunktion" />
+              <Toggle checked={drill} onChange={setDrill} label="Übung – Mitteilungen tragen den Vorspann «ÜBUNG», das Protokoll kennzeichnet sie" />
             </div>
           </div>
         )}
@@ -289,12 +293,12 @@ export default function TriggerAlarm() {
             onTrigger={fire}
             disabled={channels.length === 0 || recipients.length === 0}
             hint="Zum Auslösen gedrückt halten"
-            className="w-full alarm-pulse"
+            className={drill ? 'w-full' : 'w-full alarm-pulse'}
           >
-            <Siren size={22} /> Alarm auslösen
+            <Siren size={22} /> {drill ? 'Übung starten' : 'Alarm auslösen'}
           </HoldButton>
           {(channels.length === 0 || recipients.length === 0) && (
-            <div className="text-center text-xs text-brand-600 mt-2">
+            <div className="text-center text-xs text-alarm-600 mt-2">
               {recipients.length === 0 ? 'Keine Empfänger in der aktuellen Auswahl.' : 'Mindestens einen Kanal wählen.'}
             </div>
           )}

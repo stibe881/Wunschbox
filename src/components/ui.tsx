@@ -32,7 +32,7 @@ export function Button({ variant = 'primary', className = '', ...props }: React.
   const styles: Record<string, string> = {
     primary: 'bg-slate-800 text-white hover:bg-slate-700',
     secondary: 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50',
-    danger: 'bg-brand-600 text-white hover:bg-brand-700',
+    danger: 'bg-alarm-600 text-white hover:bg-alarm-700',
     ghost: 'text-slate-600 hover:bg-slate-100',
   }
   return (
@@ -130,6 +130,48 @@ export function useConfirm() {
   return { ask, confirmEl }
 }
 
+/** Kurzer Text abfragen – z. B. der Hinweis, der mit der Entwarnung mitgeht */
+export function usePrompt() {
+  const [req, setReq] = useState<{ title: string; message: string; label: string; placeholder: string; onConfirm: (text: string) => void } | null>(null)
+  const [text, setText] = useState('')
+
+  function frage(title: string, message: string, onConfirm: (text: string) => void, label = 'Senden', placeholder = '') {
+    setText('')
+    setReq({ title, message, label, placeholder, onConfirm })
+  }
+
+  const promptEl = req ? (
+    <div className="fixed inset-0 z-[55] flex items-center justify-center bg-slate-900/60 p-4" onClick={() => setReq(null)}>
+      <div className="toast-in bg-white rounded-2xl shadow-xl max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-semibold text-slate-800">{req.title}</h3>
+        <p className="text-sm text-slate-600 mt-1">{req.message}</p>
+        <textarea
+          className={inputClass + ' mt-3'}
+          rows={3}
+          autoFocus
+          placeholder={req.placeholder}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="secondary" onClick={() => setReq(null)}>Abbrechen</Button>
+          <Button
+            variant="danger"
+            onClick={() => {
+              req.onConfirm(text.trim())
+              setReq(null)
+            }}
+          >
+            {req.label}
+          </Button>
+        </div>
+      </div>
+    </div>
+  ) : null
+
+  return { frage, promptEl }
+}
+
 /** Relative Zeitangabe: «gerade eben», «vor 5 Min.», sonst Datum/Zeit */
 export function formatRelative(ts: number): string {
   const diff = Date.now() - ts
@@ -200,10 +242,10 @@ export function HoldButton({
           onTrigger()
         }
       }}
-      className={`relative overflow-hidden select-none touch-none rounded-2xl bg-brand-600 text-white font-bold shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+      className={`relative overflow-hidden select-none touch-none rounded-2xl bg-alarm-600 text-white font-bold shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
     >
       <span
-        className="absolute inset-y-0 left-0 bg-brand-700 transition-none"
+        className="absolute inset-y-0 left-0 bg-alarm-700 transition-none"
         style={{ width: `${progress * 100}%` }}
         aria-hidden
       />
