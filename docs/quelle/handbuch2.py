@@ -84,8 +84,9 @@ KOERPER = r"""
 <section id="b3">
   <h2 class="abschnitt"><span class="zahl">3</span> Aufgeboten werden</h2>
   <p>
-    Ein Aufgebot erreicht Sie als Push-Mitteilung, je nach Alarmplan zusätzlich per
-    SMS und Sprachanruf. In der App steht es zuoberst auf der Startseite. Tippen Sie
+    Ein Aufgebot erreicht Sie als Push-Mitteilung; SMS und Sprachanruf sind in den
+    Alarmplänen vorbereitet, aber noch nicht angebunden. In der App steht es zuoberst
+    auf der Startseite. Tippen Sie
     die Mitteilung an, öffnet die App direkt die Handlungsanweisung zu diesem Alarm.
   </p>
   <div class="geraet-reihe">
@@ -190,7 +191,9 @@ KOERPER = r"""
   <h2 class="abschnitt"><span class="zahl">5</span> Einen Alarm auslösen</h2>
   <p>
     Im Portal unter <span class="ui">Alarm auslösen</span> haben Sie mehr Einfluss als
-    in der App: Sie wählen Empfänger, Kanäle und Eskalation frei.
+    in der App: Sie wählen Empfänger, Kanäle und Eskalation frei. Von den Kanälen ist
+    heute nur die Push-Mitteilung angebunden; die übrigen sind als «vorbereitet, noch
+    nicht aktiv» gekennzeichnet.
   </p>
   <figure class="bild-breit">
     <img src="bilder/web-15-alarm-vorbereitet.webp" alt="Vorbereiteter Alarm mit gewähltem Szenario, Empfängern und Kanälen">

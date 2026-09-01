@@ -5,7 +5,7 @@ import { createAlarm, resolveRecipients, useStore } from '../store'
 import { activeScenarios } from '../lib/scenarios'
 import type { AlarmPlan, Channel, Scenario } from '../types'
 import { CHANNEL_LABELS } from '../types'
-import { Badge, HoldButton, Toggle, inputClass } from '../components/ui'
+import { Badge, HoldButton, Toggle, Vorbereitet, inputClass, kanalName } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 
 const ALL_CHANNELS: Channel[] = ['push', 'sms', 'email', 'voice', 'conference', 'tts', 'teams']
@@ -195,7 +195,7 @@ export default function TriggerAlarm() {
               : 'alle Standorte'}
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {channels.map((c) => <Badge key={c} color="blue">{CHANNEL_LABELS[c].split(' ')[0]}</Badge>)}
+            {channels.map((c) => <Badge key={c} color="blue">{kanalName(c)}</Badge>)}
             {silent && <Badge color="violet">stiller Alarm</Badge>}
             {requireAck && <Badge color="green">mit Quittierung</Badge>}
             {drill && <Badge color="amber">ÜBUNG</Badge>}
@@ -245,7 +245,7 @@ export default function TriggerAlarm() {
                 {ALL_CHANNELS.map((c) => (
                   <label key={c} className="flex items-center gap-2 py-1 text-sm">
                     <input type="checkbox" checked={channels.includes(c)} onChange={() => toggle(channels, c, setChannels)} />
-                    {CHANNEL_LABELS[c]}
+                    {CHANNEL_LABELS[c]} {c !== 'push' && <Vorbereitet />}
                   </label>
                 ))}
               </div>

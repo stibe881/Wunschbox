@@ -6,8 +6,7 @@ import {
 } from 'lucide-react'
 import { createAlarm, resolveRecipients, uid, useStore } from '../store'
 import type { Alarm, Channel, LoneWorkSession, Scenario, User as AppUser } from '../types'
-import { CHANNEL_LABELS } from '../types'
-import { Badge, HoldButton, Toggle, formatDuration, formatRelative, inputClass, useConfirm, usePrompt } from '../components/ui'
+import { Badge, HoldButton, Toggle, formatDuration, formatRelative, inputClass, kanalName, useConfirm, usePrompt } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 import { MIN_PASSWORD_LENGTH, passwordProblem } from '../lib/auth'
 import { activeScenarios, allClearStepsOf, responseStepsFor, responseStepsOf } from '../lib/scenarios'
@@ -763,7 +762,7 @@ function ScenarioView({
           <div className="text-xs text-slate-500">
             Alarmiert {responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(', ') : 'alle Mitarbeitenden mit App'}
             {alarmLocationIds.length === 0 ? ' an allen Standorten' : ''} per{' '}
-            {(scenario.defaultChannels.length > 0 ? scenario.defaultChannels : (['push', 'sms'] as Channel[])).map((c) => CHANNEL_LABELS[c].split(' ')[0]).join(', ')} – mit Quittierung.{' '}
+            {(scenario.defaultChannels.length > 0 ? scenario.defaultChannels : (['push', 'sms'] as Channel[])).map(kanalName).join(', ')} – mit Quittierung.{' '}
             <span className="font-semibold text-slate-700">{alarmRecipientCount} Empfänger:innen</span> werden benachrichtigt.
           </div>
           {!myScenarioAlarm && fremderAlarm && (

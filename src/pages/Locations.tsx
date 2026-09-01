@@ -44,8 +44,8 @@ export default function Locations() {
                   </div>
                   <div className="mt-2">
                     {l.geofence
-                      ? <Badge color="green"><MapPin size={12} /> Geofence {l.geofence.radiusM} m</Badge>
-                      : <Badge>kein Geofencing</Badge>}
+                      ? <Badge><MapPin size={12} /> Geofence {l.geofence.radiusM} m · vorbereitet, noch nicht aktiv</Badge>
+                      : <Badge>kein Geofence</Badge>}
                   </div>
                 </div>
               </div>
@@ -98,7 +98,7 @@ function LocationEditor({ location, onClose }: { location: Location; onClose: ()
       </div>
       <label className="flex items-center gap-2 text-sm mb-3">
         <input type="checkbox" checked={geoEnabled} onChange={(e) => setGeoEnabled(e.target.checked)} />
-        Geofencing aktivieren (automatische Standortzuweisung beim Betreten)
+        Geofence hinterlegen (vorbereitet, noch nicht aktiv – die App überträgt noch keinen Standort)
       </label>
       {geoEnabled && (
         <div className="grid grid-cols-3 gap-4">

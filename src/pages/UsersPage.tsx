@@ -212,7 +212,7 @@ function UserEditor({ user, onClose }: { user: User; onClose: () => void }) {
             </span>
           )}
         </Field>
-        <Field label="App-Sprache">
+        <Field label="App-Sprache – vorbereitet, noch nicht aktiv (die Inhalte sind deutsch)">
           <select className={inputClass} value={draft.language} onChange={(e) => setDraft({ ...draft, language: e.target.value as User['language'] })}>
             <option value="de">Deutsch</option>
             <option value="en">English</option>

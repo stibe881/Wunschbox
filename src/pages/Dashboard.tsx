@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Activity, AlertTriangle, ArrowRight, BellRing, Radio, Server, ShieldCheck, Siren, Smartphone, Timer, Users } from 'lucide-react'
 import { useStore } from '../store'
-import { Badge, Button, Card, formatRelative } from '../components/ui'
+import { Badge, Button, Card, VORBEREITET, formatRelative } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 import { api, type Bereitschaft } from '../lib/api'
 
@@ -70,13 +70,13 @@ export default function Dashboard() {
       <div className="grid lg:grid-cols-2 gap-6">
         <Card title={<span className="flex items-center gap-2"><Server size={16} /> Alarmserver-Status</span>}>
           <ul className="space-y-2.5 text-sm">
-            <StatusRow label="Alarmserver (Cloud Schweiz)" ok detail="Auslösung in Sekunden" />
-            <StatusRow label="SMS-Gateway" ok={state.integrations.smsGateway.enabled} detail={state.integrations.smsGateway.provider} />
-            <StatusRow label="Sprachanrufe / Telefonkonferenz" ok detail="Parallelruf aktiv" />
-            <StatusRow label="Push-Dienst (Critical Alerts)" ok detail="iOS · Android · Huawei" />
-            <StatusRow label="Microsoft Teams" ok={state.integrations.teams.enabled} detail={state.integrations.teams.tenant || '–'} />
-            <StatusRow label="LoRaWAN-Netz" ok detail={`${state.buttons.filter((b) => b.type === 'lorawan').length} Knöpfe verbunden`} />
+            <StatusRow label="Alarmserver" ok detail={state.mode === 'live' ? 'Hetzner-Hosting' : 'Demo – lokal im Browser'} />
+            <StatusRow label="Push-Dienst (Critical Alerts)" ok detail="iOS über Expo – Stand unter Bereitschaft" />
             <StatusRow label="Interne Notfallnummer" ok={state.integrations.hotline.enabled} detail={state.integrations.hotline.number} />
+            <StatusRow label="SMS-Gateway" vorbereitet detail={state.integrations.smsGateway.provider || undefined} />
+            <StatusRow label="Sprachanrufe / Telefonkonferenz" vorbereitet />
+            <StatusRow label="Microsoft Teams" vorbereitet detail={state.integrations.teams.tenant || undefined} />
+            <StatusRow label="LoRaWAN-Netz / Alarmknöpfe" vorbereitet detail={`${state.buttons.length} Knöpfe erfasst`} />
           </ul>
           {lowBattery.length > 0 && (
             <div className="mt-4 text-sm text-amber-700 bg-amber-50 rounded-lg p-3 flex items-center gap-2">
@@ -231,13 +231,15 @@ function BereitschaftKarte() {
   )
 }
 
-function StatusRow({ label, ok, detail }: { label: string; ok: boolean; detail?: string }) {
+function StatusRow({ label, ok = false, vorbereitet = false, detail }: { label: string; ok?: boolean; vorbereitet?: boolean; detail?: string }) {
   return (
     <li className="flex items-center gap-2">
-      <span className={`w-2 h-2 rounded-full ${ok ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-      <span className="text-slate-700 flex-1">{label}</span>
+      <span className={`w-2 h-2 rounded-full ${ok ? 'bg-emerald-500' : vorbereitet ? 'bg-slate-200' : 'bg-slate-300'}`} />
+      <span className={`flex-1 ${vorbereitet ? 'text-slate-500' : 'text-slate-700'}`}>{label}</span>
       <span className="text-xs text-slate-400">{detail}</span>
-      <Badge color={ok ? 'green' : 'slate'}>{ok ? 'online' : 'inaktiv'}</Badge>
+      {vorbereitet
+        ? <Badge color="slate">{VORBEREITET}</Badge>
+        : <Badge color={ok ? 'green' : 'slate'}>{ok ? 'online' : 'inaktiv'}</Badge>}
     </li>
   )
 }

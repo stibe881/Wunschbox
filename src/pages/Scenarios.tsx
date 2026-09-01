@@ -2,8 +2,7 @@ import { useMemo, useState } from 'react'
 import { Eye, EyeOff, Pencil, Phone, Plus, Scale, Trash2, Users, WifiOff } from 'lucide-react'
 import { uid, useStore } from '../store'
 import type { Channel, ResponseStep, Scenario, ScenarioPriority } from '../types'
-import { CHANNEL_LABELS } from '../types'
-import { Badge, Button, Card, Field, Modal, Toggle, inputClass, useConfirm } from '../components/ui'
+import { Badge, Button, Card, Field, Modal, Toggle, inputClass, useConfirm, kanalName } from '../components/ui'
 import { SCENARIO_ICONS, ScenarioIcon } from '../components/ScenarioIcon'
 import { isActive, responseStepsOf } from '../lib/scenarios'
 
@@ -152,7 +151,7 @@ function ScenarioDetail({ scenario, onClose }: { scenario: Scenario; onClose: ()
         <Badge>{scenario.category}</Badge>
         <Badge color={PRIORITY_META[scenario.priority].color}>{PRIORITY_META[scenario.priority].label}</Badge>
         {scenario.silentDefault && <Badge color="violet">stiller Alarm</Badge>}
-        {scenario.defaultChannels.map((c) => <Badge key={c} color="blue">{CHANNEL_LABELS[c].split(' ')[0]}</Badge>)}
+        {scenario.defaultChannels.map((c) => <Badge key={c} color="blue">{kanalName(c)}</Badge>)}
       </div>
       <div className="grid md:grid-cols-2 gap-6">
         <div>
@@ -405,7 +404,7 @@ function ScenarioEditor({ scenario, onClose }: { scenario: Scenario; onClose: ()
             {ALL_CHANNELS.map((c) => (
               <label key={c} className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={draft.defaultChannels.includes(c)} onChange={() => setDraft({ ...draft, defaultChannels: toggleIn(draft.defaultChannels, c) })} />
-                {CHANNEL_LABELS[c].split(' ')[0]}
+                {kanalName(c)}
               </label>
             ))}
           </div>

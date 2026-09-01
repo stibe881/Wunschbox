@@ -3,7 +3,7 @@ import { ClipboardList, Pencil, Plus, Trash2 } from 'lucide-react'
 import { uid, useStore } from '../store'
 import type { AlarmPlan, Channel, EscalationLevel } from '../types'
 import { CHANNEL_LABELS } from '../types'
-import { Badge, Button, Card, Field, Modal, Toggle, inputClass, useConfirm } from '../components/ui'
+import { Badge, Button, Card, Field, Modal, Toggle, inputClass, useConfirm, VORBEREITET, Vorbereitet, kanalName } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 
 const ALL_CHANNELS: Channel[] = ['push', 'sms', 'email', 'voice', 'conference', 'tts', 'teams']
@@ -51,7 +51,7 @@ export default function AlarmPlans() {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-1.5 mt-2">
-                    {p.channels.map((c) => <Badge key={c} color="blue">{CHANNEL_LABELS[c].split(' ')[0]}</Badge>)}
+                    {p.channels.map((c) => <Badge key={c} color="blue">{kanalName(c)}</Badge>)}
                     {p.requireAck && <Badge color="violet">Quittierung</Badge>}
                     {p.respectOperatingHours && <Badge color="amber">nur Betriebszeiten</Badge>}
                   </div>
@@ -64,8 +64,8 @@ export default function AlarmPlans() {
                       {p.escalation.map((e, i) => (
                         <div key={i} className="text-xs text-slate-500 bg-slate-50 rounded px-2 py-1">
                           Stufe {i + 1} nach {e.afterMinutes} Min.: {e.groupIds.map((g) => state.groups.find((x) => x.id === g)?.name).join(', ')} via{' '}
-                          {e.channels.map((c) => CHANNEL_LABELS[c].split(' ')[0]).join(', ')}
-                          {e.notifyEmergencyServices && ' + Blaulichtorganisationen'}
+                          {e.channels.map(kanalName).join(', ')}
+                          {e.notifyEmergencyServices && ' + Blaulichtorganisationen (vorbereitet)'}
                         </div>
                       ))}
                     </div>
@@ -140,7 +140,7 @@ function PlanEditor({ plan, onClose }: { plan: AlarmPlan; onClose: () => void })
             {ALL_CHANNELS.map((c) => (
               <label key={c} className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={draft.channels.includes(c)} onChange={() => setDraft({ ...draft, channels: toggleIn(draft.channels, c) })} />
-                {CHANNEL_LABELS[c]}
+                {CHANNEL_LABELS[c]} {c !== 'push' && <Vorbereitet />}
               </label>
             ))}
           </div>
@@ -148,7 +148,7 @@ function PlanEditor({ plan, onClose }: { plan: AlarmPlan; onClose: () => void })
       </div>
       <div className="flex flex-wrap gap-5 my-4">
         <Toggle checked={draft.requireAck} onChange={(v) => setDraft({ ...draft, requireAck: v })} label="Aufgebot mit Quittierfunktion" />
-        <Toggle checked={draft.respectOperatingHours} onChange={(v) => setDraft({ ...draft, respectOperatingHours: v })} label="Nur während Betriebszeiten alarmieren" />
+        <Toggle checked={draft.respectOperatingHours} onChange={(v) => setDraft({ ...draft, respectOperatingHours: v })} label={`Nur während Betriebszeiten alarmieren – ${VORBEREITET}`} />
       </div>
 
       <div className="border-t border-slate-100 pt-4">
@@ -176,7 +176,7 @@ function PlanEditor({ plan, onClose }: { plan: AlarmPlan; onClose: () => void })
               </label>
               <label className="flex items-center gap-1.5 ml-auto">
                 <input type="checkbox" checked={esc.notifyEmergencyServices} onChange={(e) => updateEscalation(i, { notifyEmergencyServices: e.target.checked })} />
-                Blaulichtorganisationen benachrichtigen
+                Blaulichtorganisationen benachrichtigen <Vorbereitet />
               </label>
               <Button variant="ghost" onClick={() => setDraft({ ...draft, escalation: draft.escalation.filter((_, j) => j !== i) })}>
                 <Trash2 size={14} />
@@ -200,7 +200,7 @@ function PlanEditor({ plan, onClose }: { plan: AlarmPlan; onClose: () => void })
                   {ALL_CHANNELS.map((c) => (
                     <label key={c} className="flex items-center gap-1 text-xs">
                       <input type="checkbox" checked={esc.channels.includes(c)} onChange={() => updateEscalation(i, { channels: toggleIn(esc.channels, c) })} />
-                      {CHANNEL_LABELS[c].split(' ')[0]}
+                      {kanalName(c)}
                     </label>
                   ))}
                 </div>

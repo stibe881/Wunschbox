@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
+import { CHANNEL_LABELS, type Channel } from '../types'
 
 export function Card({ title, actions, children, className = '' }: { title?: React.ReactNode; actions?: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
@@ -128,6 +129,23 @@ export function useConfirm() {
   ) : null
 
   return { ask, confirmEl }
+}
+
+/** Einheitliche Kennzeichnung für alles, was angelegt, aber noch nicht angebunden ist */
+export const VORBEREITET = 'vorbereitet, noch nicht aktiv'
+
+export function Vorbereitet({ className = '' }: { className?: string }) {
+  return (
+    <span className={`inline-flex items-center rounded-full border border-dashed border-slate-300 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-500 ${className}`}>
+      {VORBEREITET}
+    </span>
+  )
+}
+
+/** Kurzer Kanalname für Abzeichen; nur Push ist tatsächlich angebunden */
+export function kanalName(c: Channel): string {
+  const kurz = CHANNEL_LABELS[c].split(' ')[0]
+  return c === 'push' ? kurz : `${kurz} (vorbereitet)`
 }
 
 /** Kurzer Text abfragen – z. B. der Hinweis, der mit der Entwarnung mitgeht */

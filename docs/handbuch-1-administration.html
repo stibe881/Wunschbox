@@ -394,7 +394,7 @@ footer .adressfuss { margin-top: 22px; }
   </p>
   <figure class="bild-breit">
     <img src="bilder/web-02-dashboard.webp" alt="Dashboard mit vier Kennzahlen, Alarmserver-Status und den letzten Ereignissen">
-    <figcaption><b>Abb. 4</b> &nbsp; Das Dashboard. Vier Kennzahlen oben, links der Zustand aller angebundenen Kanäle, rechts die jüngsten Ereignisse.</figcaption>
+    <figcaption><b>Abb. 4</b> &nbsp; Das Dashboard. Vier Kennzahlen oben, links der Zustand der Kanäle, rechts die jüngsten Ereignisse. Was nur vorbereitet ist, steht grau als «vorbereitet, noch nicht aktiv».</figcaption>
   </figure>
   <p>
     Darunter die Kachel <b>Bereitschaft</b> &ndash; die Antwort auf die Frage, ob ein
@@ -597,6 +597,19 @@ footer .adressfuss { margin-top: 22px; }
     Kanäle und die Eskalationsstufen mit ihren Zeiten. Im Ereignisfall genügt ein
     Klick, statt alles einzeln zu wählen.
   </p>
+  <div class="hinweis">
+    <p class="marke-klein">Vorbereitet, noch nicht aktiv</p>
+    <p>
+      Von den Kanälen ist heute nur die <b>Push-Mitteilung</b> angebunden. SMS,
+      Sprachanruf, Telefonkonferenz, Durchsage und Teams lassen sich in Plänen und
+      Szenarien bereits wählen, damit die Planung vollständig ist &ndash; versendet wird
+      darüber nichts, und in der Alarmzentrale steht bei diesen Kanälen «kein Versand».
+      Dasselbe gilt für «Blaulichtorganisationen benachrichtigen» in den
+      Eskalationsstufen (nur ein Protokolleintrag) und für «Nur während Betriebszeiten».
+      Überall im Portal ist das einheitlich mit <em>vorbereitet, noch nicht aktiv</em>
+      gekennzeichnet.
+    </p>
+  </div>
   <figure class="bild-breit">
     <img src="bilder/web-08-alarmplaene.webp" alt="Übersicht der Alarmpläne mit Zielgruppen, Kanälen und Eskalationsstufen">
     <figcaption><b>Abb. 10</b> &nbsp; Sechs vorbereitete Alarmpläne. Die Stufen darunter greifen automatisch, wenn niemand quittiert.</figcaption>
@@ -636,6 +649,11 @@ footer .adressfuss { margin-top: 22px; }
     <img src="bilder/web-06-alarmknoepfe.webp" alt="Übersicht der Alarmknöpfe mit Batteriestand und Funkverbindung">
     <figcaption><b>Abb. 13</b> &nbsp; Die fest installierten und tragbaren Alarmknöpfe mit Batteriestand und Funkverbindung. Ein Knopf mit schwacher Batterie ist hier zu erkennen, bevor er ausfällt.</figcaption>
   </figure>
+  <p>
+    Die Alarmknöpfe sind <em>vorbereitet, noch nicht aktiv</em>: Sie können Geräte
+    erfassen, Standort, Nachricht und Zielgruppen planen, aber ein Knopfdruck löst
+    heute keinen Alarm aus, solange kein LoRaWAN- oder GSM-Netz angebunden ist.
+  </p>
 </section>
 
 <section id="a9">
@@ -710,17 +728,31 @@ footer .adressfuss { margin-top: 22px; }
     der App; Antippen ruft an. Ändert sie sich, tragen Sie die neue hier ein &ndash;
     die App übernimmt sie beim nächsten Abgleich.
   </p>
-  <h3>Zugangscodes</h3>
+  <h3>Was hier angebunden ist &ndash; und was nicht</h3>
   <p>
-    Ein Zugangscode je Standort erlaubt es Mitarbeitenden, die App selbständig
-    einzurichten &ndash; ohne Geräteverwaltung. Sie erzeugen den Code hier, geben ihn
-    weiter und sehen, wie oft er verwendet wurde.
+    Aktiv sind die <b>interne Notfallnummer</b> (erscheint in der App, Antippen ruft
+    an), die <b>Push-Mitteilungen</b> und die <b>ausgehenden Webhooks</b>, die jede
+    Auslösung an Drittsysteme melden. Alles Übrige auf dieser Seite ist mit
+    <em>vorbereitet, noch nicht aktiv</em> gekennzeichnet: Die Schalter werden
+    gespeichert, damit die Planung vollständig ist, aber noch nicht ausgewertet.
   </p>
-  <h3>Single Sign-On</h3>
-  <p>
-    Die Anmeldung über Microsoft Entra ID ist vorbereitet, aber nicht aktiv. Solange
-    sie ausgeschaltet ist, gelten E-Mail-Adresse und Passwort.
-  </p>
+  <div class="tabelle-huelle">
+    <table>
+      <caption>Vorbereitet, noch nicht aktiv</caption>
+      <thead><tr><th>Funktion</th><th>Was heute gilt</th></tr></thead>
+      <tbody>
+        <tr><td>SMS-Gateway, VoIP, Microsoft Teams</td><td>Kein Versand über diese Kanäle; Alarme gehen per Push</td></tr>
+        <tr><td>Single Sign-On</td><td>Anmeldung mit E-Mail-Adresse und Passwort</td></tr>
+        <tr><td>Synchronisation mit dem Personalsystem</td><td>Benutzer werden von Hand oder per Import gepflegt</td></tr>
+        <tr><td>Mehrsprachige App-Inhalte</td><td>Alle Inhalte sind deutsch; die Sprache im Benutzerprofil ist eine Vormerkung</td></tr>
+        <tr><td>Geofencing</td><td>Alarmiert wird nach dem Standort im Profil; die App überträgt keinen Standort</td></tr>
+        <tr><td>Eingehende Webhooks</td><td>Der Server nimmt keine Auslösung von aussen entgegen (z. B. Brandmeldeanlage)</td></tr>
+        <tr><td>Zugangscodes</td><td>Die App kennt keine Codes; Mitarbeitende melden sich mit E-Mail und Passwort an</td></tr>
+        <tr><td>Physische Alarmknöpfe</td><td>Geräte sind nicht angebunden; die Einträge dienen der Planung</td></tr>
+        <tr><td>Blaulicht in Eskalationsstufen, Betriebszeiten</td><td>Nur Protokolleintrag beziehungsweise ohne Wirkung</td></tr>
+      </tbody>
+    </table>
+  </div>
 </section>
 
 <section id="a12">

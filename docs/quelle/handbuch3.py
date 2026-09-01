@@ -314,7 +314,8 @@ KOERPER = r"""
   <p>
     Reicht die eigene Kraft nicht, bieten Sie hier das Krisenteam auf. Einzelne
     Personen erreichen Sie über <span class="ui">Anrufen</span> oder
-    <span class="ui">SMS &amp; Push</span>.
+    <span class="ui">SMS &amp; Push</span> &ndash; die Push-Mitteilung kommt an, der
+    SMS-Versand ist noch nicht angebunden.
   </p>
 
   <h3>Phase 4 &middot; Weitere Massnahmen</h3>

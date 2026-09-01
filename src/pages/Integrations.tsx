@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { KeyRound, Link2, Phone, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { uid, useStore } from '../store'
 import type { IntegrationSettings, Webhook } from '../types'
-import { Badge, Button, Card, Field, Modal, Toggle, formatDateTime, inputClass } from '../components/ui'
+import { Badge, Button, Card, Field, Modal, Toggle, VORBEREITET, Vorbereitet, formatDateTime, inputClass } from '../components/ui'
 
 export default function Integrations() {
   const { state, dispatch } = useStore()
@@ -18,13 +18,17 @@ export default function Integrations() {
       <div>
         <h1 className="text-2xl font-bold text-slate-800">Integrationen &amp; Optionen</h1>
         <p className="text-sm text-slate-500">Anbindung von Drittanwendungen, Kommunikationskanälen und Deployment-Optionen</p>
+        <p className="text-xs text-slate-500 mt-2 flex items-center gap-2 flex-wrap">
+          <Vorbereitet /> Diese Schalter werden gespeichert, aber noch nicht ausgewertet. Angebunden sind heute Push-Mitteilungen,
+          die interne Notfallnummer und ausgehende Webhooks.
+        </p>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Card title="Kommunikationskanäle">
           <div className="space-y-4">
             <div>
-              <Toggle checked={integ.smsGateway.enabled} onChange={(v) => update({ smsGateway: { ...integ.smsGateway, enabled: v } })} label="SMS-Gateway (Anbindung Drittsysteme via SMS)" />
+              <Toggle checked={integ.smsGateway.enabled} onChange={(v) => update({ smsGateway: { ...integ.smsGateway, enabled: v } })} label={`SMS-Gateway (Anbindung Drittsysteme via SMS) – ${VORBEREITET}`} />
               {integ.smsGateway.enabled && (
                 <div className="grid grid-cols-2 gap-4 mt-2 pl-11">
                   <Field label="Provider">
@@ -37,7 +41,7 @@ export default function Integrations() {
               )}
             </div>
             <div>
-              <Toggle checked={integ.voip.enabled} onChange={(v) => update({ voip: { ...integ.voip, enabled: v } })} label="VoIP-Integration (Telefonanlage)" />
+              <Toggle checked={integ.voip.enabled} onChange={(v) => update({ voip: { ...integ.voip, enabled: v } })} label={`VoIP-Integration (Telefonanlage) – ${VORBEREITET}`} />
               {integ.voip.enabled && (
                 <div className="mt-2 pl-11">
                   <Field label="SIP-Server">
@@ -47,7 +51,7 @@ export default function Integrations() {
               )}
             </div>
             <div>
-              <Toggle checked={integ.teams.enabled} onChange={(v) => update({ teams: { ...integ.teams, enabled: v } })} label="Microsoft Teams-Integration" />
+              <Toggle checked={integ.teams.enabled} onChange={(v) => update({ teams: { ...integ.teams, enabled: v } })} label={`Microsoft Teams-Integration – ${VORBEREITET}`} />
               {integ.teams.enabled && (
                 <div className="mt-2 pl-11">
                   <Field label="Tenant">
@@ -80,7 +84,7 @@ export default function Integrations() {
         <Card title="Identität &amp; Personalsystem">
           <div className="space-y-4">
             <div>
-              <Toggle checked={integ.sso.enabled} onChange={(v) => update({ sso: { ...integ.sso, enabled: v } })} label="Single Sign-On (SSO)" />
+              <Toggle checked={integ.sso.enabled} onChange={(v) => update({ sso: { ...integ.sso, enabled: v } })} label={`Single Sign-On (SSO) – ${VORBEREITET}`} />
               {integ.sso.enabled && (
                 <div className="grid grid-cols-2 gap-4 mt-2 pl-11">
                   <Field label="Provider">
@@ -94,7 +98,7 @@ export default function Integrations() {
               {!integ.sso.enabled && <div className="text-xs text-slate-400 pl-11 mt-1">Alternativ: Authentifizierung via SMS-/E-Mail-Code</div>}
             </div>
             <div>
-              <Toggle checked={integ.hrSync.enabled} onChange={(v) => update({ hrSync: { ...integ.hrSync, enabled: v, lastSync: v ? Date.now() : integ.hrSync.lastSync } })} label="Automatische Synchronisation mit Personalsystem" />
+              <Toggle checked={integ.hrSync.enabled} onChange={(v) => update({ hrSync: { ...integ.hrSync, enabled: v, lastSync: v ? Date.now() : integ.hrSync.lastSync } })} label={`Automatische Synchronisation mit Personalsystem – ${VORBEREITET}`} />
               {integ.hrSync.enabled && (
                 <div className="mt-2 pl-11 space-y-2">
                   <Field label="System">
@@ -110,8 +114,8 @@ export default function Integrations() {
               )}
             </div>
             <div className="pt-2 border-t border-slate-100 space-y-3">
-              <Toggle checked={integ.multiLanguage} onChange={(v) => update({ multiLanguage: v })} label="Mehrsprachige App-Inhalte (DE/EN/FR/IT)" />
-              <Toggle checked={integ.geofencing} onChange={(v) => update({ geofencing: v })} label="Geofencing (automatische Standortzuweisung)" />
+              <Toggle checked={integ.multiLanguage} onChange={(v) => update({ multiLanguage: v })} label={`Mehrsprachige App-Inhalte (DE/EN/FR/IT) – ${VORBEREITET}`} />
+              <Toggle checked={integ.geofencing} onChange={(v) => update({ geofencing: v })} label={`Geofencing (automatische Standortzuweisung) – ${VORBEREITET}`} />
             </div>
           </div>
         </Card>
@@ -128,6 +132,7 @@ export default function Integrations() {
                   <div className="text-xs text-slate-400 truncate">{w.url}</div>
                 </div>
                 <Badge color={w.direction === 'inbound' ? 'blue' : 'violet'}>{w.direction === 'inbound' ? 'eingehend' : 'ausgehend'}</Badge>
+                {w.direction === 'inbound' && <Vorbereitet />}
                 <Badge color={w.active ? 'green' : 'slate'}>{w.active ? 'aktiv' : 'inaktiv'}</Badge>
                 <Button variant="ghost" onClick={() => setEditingWebhook(w)}>Bearbeiten</Button>
                 <Button variant="ghost" onClick={() => dispatch({ type: 'DELETE_WEBHOOK', webhookId: w.id })}><Trash2 size={14} /></Button>
@@ -135,13 +140,14 @@ export default function Integrations() {
             ))}
           </div>
           <div className="text-xs text-slate-400 mt-3">
-            Eingehende Webhooks lösen Alarme automatisch aus (z. B. Brandmeldeanlage) – ausgehende melden Ereignisse an Drittsysteme.
+            Ausgehende Webhooks melden jede Auslösung an Drittsysteme und sind aktiv. Eingehende Webhooks (z. B. Brandmeldeanlage) sind {VORBEREITET}: Der Server nimmt noch keine Auslösung von aussen entgegen.
           </div>
         </Card>
 
-        <Card title={<span className="flex items-center gap-2"><KeyRound size={16} /> Deployment via Zugangscodes</span>}>
+        <Card title={<span className="flex items-center gap-2"><KeyRound size={16} /> Deployment via Zugangscodes <Vorbereitet /></span>}>
           <p className="text-sm text-slate-500 mb-3">
-            Mitarbeitende installieren die App selbständig und konfigurieren sie mit einem Zugangscode – ohne MDM.
+            Gedacht für die Selbstinstallation ohne Geräteverwaltung. Die App kennt die Codes noch nicht – Mitarbeitende melden sich
+            heute mit E-Mail-Adresse und Passwort an.
           </p>
           <div className="space-y-2">
             {integ.accessCodes.map((c) => (

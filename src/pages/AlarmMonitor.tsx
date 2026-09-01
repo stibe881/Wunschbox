@@ -3,8 +3,7 @@ import { Link } from 'react-router-dom'
 import { BellOff, CheckCircle2, ChevronDown, ChevronRight, Megaphone, Send, Siren, XCircle } from 'lucide-react'
 import { useStore } from '../store'
 import type { Alarm, Delivery } from '../types'
-import { CHANNEL_LABELS } from '../types'
-import { Badge, Button, Card, formatDateTime, formatRelative, formatTime, inputClass, usePrompt } from '../components/ui'
+import { Badge, Button, Card, formatDateTime, formatRelative, formatTime, inputClass, kanalName, usePrompt } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 
 export default function AlarmMonitor() {
@@ -232,7 +231,7 @@ function DeliveryChip({ d }: { d: Delivery }) {
   }
   return (
     <span className={`text-[11px] px-1.5 py-0.5 rounded ${colors[d.status]}`}>
-      {CHANNEL_LABELS[d.channel].split(' ')[0]}: {labels[d.status]}
+      {kanalName(d.channel)}: {d.channel === 'push' ? labels[d.status] : 'kein Versand'}
     </span>
   )
 }

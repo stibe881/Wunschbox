@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BatteryLow, BatteryMedium, BatteryFull, MapPin, Pencil, Plus, Radio, Trash2, Zap } from 'lucide-react'
 import { createAlarm, uid, useStore } from '../store'
 import type { AlarmButton } from '../types'
-import { Badge, Button, Card, Field, Modal, formatDateTime, inputClass, useConfirm } from '../components/ui'
+import { Badge, Button, Card, Field, Modal, formatDateTime, inputClass, useConfirm, Vorbereitet } from '../components/ui'
 
 export default function Buttons() {
   const { state, dispatch } = useStore()
@@ -42,10 +42,10 @@ export default function Buttons() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Physische Alarmknöpfe</h1>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-3">Physische Alarmknöpfe <Vorbereitet /></h1>
           <p className="text-sm text-slate-500">
-            LoRaWAN- und GSM-Notfallknöpfe – app-unabhängig, diskret, mit Standortübertragung und automatischer Eskalation
-            an Blaulichtorganisationen. LoRaWAN-Batterielaufzeit über 4 Jahre.
+            LoRaWAN- und GSM-Notfallknöpfe – app-unabhängig, diskret, mit Standortübertragung und automatischer Eskalation.
+            Die Geräte sind noch nicht angebunden: Die Einträge hier dienen der Planung, ein Knopfdruck löst heute keinen Alarm aus.
           </p>
         </div>
         <Button onClick={() => setEditing(newButton())}><Plus size={16} /> Knopf registrieren</Button>
