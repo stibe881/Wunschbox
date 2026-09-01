@@ -2,12 +2,12 @@ import React, { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
-import { BellRing, BookOpen, CheckCircle2, MapPin, Phone, Siren, Timer, User, WifiOff } from 'lucide-react-native'
+import { BellRing, BookOpen, CheckCircle2, MapPin, Phone, Siren, Timer, User } from 'lucide-react-native'
 import { StoreProvider, useStore } from './src/store'
-import { ensurePermissions } from './src/notifications'
+import { ensurePermissions, onNotificationTap, type PushDaten } from './src/notifications'
 import type { Alarm, Scenario } from './src/types'
 import { colors } from './src/ui'
-import { ContactsScreen, LoneWorkScreen, ProfileScreen, ScenarioDetailScreen, ScenariosScreen, StartScreen } from './src/screens'
+import { AlarmAuswahlScreen, ContactsScreen, LoneWorkScreen, ProfileScreen, ScenarioDetailScreen, ScenariosScreen, StartScreen } from './src/screens'
 import LoginScreen, { ForcePasswordChange } from './src/LoginScreen'
 
 type Tab = 'start' | 'szenarien' | 'alleinarbeit' | 'notruf' | 'profil'
@@ -20,8 +20,13 @@ const TABS: { key: Tab; label: string; icon: typeof Siren }[] = [
   { key: 'profil', label: 'Profil', icon: User },
 ]
 
+type ScenarioModus = 'entdecker' | 'empfaenger' | 'entwarnung'
+
+/** Wie lange nach dem Antippen einer Mitteilung auf die Daten vom Server gewartet wird */
+const PUSH_WARTEZEIT_MS = 20_000
+
 function Root() {
-  const { state, toasts, hydrated } = useStore()
+  const { state, toasts, hydrated, refresh } = useStore()
   const [tab, setTab] = useState<Tab>('start')
 
   useEffect(() => {
@@ -29,14 +34,50 @@ function Root() {
   }, [hydrated])
   const [openScenario, setOpenScenario] = useState<Scenario | null>(null)
   // Aus der Liste geöffnet: Ich habe es entdeckt. Über einen erhaltenen Alarm
-  // geöffnet: Ich wurde alarmiert – ein anderer Ablauf ohne Notruf.
-  const [openModus, setOpenModus] = useState<'entdecker' | 'empfaenger'>('entdecker')
+  // geöffnet: Ich wurde alarmiert – ein anderer Ablauf ohne Notruf. Nach der
+  // Entwarnung: die Schritte zurück in den Normalbetrieb.
+  const [openModus, setOpenModus] = useState<ScenarioModus>('entdecker')
   const [openAlarm, setOpenAlarm] = useState<Alarm | null>(null)
-  function oeffneSzenario(s: Scenario, modus: 'entdecker' | 'empfaenger' = 'entdecker', alarm: Alarm | null = null) {
+  const [openPhase, setOpenPhase] = useState<number | null>(null)
+  // Knopf oben rechts: zuerst das Ereignis wählen
+  const [alarmWahl, setAlarmWahl] = useState(false)
+  function oeffneSzenario(s: Scenario, modus: ScenarioModus = 'entdecker', alarm: Alarm | null = null, phase: number | null = null) {
     setOpenScenario(s)
     setOpenModus(modus)
     setOpenAlarm(alarm)
+    setOpenPhase(phase)
+    setAlarmWahl(false)
   }
+
+  // Antippen einer Push-Mitteilung: direkt zur Handlungsanweisung des Alarms
+  // bzw. zu den Schritten nach der Entwarnung. Beim Kaltstart sind die Daten
+  // noch nicht da – dann wird nachgeladen und gewartet.
+  const [pendingPush, setPendingPush] = useState<(PushDaten & { seit: number }) | null>(null)
+  useEffect(
+    () =>
+      onNotificationTap((daten) => {
+        setPendingPush({ ...daten, seit: Date.now() })
+        // Einmal sofort nachladen; danach übernimmt der regelmässige Abgleich
+        refresh()
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  )
+  useEffect(() => {
+    if (!pendingPush || !hydrated || !state.session) return
+    const alarm = state.alarms.find((a) => a.id === pendingPush.alarmId) ?? null
+    const scenario = state.scenarios.find((s) => s.id === (alarm?.scenarioId ?? pendingPush.scenarioId)) ?? null
+    if (scenario && (alarm || pendingPush.kind !== 'ended')) {
+      setPendingPush(null)
+      setTab('start')
+      oeffneSzenario(scenario, pendingPush.kind === 'ended' ? 'entwarnung' : 'empfaenger', alarm)
+      return
+    }
+    if (Date.now() - pendingPush.seit > PUSH_WARTEZEIT_MS) {
+      setPendingPush(null)
+      setTab('start')
+    }
+  }, [pendingPush, hydrated, state.session, state.alarms, state.scenarios])
 
   const sessionUser = state.users.find((u) => u.id === state.session?.userId)
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
@@ -70,13 +111,18 @@ function Root() {
             <Text style={styles.headerSub} numberOfLines={1}> {myLocation?.name}</Text>
           </View>
         </View>
-        <View style={styles.headerBadge}>
-          <WifiOff size={11} color="#94a3b8" />
-          <Text style={styles.headerSub}> offline-fähig</Text>
-        </View>
+        <Pressable
+          style={styles.headerAlarmButton}
+          onPress={() => { setOpenScenario(null); setAlarmWahl(true) }}
+          accessibilityRole="button"
+          accessibilityLabel="Alarm auslösen"
+        >
+          <Siren size={15} color="#fff" />
+          <Text style={styles.headerAlarmText}>Alarm auslösen</Text>
+        </Pressable>
       </View>
 
-      {myAlarms.length > 0 && tab !== 'start' && !openScenario && (
+      {myAlarms.length > 0 && tab !== 'start' && !openScenario && !alarmWahl && (
         <Pressable style={styles.alarmBanner} onPress={() => { setTab('start'); setOpenScenario(null) }}>
           <BellRing size={15} color="#fff" />
           <Text style={styles.alarmBannerText}>
@@ -87,9 +133,18 @@ function Root() {
 
       <View style={{ flex: 1, backgroundColor: colors.bg }}>
         {openScenario ? (
-          <ScenarioDetailScreen scenario={openScenario} startModus={openModus} alarm={openAlarm} onBack={() => setOpenScenario(null)} />
+          <ScenarioDetailScreen
+            key={`${openScenario.id}-${openModus}-${openAlarm?.id ?? ''}-${openPhase ?? ''}`}
+            scenario={openScenario}
+            startModus={openModus}
+            alarm={openAlarm}
+            startPhase={openPhase}
+            onBack={() => setOpenScenario(null)}
+          />
+        ) : alarmWahl ? (
+          <AlarmAuswahlScreen onPick={(s) => oeffneSzenario(s, 'entdecker', null, 0)} onBack={() => setAlarmWahl(false)} />
         ) : tab === 'start' ? (
-          <StartScreen onOpenScenario={(s, a) => oeffneSzenario(s, 'empfaenger', a)} />
+          <StartScreen onOpenScenario={(s, a, modus) => oeffneSzenario(s, modus ?? 'empfaenger', a)} />
         ) : tab === 'szenarien' ? (
           <ScenariosScreen onOpen={(s) => oeffneSzenario(s)} />
         ) : tab === 'alleinarbeit' ? (
@@ -117,9 +172,9 @@ function Root() {
       <SafeAreaView edges={['bottom']} style={styles.tabBarWrap}>
         <View style={styles.tabBar}>
           {TABS.map(({ key, label, icon: Icon }) => {
-            const active = tab === key && !openScenario
+            const active = tab === key && !openScenario && !alarmWahl
             return (
-              <Pressable key={key} style={styles.tabItem} onPress={() => { setTab(key); setOpenScenario(null) }}>
+              <Pressable key={key} style={styles.tabItem} onPress={() => { setTab(key); setOpenScenario(null); setAlarmWahl(false) }}>
                 <View>
                   <Icon size={21} color={active ? colors.brand : colors.faint} />
                   {key === 'start' && myAlarms.length > 0 && (
@@ -161,7 +216,16 @@ const styles = StyleSheet.create({
   headerTitle: { color: '#fff', fontWeight: '800', fontSize: 16 },
   headerSubRow: { flexDirection: 'row', alignItems: 'center' },
   headerSub: { color: '#94a3b8', fontSize: 11 },
-  headerBadge: { flexDirection: 'row', alignItems: 'center' },
+  headerAlarmButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.brandLight,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  headerAlarmText: { color: '#fff', fontWeight: '800', fontSize: 12 },
   alarmBanner: {
     flexDirection: 'row',
     alignItems: 'center',

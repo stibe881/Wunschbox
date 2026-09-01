@@ -36,3 +36,12 @@ export function responseStepsFor(scenario: Scenario, groupIds: string[]): { eige
   }
   return { eigene, andere }
 }
+
+/**
+ * Was nach der Entwarnung zu tun ist. Fehlt das Feld (selbst erstelltes
+ * Szenario), greifen die weiterführenden Massnahmen.
+ */
+export function allClearStepsOf(scenario: Scenario): string[] {
+  if (scenario.allClearSteps?.length) return scenario.allClearSteps
+  return scenario.followUp ?? []
+}

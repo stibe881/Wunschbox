@@ -1,9 +1,9 @@
 import React, { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react'
 import { Vibration } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import type { Alarm, AlarmLogEntry, Channel, Delivery, EmergencyContact, EscalationLevel, Group, Location, LoneWorkSession, Scenario, Session, User } from './types'
+import type { Alarm, AlarmLogEntry, Channel, Delivery, EmergencyContact, EscalationLevel, Group, IntegrationSettings, Location, LoneWorkSession, Scenario, Session, User } from './types'
 import { CHANNEL_LABELS } from './types'
-import { LIVE_INITIAL_PASSWORD, SCENARIO_CONTENT_VERSION, SEED_CONTACTS, SEED_GROUPS, SEED_LOCATIONS, SEED_SCENARIOS, SEED_USERS } from './seed'
+import { LIVE_INITIAL_PASSWORD, SCENARIO_CONTENT_VERSION, SEED_CONTACTS, SEED_GROUPS, SEED_INTEGRATIONS, SEED_LOCATIONS, SEED_SCENARIOS, SEED_USERS } from './seed'
 import { hashPassword, randomSalt } from './auth'
 import { criticalAlertsGranted, getPushToken, notifyNow } from './notifications'
 import { ApiError, api, authToken, loadApiSettings, setAuthToken, type ServerData } from './api'
@@ -41,6 +41,8 @@ export interface MobileState {
   locations: Location[]
   scenarios: Scenario[]
   contacts: EmergencyContact[]
+  /** Einstellungen wie die interne Notfallnummer – im Live-Modus vom Server */
+  integrations?: IntegrationSettings
   currentUserId: string
   alarms: Alarm[]
   loneWorkSessions: LoneWorkSession[]
@@ -59,6 +61,7 @@ function initialState(mode: AppMode): MobileState {
     locations: live ? [] : SEED_LOCATIONS,
     scenarios: live ? [] : SEED_SCENARIOS,
     contacts: live ? [] : SEED_CONTACTS,
+    integrations: SEED_INTEGRATIONS,
     currentUserId: users[0]?.id ?? '',
     alarms: [],
     loneWorkSessions: [],
@@ -320,6 +323,7 @@ function reducer(state: MobileState, action: Action): MobileState {
         locations: action.data.locations ?? state.locations,
         scenarios: action.data.scenarios ?? state.scenarios,
         contacts: action.data.contacts ?? state.contacts,
+        integrations: action.data.integrations ?? state.integrations,
         alarms: action.data.alarms ?? [],
         loneWorkSessions: action.data.loneWorkSessions ?? [],
         mode: 'live',
@@ -460,8 +464,14 @@ function migrateAuth(roh: Partial<MobileState>, mode: AppMode): MobileState {
   }
 
   const session = parsed.session ?? null
+  // Platzhalternummer aus früheren Versionen durch die echte Notfallnummer ersetzen
+  const integrations =
+    parsed.integrations?.hotline && ['', '+41 41 000 11 22'].includes(parsed.integrations.hotline.number.trim())
+      ? { ...parsed.integrations, hotline: { enabled: true, number: '+41 41 767 49 48' } }
+      : parsed.integrations ?? fallback.integrations
   return {
     ...parsed,
+    integrations,
     mode,
     authVersion: AUTH_MIGRATION_VERSION,
     scenarioContentVersion: SCENARIO_CONTENT_VERSION,

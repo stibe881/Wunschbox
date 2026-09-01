@@ -161,6 +161,33 @@ const b = await chromium.launch({ executablePath: BROWSER })
   await p.getByRole('button', { name: 'Profil' }).click()
   await schuss(p, 'app-12-profil', 800)
 
+  // Knopf oben rechts: Ereignis wählen. Für Brand läuft bereits ein Alarm -
+  // die App weist darauf hin, statt stumm einen zweiten auszulösen.
+  await p.getByRole('button', { name: 'Alarm auslösen' }).click()
+  await schuss(p, 'app-14-alarm-auswahl', 800)
+  await p.getByText('Brand / Feuer').first().click()
+  await p.waitForTimeout(6000)
+  await p.getByText('Für dieses Ereignis läuft bereits ein Alarm').scrollIntoViewIfNeeded()
+  await schuss(p, 'app-15-doppelalarm', 800)
+
+  // Entwarnung: Der Krisenstab beendet den Alarm, Lea erhält die zweite Mitteilung
+  await abmelden(p)
+  await anmelden(p, 'stefan.gross@sonnenberg-baar.ch')
+  await p.goto(BASIS + '/#/monitor', { waitUntil: 'networkidle' })
+  await p.waitForTimeout(800)
+  await p.getByRole('button', { name: 'Beenden' }).first().click()
+  await p.waitForTimeout(600)
+  const bestaetigen = p.getByRole('button', { name: /Beenden|Entwarnung/ }).last()
+  if (await bestaetigen.isVisible().catch(() => false)) await bestaetigen.click()
+  await abmelden(p)
+  await anmelden(p, 'lea.weber@sonnenberg-baar.ch')
+  await p.goto(BASIS + '/#/app', { waitUntil: 'networkidle' })
+  await schuss(p, 'app-16-entwarnung-start', 900)
+  await p.getByRole('button', { name: /Nächste Schritte/ }).first().click()
+  await schuss(p, 'app-17-entwarnung', 800)
+  await p.getByRole('button', { name: 'Start' }).click()
+  await p.waitForTimeout(600)
+
   // Geführter Ablauf. Vorher warten, bis die Rückmeldung ausgeblendet ist.
   await p.getByRole('button', { name: 'Szenarien' }).click()
   await p.waitForTimeout(700)

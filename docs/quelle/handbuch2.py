@@ -84,7 +84,8 @@ KOERPER = r"""
   <h2 class="abschnitt"><span class="zahl">3</span> Aufgeboten werden</h2>
   <p>
     Ein Aufgebot erreicht Sie als Push-Mitteilung, je nach Alarmplan zusätzlich per
-    SMS und Sprachanruf. In der App steht es zuoberst auf der Startseite.
+    SMS und Sprachanruf. In der App steht es zuoberst auf der Startseite. Tippen Sie
+    die Mitteilung an, öffnet die App direkt die Handlungsanweisung zu diesem Alarm.
   </p>
   <div class="geraet-reihe">
     <figure class="geraet">
@@ -118,10 +119,12 @@ KOERPER = r"""
   <div class="hinweis hinweis--warnung">
     <p class="marke-klein">Stille Alarme</p>
     <p>
-      Ein still ausgelöster Alarm kommt ohne Ton und ohne auffällige Anzeige an &ndash;
-      und ist in der App violett gekennzeichnet. Das ist Absicht: bei herausforderndem
-      Verhalten, einer verdächtigen Person oder einem Todesfall schadet Aufsehen.
-      Verhalten Sie sich entsprechend unauffällig.
+      Ein still ausgelöster Alarm kommt als Mitteilung ohne Ton und ohne Vibration an
+      &ndash; sichtbar auf dem Sperrbildschirm, in der App violett gekennzeichnet. Das
+      ist Absicht: bei herausforderndem Verhalten, einer verdächtigen Person, einem
+      Todesfall oder einer Bedrohungslage schadet Aufsehen. Verhalten Sie sich
+      entsprechend unauffällig. Der normale Alarm dagegen klingelt auch bei
+      stummgeschaltetem Telefon.
     </p>
   </div>
 </section>
@@ -199,6 +202,21 @@ KOERPER = r"""
       Halten. Ein Klick allein löst nichts aus.
     </p>
   </div>
+  <p>
+    In der App führt der rote Knopf <span class="ui">Alarm auslösen</span> oben rechts
+    zur Auswahl des Ereignisses und direkt in die Phase «Alarmieren» des Szenarios.
+  </p>
+  <div class="hinweis">
+    <p class="marke-klein">Wenn zwei Personen dasselbe auslösen</p>
+    <p>
+      Das System legt zwei getrennte Alarme an: Beide werden zugestellt, beide
+      erscheinen in der Alarmzentrale, beide müssen quittiert und beendet werden. In
+      der App sieht die zweite Person vor dem Auslösen den Hinweis, dass für dieses
+      Ereignis am selben Standort bereits ein Alarm läuft, und wird zu den Schritten
+      für Empfänger geführt. Bleiben trotzdem zwei Alarme stehen, beenden Sie den
+      überzähligen &ndash; das Journal hält beide fest.
+    </p>
+  </div>
 </section>
 
 <section id="b6">
@@ -227,6 +245,16 @@ KOERPER = r"""
     nur Krisenstab und Administration &ndash; Mitarbeitende können einen Alarm nicht
     beenden.
   </p>
+  <p>
+    Die Entwarnung ist eine eigene Push-Mitteilung. Wer sie antippt, sieht die Schritte
+    <b>Nach der Entwarnung</b> des Szenarios: Rückkehr erst nach Freigabe, erneut
+    zählen, Vorfall festhalten, Nachsorge. Nach einem stillen Alarm bleibt auch die
+    Entwarnung ohne Ton.
+  </p>
+  <figure class="geraet">
+    <img src="bilder/app-17-entwarnung.webp" alt="Ansicht Entwarnung in der App mit der beendeten Alarmmeldung und den Schritten nach der Entwarnung">
+    <figcaption><b>Abb.</b> &nbsp; Das sehen die Alarmierten, wenn Sie beenden.</figcaption>
+  </figure>
   <div class="hinweis hinweis--stopp">
     <p class="marke-klein">Erst prüfen, dann beenden</p>
     <p>

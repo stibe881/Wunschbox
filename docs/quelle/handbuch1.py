@@ -149,10 +149,33 @@ KOERPER = r"""
   </div>
   <h3>Stiller Alarm</h3>
   <p>
-    Ein stiller Alarm erreicht die Empfänger ohne Ton und ohne auffällige Anzeige.
-    Er ist für Lagen gedacht, in denen Aufsehen schadet: herausforderndes Verhalten,
-    eine verdächtige Person auf dem Areal, ein Todesfall. Szenarien mit dieser
-    Voreinstellung sind im Portal mit <span class="ui">stiller Alarm</span> gekennzeichnet.
+    Ein stiller Alarm erreicht die Empfänger als Mitteilung ohne Ton und ohne
+    Vibration &ndash; sie erscheint auf dem Sperrbildschirm und in der App violett
+    gekennzeichnet, aber kein Telefon klingelt. Er ist für Lagen gedacht, in denen
+    Aufsehen schadet: herausforderndes Verhalten, eine verdächtige Person auf dem
+    Areal, ein Todesfall, Amok / Bedrohungslage. Der normale Alarm dagegen klingelt
+    auch bei stummgeschaltetem Telefon und durchbricht Fokus-Modi. Szenarien mit der
+    stillen Voreinstellung sind im Portal mit <span class="ui">stiller Alarm</span>
+    gekennzeichnet.
+  </p>
+  <h3>Wenn zwei Personen dasselbe auslösen</h3>
+  <p>
+    Jede Auslösung ist ein eigener Alarm mit eigener Zustellung, Quittierung,
+    Eskalation und Entwarnung. Zwei Auslösungen für dasselbe Ereignis ergeben zwei
+    Einträge in der Alarmzentrale, und die Empfänger erhalten beide Meldungen. Die App
+    beugt dem vor: Läuft für ein Szenario am gewählten Standort bereits ein Alarm, sieht
+    die zweite Person in der Phase «Alarmieren» einen Hinweis mit Name und Zeit und
+    wird zu den Schritten für Empfänger geführt. Der Auslöseknopf bleibt erreichbar,
+    ist aber als <span class="ui">Trotzdem zusätzlich</span> beschriftet &ndash; für den
+    Fall, dass ein weiterer Standort betroffen ist. Einen überzähligen Alarm beenden Sie
+    in der Alarmzentrale.
+  </p>
+  <h3>Der Knopf in der App</h3>
+  <p>
+    In der App steht <span class="ui">Alarm auslösen</span> oben rechts auf jeder Seite.
+    Er führt zur Wahl des Ereignisses und direkt in die Phase «Alarmieren» des
+    Szenarios. Push-Mitteilungen sind verknüpft: Antippen öffnet die
+    Handlungsanweisung zum Alarm, nach dem Beenden die Schritte nach der Entwarnung.
   </p>
 </section>
 
@@ -186,7 +209,7 @@ KOERPER = r"""
   </p>
   <figure class="bild-breit">
     <img src="bilder/web-07-szenarien.webp" alt="Übersicht der Szenarien als Karten mit Kategorie, Priorität und Anzahl der Massnahmen">
-    <figcaption><b>Abb.</b> &nbsp; Die Szenarienübersicht. Neun Szenarien sind für Mitarbeitende freigegeben, die übrigen sind ausgeblendet und lassen sich mit dem Augensymbol wieder einblenden.</figcaption>
+    <figcaption><b>Abb.</b> &nbsp; Die Szenarienübersicht. Zehn Szenarien sind für Mitarbeitende freigegeben &ndash; darunter Amok / Bedrohungslage mit stiller Voreinstellung &ndash;, die übrigen sind ausgeblendet und lassen sich mit dem Augensymbol wieder einblenden.</figcaption>
   </figure>
 
   <h3>Ein Szenario ansehen</h3>
@@ -212,6 +235,7 @@ KOERPER = r"""
         <tr><td><b>Alarmieren</b></td><td>Phase 1</td><td>Wann ein Notruf nötig ist und was am Telefon zu melden ist</td></tr>
         <tr><td><b>Sofortmassnahmen</b></td><td>Phase 2</td><td>Nur Handgriffe &ndash; keine Anweisungen zum Anrufen</td></tr>
         <tr><td><b>Empfänger</b></td><td>eigener Weg «Ich wurde alarmiert»</td><td>Was jemand tut, der den Alarm erhält: kein Notruf, keine Auslösung, sondern die eigene Aufgabe &ndash; je Schritt wählbar, für welche Gruppen er gilt</td></tr>
+        <tr><td><b>Nach der Entwarnung</b></td><td>mit der Entwarnungs-Mitteilung</td><td>Was die Alarmierten tun, sobald der Alarm beendet ist: Rückkehr nach Freigabe, erneut zählen, festhalten, Nachsorge</td></tr>
         <tr><td><b>Weiterführende Massnahmen</b></td><td>Phase 4</td><td>Alles nach der Akutphase: informieren, dokumentieren, nachsorgen</td></tr>
         <tr><td><b>Checkliste</b></td><td>Phase 4</td><td>Punkte zum Abhaken für die Nachkontrolle</td></tr>
         <tr><td><b>Rechtsgrundlagen</b></td><td>Phase 4, aufklappbar</td><td>Orientierungshilfe, keine Rechtsberatung</td></tr>
@@ -368,6 +392,12 @@ KOERPER = r"""
     <img src="bilder/web-13-integrationen.webp" alt="Seite Integrationen mit Kommunikationskanälen, Identitätsanbindung, Webhooks und Zugangscodes">
     <figcaption><b>Abb.</b> &nbsp; Kommunikationskanäle, Anbindung an Drittsysteme und die Zugangscodes für die App-Installation.</figcaption>
   </figure>
+  <h3>Interne Notfallnummer</h3>
+  <p>
+    Die Nummer <b>+41 41 767 49 48</b> ist hinterlegt und erscheint auf der Startseite
+    der App; Antippen ruft an. Ändert sie sich, tragen Sie die neue hier ein &ndash;
+    die App übernimmt sie beim nächsten Abgleich.
+  </p>
   <h3>Zugangscodes</h3>
   <p>
     Ein Zugangscode je Standort erlaubt es Mitarbeitenden, die App selbständig

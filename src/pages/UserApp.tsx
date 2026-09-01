@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowRight, BellRing, BookOpen, Check, CheckCircle2, ChevronLeft, ClipboardCheck, Clock, KeyRound, LayoutDashboard,
-  ListChecks, LogOut, MapPin, Megaphone, Phone, PhoneCall, Play, Scale, Search, ShieldAlert, Siren, Timer, User, Users, Volume2, WifiOff, X,
+  ListChecks, LogOut, MapPin, Megaphone, Phone, PhoneCall, Play, Scale, Search, ShieldAlert, ShieldCheck, Siren, Timer, User, Users, Volume2, X,
 } from 'lucide-react'
 import { createAlarm, resolveRecipients, uid, useStore } from '../store'
 import type { Alarm, Channel, LoneWorkSession, Scenario, User as AppUser } from '../types'
@@ -10,17 +10,21 @@ import { CHANNEL_LABELS } from '../types'
 import { Badge, HoldButton, Toggle, formatDuration, formatRelative, inputClass, useConfirm } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 import { MIN_PASSWORD_LENGTH, passwordProblem } from '../lib/auth'
-import { activeScenarios, responseStepsFor, responseStepsOf } from '../lib/scenarios'
+import { activeScenarios, allClearStepsOf, responseStepsFor, responseStepsOf } from '../lib/scenarios'
 
 type Tab = 'start' | 'szenarien' | 'alleinarbeit' | 'notruf' | 'profil'
 
 /**
- * Zwei Wege in ein Szenario, zwei Abläufe:
+ * Drei Wege in ein Szenario, drei Abläufe:
  * - entdecker: Ich habe die Lage entdeckt. Zuerst alarmieren, dann handeln.
  * - empfaenger: Ich wurde alarmiert. Kein Notruf, keine erneute Auslösung –
  *   stattdessen die eigene Aufgabe.
+ * - entwarnung: Der Alarm ist beendet – die Schritte zurück in den Normalbetrieb.
  */
-type ScenarioModus = 'entdecker' | 'empfaenger'
+type ScenarioModus = 'entdecker' | 'empfaenger' | 'entwarnung'
+
+/** Wie lange eine Entwarnung auf dem Start-Tab stehen bleibt */
+const ENTWARNUNG_SICHTBAR_MS = 12 * 60 * 60_000
 
 const TABS: { key: Tab; label: string; icon: typeof Siren }[] = [
   { key: 'start', label: 'Start', icon: Siren },
@@ -36,11 +40,16 @@ export default function UserApp() {
   const [openScenario, setOpenScenario] = useState<Scenario | null>(null)
   const [openModus, setOpenModus] = useState<ScenarioModus>('entdecker')
   const [openAlarm, setOpenAlarm] = useState<Alarm | null>(null)
+  const [openPhase, setOpenPhase] = useState<number | null>(null)
+  // Knopf oben rechts: zuerst das Ereignis wählen
+  const [alarmWahl, setAlarmWahl] = useState(false)
 
-  function oeffneSzenario(s: Scenario, modus: ScenarioModus = 'entdecker', alarm: Alarm | null = null) {
+  function oeffneSzenario(s: Scenario, modus: ScenarioModus = 'entdecker', alarm: Alarm | null = null, phase: number | null = null) {
     setOpenScenario(s)
     setOpenModus(modus)
     setOpenAlarm(alarm)
+    setOpenPhase(phase)
+    setAlarmWahl(false)
   }
 
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
@@ -59,12 +68,16 @@ export default function UserApp() {
             {me.firstName} {me.lastName} · <MapPin size={10} /> {myLocation?.name}
           </div>
         </div>
-        <span className="text-[10px] text-slate-400 flex items-center gap-1 shrink-0">
-          <WifiOff size={11} /> offline-fähig
-        </span>
+        <button
+          className="shrink-0 flex items-center gap-1.5 rounded-full bg-brand-600 text-white text-xs font-bold px-3 py-1.5 active:scale-95 transition"
+          onClick={() => { setOpenScenario(null); setAlarmWahl(true) }}
+          aria-label="Alarm auslösen"
+        >
+          <Siren size={14} /> Alarm auslösen
+        </button>
       </header>
 
-      {myAlarms.length > 0 && tab !== 'start' && (
+      {myAlarms.length > 0 && tab !== 'start' && !alarmWahl && (
         <button
           onClick={() => { setTab('start'); setOpenScenario(null) }}
           className="bg-brand-600 text-white text-sm font-semibold px-4 py-2 flex items-center gap-2 alarm-pulse"
@@ -76,9 +89,18 @@ export default function UserApp() {
 
       <main className="flex-1 p-4 pb-28">
         {openScenario ? (
-          <ScenarioView scenario={openScenario} startModus={openModus} alarm={openAlarm} onBack={() => setOpenScenario(null)} />
+          <ScenarioView
+            key={`${openScenario.id}-${openModus}-${openAlarm?.id ?? ''}-${openPhase ?? ''}`}
+            scenario={openScenario}
+            startModus={openModus}
+            alarm={openAlarm}
+            startPhase={openPhase}
+            onBack={() => setOpenScenario(null)}
+          />
+        ) : alarmWahl ? (
+          <AlarmAuswahl onPick={(s) => oeffneSzenario(s, 'entdecker', null, 0)} onBack={() => setAlarmWahl(false)} />
         ) : tab === 'start' ? (
-          <StartTab onOpenScenario={(s, a) => oeffneSzenario(s, 'empfaenger', a)} />
+          <StartTab onOpenScenario={(s, a, modus) => oeffneSzenario(s, modus ?? 'empfaenger', a)} />
         ) : tab === 'szenarien' ? (
           <ScenarioListTab onOpen={(s) => oeffneSzenario(s)} />
         ) : tab === 'alleinarbeit' ? (
@@ -98,9 +120,9 @@ export default function UserApp() {
           {TABS.map(({ key, label, icon: Icon }) => (
             <button
               key={key}
-              onClick={() => { setTab(key); setOpenScenario(null) }}
+              onClick={() => { setTab(key); setOpenScenario(null); setAlarmWahl(false) }}
               className={`relative py-2.5 flex flex-col items-center gap-0.5 text-[11px] ${
-                tab === key && !openScenario ? 'text-brand-600 font-semibold' : 'text-slate-400'
+                tab === key && !openScenario && !alarmWahl ? 'text-brand-600 font-semibold' : 'text-slate-400'
               }`}
             >
               <span className="relative">
@@ -122,7 +144,7 @@ export default function UserApp() {
 
 // ---------- Start: Alarme + SOS ----------
 
-function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Alarm) => void }) {
+function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Alarm, modus?: 'empfaenger' | 'entwarnung') => void }) {
   const { state, dispatch } = useStore()
   const { ask, confirmEl } = useConfirm()
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
@@ -130,6 +152,14 @@ function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Ala
   const myAlarms = state.alarms.filter(
     (a) => a.status === 'active' && a.triggeredByUserId !== me.id && a.deliveries.some((d) => d.userId === me.id),
   )
+  // Beendete Alarme der letzten Stunden: Die Entwarnung bringt eigene Schritte mit
+  const entwarnungen = state.alarms
+    .filter(
+      (a) => a.status === 'ended' && (a.endedAt ?? 0) > Date.now() - ENTWARNUNG_SICHTBAR_MS &&
+        (a.triggeredByUserId === me.id || a.deliveries.some((d) => d.userId === me.id)),
+    )
+    .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))
+    .slice(0, 3)
 
   function sos() {
     navigator.vibrate?.([120, 60, 120])
@@ -253,6 +283,28 @@ function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Ala
         </div>
       )}
 
+      {entwarnungen.map((a) => {
+        const scenario = state.scenarios.find((s) => s.id === a.scenarioId)
+        return (
+          <div key={a.id} className="rounded-2xl border-2 border-emerald-500 bg-white p-4">
+            <div className="flex items-center gap-2 font-bold text-slate-800">
+              <ShieldCheck size={18} className="text-emerald-600" />
+              <span className="flex-1">Entwarnung · {scenario?.title ?? 'Alarm'}</span>
+              <span className="text-xs font-normal text-slate-400">{formatRelative(a.endedAt ?? a.triggeredAt)}</span>
+            </div>
+            <p className="text-sm text-slate-700 mt-2">Der Alarm ist beendet. Für die Rückkehr zum Normalbetrieb gelten eigene Schritte.</p>
+            {scenario && (
+              <button
+                className="mt-3 w-full rounded-xl bg-emerald-600 text-white py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5"
+                onClick={() => onOpenScenario(scenario, a, 'entwarnung')}
+              >
+                Nächste Schritte <ArrowRight size={14} />
+              </button>
+            )}
+          </div>
+        )
+      })}
+
       {mySos.length === 0 && (
         <>
           <HoldButton onTrigger={sos} hint="Zum Auslösen gedrückt halten" className="w-full">
@@ -277,6 +329,58 @@ function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Ala
           <span className="font-bold text-brand-600">{state.integrations.hotline.number}</span>
         </a>
       )}
+    </div>
+  )
+}
+
+// ---------- Alarm auslösen: Ereignis wählen ----------
+
+/**
+ * Einstieg über den Knopf oben rechts: Welches Ereignis? Danach geht es direkt
+ * in die Phase «Alarmieren» des gewählten Szenarios – Notruf zuerst, dann die
+ * interne Alarmierung.
+ */
+function AlarmAuswahl({ onPick, onBack }: { onPick: (s: Scenario) => void; onBack: () => void }) {
+  const { state } = useStore()
+  const rang = { hoch: 0, mittel: 1, tief: 2 } as const
+  const szenarien = [...activeScenarios(state.scenarios)].sort((a, b) => rang[a.priority] - rang[b.priority])
+
+  return (
+    <div>
+      <button className="flex items-center gap-1 text-sm text-slate-500 mb-3" onClick={onBack}>
+        <ChevronLeft size={16} /> Zurück
+      </button>
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-12 h-12 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+          <Siren size={26} />
+        </div>
+        <div className="min-w-0">
+          <h2 className="font-bold text-slate-800 text-xl leading-tight">Alarm auslösen</h2>
+          <div className="text-xs text-slate-400">Welches Ereignis liegt vor?</div>
+        </div>
+      </div>
+      <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 mb-3 text-xs text-amber-900">
+        Bei Lebensgefahr zuerst der Notruf – die passende Nummer steht im nächsten Schritt. Danach halten Sie den roten Knopf gedrückt, um intern zu alarmieren.
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        {szenarien.map((s) => (
+          <button
+            key={s.id}
+            onClick={() => onPick(s)}
+            className="rounded-2xl bg-white border border-slate-200 p-3.5 text-left active:scale-[0.98] transition"
+          >
+            <div className="flex items-center justify-between">
+              <ScenarioIcon name={s.icon} size={22} className={s.priority === 'hoch' ? 'text-brand-600' : 'text-slate-500'} />
+              {s.silentDefault && <Badge color="violet">still</Badge>}
+            </div>
+            <div className="font-semibold text-sm text-slate-800 mt-2 leading-snug">{s.title}</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">{s.category}</div>
+          </button>
+        ))}
+      </div>
+      <div className="text-xs text-center text-slate-500 mt-4">
+        Persönlicher Notfall ohne Szenario: SOS auf dem Start-Tab alarmiert Schulsanität und Hausdienst.
+      </div>
     </div>
   )
 }
@@ -317,16 +421,18 @@ function ScenarioListTab({ onOpen }: { onOpen: (s: Scenario) => void }) {
 }
 
 function ScenarioView({
-  scenario, onBack, startModus = 'entdecker', alarm = null,
+  scenario, onBack, startModus = 'entdecker', alarm = null, startPhase = null,
 }: {
   scenario: Scenario
   onBack: () => void
   startModus?: ScenarioModus
   alarm?: Alarm | null
+  /** Direkt in eine Phase springen, z. B. 0 = Alarmieren über den Knopf im Header */
+  startPhase?: number | null
 }) {
   const { state, dispatch } = useStore()
   const [modus, setModus] = useState<ScenarioModus>(startModus)
-  const [phase, setPhase] = useState<number | null>(null)
+  const [phase, setPhase] = useState<number | null>(startPhase)
   const [checkedSteps, setCheckedSteps] = useState<Record<number, boolean>>({})
   const [checkedList, setCheckedList] = useState<Record<number, boolean>>({})
   const [notifiedUserIds, setNotifiedUserIds] = useState<string[]>([])
@@ -347,6 +453,15 @@ function ScenarioView({
   const myScenarioAlarm = state.alarms.find(
     (a) => a.status === 'active' && a.scenarioId === scenario.id && a.triggeredByUserId === me.id && !a.message.startsWith('Info an'),
   )
+  // Läuft für dieses Ereignis bereits ein Alarm von jemand anderem am selben
+  // Standort? Dann ist eine zweite Auslösung meist überflüssig.
+  const fremderAlarm = state.alarms.find(
+    (a) =>
+      a.status === 'active' && a.scenarioId === scenario.id && a.triggeredByUserId !== me.id &&
+      !a.message.startsWith('Info an') && !a.message.startsWith('Krisenteam-Aufgebot') &&
+      (a.locationIds.length === 0 || alarmLocationIds.length === 0 || a.locationIds.some((id) => alarmLocationIds.includes(id))),
+  )
+  const fremderAusloeser = fremderAlarm ? state.users.find((u) => u.id === fremderAlarm.triggeredByUserId) : undefined
   const myCrisisAlarm = state.alarms.find(
     (a) => a.status === 'active' && a.triggeredByUserId === me.id && a.message.startsWith('Krisenteam-Aufgebot'),
   )
@@ -437,6 +552,24 @@ function ScenarioView({
       </div>
     </div>
   )
+
+  // ---------- Nach der Entwarnung ----------
+  if (modus === 'entwarnung') {
+    const beendeterAlarm =
+      (alarm && state.alarms.find((a) => a.id === alarm.id)) ??
+      [...state.alarms]
+        .filter((a) => a.status === 'ended' && a.scenarioId === scenario.id)
+        .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))[0] ??
+      null
+    return (
+      <EntwarnungAnsicht
+        scenario={scenario}
+        alarm={beendeterAlarm}
+        onBack={onBack}
+        onSzenario={() => { setModus('entdecker'); setPhase(null) }}
+      />
+    )
+  }
 
   // ---------- Empfängerweg ----------
   if (modus === 'empfaenger') {
@@ -569,6 +702,23 @@ function ScenarioView({
             {(scenario.defaultChannels.length > 0 ? scenario.defaultChannels : (['push', 'sms'] as Channel[])).map((c) => CHANNEL_LABELS[c].split(' ')[0]).join(', ')} – mit Quittierung.{' '}
             <span className="font-semibold text-slate-700">{alarmRecipientCount} Empfänger:innen</span> werden benachrichtigt.
           </div>
+          {!myScenarioAlarm && fremderAlarm && (
+            <div className="rounded-xl border-2 border-violet-400 bg-violet-50 p-3.5 text-sm space-y-2">
+              <div className="flex items-center gap-2 font-semibold text-violet-800">
+                <BellRing size={16} /> Für dieses Ereignis läuft bereits ein Alarm
+              </div>
+              <p className="text-violet-900">
+                {fremderAusloeser ? `${fremderAusloeser.firstName} ${fremderAusloeser.lastName}` : 'Jemand'} hat {formatRelative(fremderAlarm.triggeredAt)} alarmiert.
+                Ein zweiter Alarm ist nur nötig, wenn ein weiterer Standort betroffen ist oder Sie wesentlich Neues wissen – sonst erhalten alle dieselbe Meldung doppelt.
+              </p>
+              <button
+                className="w-full rounded-xl bg-slate-800 text-white py-2.5 text-sm font-semibold flex items-center justify-center gap-1.5"
+                onClick={() => setModus('empfaenger')}
+              >
+                Was jetzt zu tun ist <ArrowRight size={14} />
+              </button>
+            </div>
+          )}
           {myScenarioAlarm ? (
             alarmStatus(myScenarioAlarm)
           ) : (
@@ -578,7 +728,7 @@ function ScenarioView({
               hint="Zum Alarmieren gedrückt halten"
               className="w-full"
             >
-              <Siren size={20} /> {responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(' & ') : 'Alle'} alarmieren ({alarmRecipientCount})
+              <Siren size={20} /> {fremderAlarm ? 'Trotzdem zusätzlich: ' : ''}{responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(' & ') : 'Alle'} alarmieren ({alarmRecipientCount})
             </HoldButton>
           )}
         </div>
@@ -804,6 +954,87 @@ function LoneWorkTab() {
  * entdeckt hat. Notruf und Auslösung sind bereits geschehen; hier steht die
  * eigene Aufgabe, dazu die Quittierung.
  */
+/**
+ * Nach der Entwarnung: Der Alarm ist beendet, aber der Normalbetrieb beginnt
+ * nicht von selbst – Rückkehr, Zählung, Nachsorge.
+ */
+function EntwarnungAnsicht({
+  scenario, alarm, onBack, onSzenario,
+}: {
+  scenario: Scenario
+  alarm: Alarm | null
+  onBack: () => void
+  onSzenario: () => void
+}) {
+  const { state } = useStore()
+  const [erledigt, setErledigt] = useState<Record<number, boolean>>({})
+  const schritte = allClearStepsOf(scenario)
+  const beendetDurch = alarm?.log
+    .map((l) => l.message)
+    .reverse()
+    .find((m) => m.startsWith('Alarm beendet durch '))
+    ?.replace(/^Alarm beendet durch /, '')
+    .replace(/ – Entwarnung versendet\.$/, '')
+  const orte = alarm
+    ? alarm.locationIds.map((id) => state.locations.find((l) => l.id === id)?.name).filter(Boolean).join(', ')
+    : ''
+
+  return (
+    <div>
+      <button className="flex items-center gap-1 text-sm text-slate-500 mb-3" onClick={onBack}>
+        <ChevronLeft size={16} /> Zurück
+      </button>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+          <ShieldCheck size={26} />
+        </div>
+        <div className="min-w-0">
+          <h2 className="font-bold text-slate-800 text-xl leading-tight">Entwarnung</h2>
+          <div className="text-xs text-slate-400">{scenario.title}</div>
+        </div>
+      </div>
+
+      {alarm ? (
+        <div className="rounded-2xl border-2 border-emerald-500 bg-white p-4 mb-3">
+          <p className="text-sm text-slate-700">{alarm.message}</p>
+          <div className="text-xs text-slate-500 mt-2 flex flex-wrap gap-x-3 gap-y-1">
+            <span>Beendet {formatRelative(alarm.endedAt ?? alarm.triggeredAt)}{beendetDurch ? ` durch ${beendetDurch}` : ''}</span>
+            {orte && <span className="flex items-center gap-1"><MapPin size={11} /> {orte}</span>}
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-2xl bg-white border border-slate-200 p-3 mb-3 text-xs text-slate-500">
+          Zu diesem Szenario ist kein beendeter Alarm bekannt. Das sind die Schritte für den Fall einer Entwarnung.
+        </div>
+      )}
+
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 mb-3 text-xs text-emerald-900">
+        Der Alarm ist beendet. Der Normalbetrieb beginnt aber nicht von selbst – das gilt jetzt:
+      </div>
+
+      <div className="text-xs text-slate-400 mb-1">Schritte antippen, wenn erledigt:</div>
+      <div className="space-y-2">
+        {schritte.map((schritt, i) => (
+          <button
+            key={i}
+            className="w-full flex gap-2.5 text-sm bg-white rounded-xl border border-slate-200 p-3 text-left"
+            onClick={() => setErledigt({ ...erledigt, [i]: !erledigt[i] })}
+          >
+            <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${erledigt[i] ? 'bg-slate-300' : 'bg-emerald-600'}`}>
+              {erledigt[i] ? <Check size={14} /> : i + 1}
+            </span>
+            <span className={`pt-0.5 ${erledigt[i] ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{schritt}</span>
+          </button>
+        ))}
+      </div>
+
+      <button className="mt-5 w-full text-sm text-slate-500 underline underline-offset-2" onClick={onSzenario}>
+        Vollständiges Szenario ansehen
+      </button>
+    </div>
+  )
+}
+
 function EmpfaengerAnsicht({
   scenario, alarm, onBack, onEntdecker,
 }: {

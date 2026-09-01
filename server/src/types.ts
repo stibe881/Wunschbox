@@ -82,6 +82,8 @@ export interface Scenario {
    * keine Anweisungen mehr zum Anrufen oder Auslösen.
    */
   callGuidance?: string[]
+  /** Was nach der Entwarnung zu tun ist – wird mit der Entwarnungs-Mitteilung angezeigt */
+  allClearSteps?: string[]
   /**
    * Was Empfänger:innen dieses Alarms tun. Sie sind nicht am Ort des
    * Geschehens und haben den Alarm von jemand anderem erhalten: kein Notruf,

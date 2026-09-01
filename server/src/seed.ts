@@ -11,7 +11,7 @@ import type { Scenario, Group, Location, AlarmPlan, AlarmButton, EmergencyContac
 
 // Vorkonfigurierte Notfallszenarien für das heilpädagogische Kompetenzzentrum SONNENBERG
 /** Inhaltsversion der Standard-Szenarien – bei Erhöhung werden sie beim Laden aktualisiert */
-export const SCENARIO_CONTENT_VERSION = 6
+export const SCENARIO_CONTENT_VERSION = 7
 
 export const SEED_SCENARIOS: Scenario[] = [
   {
@@ -43,6 +43,13 @@ export const SEED_SCENARIOS: Scenario[] = [
       { text: 'Hausdienst: Feuerwehr an der Zufahrt einweisen, Schlüssel und Gebäudepläne bereithalten, Aufzüge ausser Betrieb.', groupIds: ['gr-sicherheit'] },
       { text: 'An einem anderen Standort: nichts unternehmen, erreichbar bleiben, den betroffenen Standort nicht anrufen – die Leitungen werden gebraucht.' },
       { text: 'Nicht ins Gebäude zurück, bis die Feuerwehr freigibt. Weisungen der Einsatzleitung gehen allen anderen vor.' },
+    ],
+    allClearSteps: [
+      'Rückkehr ins Gebäude nur über die freigegebenen Wege – Anweisungen der Feuerwehr und der Evakuationsleitung befolgen.',
+      'Klasse im Raum erneut zählen und die Vollständigkeit der Evakuationsleitung melden.',
+      'Kinder beruhigen und den Tagesablauf möglichst normal weiterführen; auffällige Reaktionen der Klassenleitung melden.',
+      'Verletzungen oder Rauchgaseinwirkung, auch leichte, der Schulleitung melden – Unfallmeldung.',
+      'Beobachtungen (Zeiten, Ablauf, Probleme) noch heute schriftlich festhalten und dem Brandschutzverantwortlichen abgeben.',
     ],
     followUp: [
       'Am Sammelplatz anhand der Klassenliste zählen und das Ergebnis der Evakuationsleitung melden – auch dann, wenn alle da sind.',
@@ -102,6 +109,13 @@ export const SEED_SCENARIOS: Scenario[] = [
       { text: 'Hausdienst: Zufahrten freihalten, Einsatzkräfte einweisen, Ausweichräume bei Kälte aufschliessen.', groupIds: ['gr-sicherheit'] },
       { text: 'Rückkehr erst nach Entwarnung über die App oder durch die Einsatzleitung.' },
     ],
+    allClearSteps: [
+      'Rückkehr erst nach der Freigabe durch die Evakuationsleitung – den Sammelplatz geschlossen als Klasse verlassen.',
+      'Klasse im Raum erneut zählen und die Vollständigkeit melden.',
+      'Kinder beruhigen: Strukturen und Rituale wieder aufnehmen, Bezugspersonen bleiben bei ihren Schüler:innen.',
+      'Eltern nur auf Anweisung der Schulleitung informieren – keine eigenen Mitteilungen.',
+      'Rückmeldung zum Ablauf (was hat funktioniert, was nicht) an die Evakuationsleitung.',
+    ],
     followUp: [
       'Zählung an die Evakuationsleitung melden, im festen Wortlaut: «Klasse X, vollständig» oder «Klasse X, es fehlen N – zuletzt gesehen in …».',
       'Vermisste sofort der Einsatzleitung melden – niemand geht auf eigene Faust zurück ins Gebäude.',
@@ -157,6 +171,13 @@ export const SEED_SCENARIOS: Scenario[] = [
       { text: 'Hausdienst: Zufahrt freihalten, Aufzug für den Rettungsdienst bereithalten, Notfallblatt aus dem Sekretariat holen.', groupIds: ['gr-sicherheit'] },
       { text: 'Kinder aus dem Bereich führen, Zugänge freihalten, keine Zuschauer, keine Fotos.' },
       { text: 'Wer nicht in der Nähe ist: nichts unternehmen, erreichbar bleiben.' },
+    ],
+    allClearSteps: [
+      'Die betroffene Person ist versorgt oder übergeben – Ersthelfer räumen auf und ergänzen den Notfallrucksack.',
+      'Klasse oder Gruppe beruhigen und den Tagesablauf wieder aufnehmen; Kinder, die den Vorfall miterlebt haben, im Auge behalten.',
+      'Ereignisprotokoll noch heute ausfüllen: Zeitpunkt, Massnahmen, beigezogene Dienste.',
+      'Erziehungsberechtigte werden durch die Schulleitung oder die zuständige Lehrperson informiert – nicht durch Dritte.',
+      'Bei Bedarf ein Gespräch mit der Schulleitung oder dem Care-Team anfordern – auch für Mitarbeitende.',
     ],
     followUp: [
       'Eine Bezugsperson begleitet das Kind ins Spital; Notfallblatt mit Diagnosen, Medikamenten und Allergien mitgeben.',
@@ -214,6 +235,13 @@ export const SEED_SCENARIOS: Scenario[] = [
       { text: 'Polizei nur auf Anweisung der Person vor Ort oder der Schulleitung – nicht auf eigene Faust.' },
       { text: 'Entwarnung kommt über die App. Bis dahin bleibt der Bereich gesperrt.' },
     ],
+    allClearSteps: [
+      'Erst wieder in die Situation, wenn das Deeskalationsteam oder die Schulleitung freigibt.',
+      'Betroffene Schüler:innen und Mitarbeitende nicht allein lassen; ruhige Nachbesprechung, keine Sanktionen im Affekt.',
+      'Verletzungen medizinisch abklären lassen und melden.',
+      'Vorfall im Ereignisprotokoll festhalten (Auslöser, Verlauf, Massnahmen) und der Schulleitung übergeben.',
+      'Förderplanung und persönlichen Notfallplan der betroffenen Person zeitnah überprüfen.',
+    ],
     followUp: [
       'Nachsorge für die betroffene Person: Rückzugsort, vertraute Bezugsperson, keine Sanktion in der Erregungsphase.',
       'Jede bewegungseinschränkende Massnahme unverzüglich schriftlich protokollieren: wer, was, wann, wie lange, warum, welche milderen Mittel wurden zuerst versucht.',
@@ -268,6 +296,12 @@ export const SEED_SCENARIOS: Scenario[] = [
       { text: 'Bei unmittelbarer Bedrohung im eigenen Bereich: Raum abschliessen, Polizei 117, drinnen bleiben.' },
       { text: 'Normalbetrieb erst nach Entwarnung über die App.' },
     ],
+    allClearSteps: [
+      'Normalbetrieb erst nach Freigabe durch Hausdienst oder Schulleitung – Türen wieder gemäss Tagesregelung.',
+      'Beobachtungen (Beschreibung, Zeit, Ort, Verhalten) schriftlich festhalten, solange die Erinnerung frisch ist.',
+      'Schüler:innen ohne Dramatisierung informieren, falls sie etwas mitbekommen haben.',
+      'Zutrittsregelung und Besucherprozess mit dem Hausdienst überprüfen.',
+    ],
     followUp: [
       'Beobachtungen sofort schriftlich festhalten, solange die Erinnerung frisch ist – jede Person für sich, ohne Absprache untereinander.',
       'Schulleitung entscheidet über eine Strafanzeige wegen Hausfriedensbruch und über ein schriftliches Hausverbot.',
@@ -318,6 +352,12 @@ export const SEED_SCENARIOS: Scenario[] = [
       { text: 'Fragen von Kindern oder Eltern: «Die Schulleitung informiert.» – nicht mehr.' },
       { text: 'Medienanfragen unbeantwortet an die von der Schulleitung bezeichnete Stelle weiterleiten.' },
       { text: 'Weitere Weisungen kommen über die App oder persönlich von der Schulleitung.' },
+    ],
+    allClearSteps: [
+      'Anweisungen des Krisenstabs zur Information der Klassen und Eltern abwarten – keine eigenen Mitteilungen.',
+      'Betroffene Schüler:innen und Mitarbeitende begleiten; Care-Team beiziehen, Rückzugsraum anbieten.',
+      'Auf sich selbst achten: Unterstützung annehmen, Gespräch mit der Schulleitung oder dem Care-Team.',
+      'Tagesstruktur behutsam wieder aufnehmen; Rituale und Gedenken gemäss Vorgabe des Krisenstabs.',
     ],
     followUp: [
       'Angehörige werden zuerst und persönlich informiert – nie über die Schule und nie vor der Polizei, wenn diese eingeschaltet ist.',
@@ -375,6 +415,12 @@ export const SEED_SCENARIOS: Scenario[] = [
       { text: 'Übrige Kinder in den Trockenbereich, abtrocknen, warm halten, betreuen; niemand zurück ins Wasser.' },
       { text: 'Wer nicht in der Nähe ist: nichts unternehmen, erreichbar bleiben.' },
     ],
+    allClearSteps: [
+      'Der Badbetrieb bleibt gesperrt, bis Badeaufsicht und Schulleitung freigeben.',
+      'Beteiligte Kinder in Ruhe umziehen, wärmen und beobachten – Beschwerden können bis 24 Stunden später auftreten; Eltern auf Warnzeichen hinweisen.',
+      'Ereignisprotokoll (Zeiten, Massnahmen, Beteiligte) ausfüllen und der Schulleitung übergeben.',
+      'Bad- und Aufsichtskonzept mit der Badeaufsicht überprüfen.',
+    ],
     followUp: [
       'Betrieb des Bades bis zur Klärung einstellen und den Zugang sperren.',
       'Erziehungsberechtigte umgehend persönlich informieren; eine Bezugsperson begleitet ins Spital.',
@@ -431,6 +477,12 @@ export const SEED_SCENARIOS: Scenario[] = [
       { text: 'Verdächtige E-Mails oder Anrufe von angeblichem Support: nicht reagieren, der ICT melden.' },
       { text: 'Nichts nach aussen kommunizieren – das macht der Krisenstab.' },
     ],
+    allClearSteps: [
+      'Systeme erst wieder normal nutzen, wenn die IT die Freigabe gibt – auch wenn etwas wieder zu funktionieren scheint.',
+      'Passwort ändern, falls die IT dazu auffordert; verdächtige Mails oder Geräte melden statt selbst prüfen.',
+      'Während des Ausfalls auf Papier erfasste Daten nachtragen.',
+      'Notierte Auffälligkeiten (Zeitpunkt, Fehlermeldung, betroffene Geräte) der IT melden.',
+    ],
     followUp: [
       'Betroffene Systeme, Zeitpunkte und Auffälligkeiten protokollieren; Ereignisprotokolle und Sicherungen sichern.',
       'Prüfen, ob Personendaten betroffen sind. Ist ein hohes Risiko für die betroffenen Personen wahrscheinlich, ist die Verletzung der Datensicherheit der zuständigen Datenschutzaufsicht so rasch als möglich zu melden.',
@@ -484,6 +536,12 @@ export const SEED_SCENARIOS: Scenario[] = [
       { text: 'Unterwegs keine Auskünfte, keine Nachrichten in Gruppen-Chats, keine Anrufe an Eltern.', groupIds: ['gr-krisenstab'] },
       { text: 'Beim Eintreffen: Lage abholen, Rolle übernehmen, sich ins Journal eintragen lassen.', groupIds: ['gr-krisenstab'] },
       { text: 'Wer nicht zum Krisenstab gehört: nichts unternehmen, Weisungen kommen über die App.' },
+    ],
+    allClearSteps: [
+      'Der Krisenstab ist aufgelöst – die Zuständigkeiten gehen zurück an die Linie.',
+      'Beschlossene Massnahmen gemäss Protokoll umsetzen; Fristen und Verantwortliche sind dort festgehalten.',
+      'Kommunikation nach aussen bleibt bei der Schulleitung.',
+      'Nachbesprechung innerhalb von zwei Wochen: Was hat funktioniert, was wird angepasst.',
     ],
     followUp: [
       'Erziehungsberechtigte über den offiziellen Kanal informieren; Eltern-Hotline oder Informationsseite einrichten, bevor Gerüchte entstehen.',
@@ -572,15 +630,39 @@ export const SEED_SCENARIOS: Scenario[] = [
     checklist: ['Letzter Standort + Zeit erfasst', 'Suchalarm ausgelöst', 'Beschreibung verteilt', 'Gefahrenstellen abgesucht', 'Aufsicht geregelt', '117 nach 15 Min.', 'Eltern informiert', 'Suchprotokoll geführt'],
   },
   {
-    id: 'sc-amok', icon: 'shield-alert', title: 'Amok / Bedrohungslage', category: 'Sicherheit', priority: 'hoch', active: false, silentDefault: true,
+    id: 'sc-amok', icon: 'shield-alert', title: 'Amok / Bedrohungslage', category: 'Sicherheit', priority: 'hoch', silentDefault: true,
     defaultChannels: ['push', 'sms'], responsibleGroupIds: ['gr-alle'], contactIds: ['ec-117'],
+    callGuidance: [
+      'Zuerst in Sicherheit bringen, dann alarmieren: Der stille Alarm in der App warnt alle am Standort ohne Ton – keine Durchsage, keine Sirene.',
+      'Polizei 117 anrufen, sobald es gefahrlos möglich ist – leise sprechen, nicht auflegen.',
+      'Melden: Wer ruft an, Standort und Gebäude, was passiert (Waffe, Anzahl Täter), wo die Person zuletzt gesehen wurde, wie viele Personen betroffen sind.',
+      'Ausdrücklich sagen: Sonderschule mit Kindern, die das Gebäude nicht selbständig verlassen können.',
+      'Keine weiteren Anrufe, keine Nachrichten in Chats – die Leitungen und die Ruhe werden gebraucht.',
+    ],
     instructions: [
       'Raus nur, wenn der Weg sicher frei ist – sonst: Raum verriegeln.',
-      'Tür abschliessen oder verbarrikadieren (Pulte, Schränke), Licht aus, weg vom Fenster, auf den Boden.',
-      'Stillen Alarm in der App auslösen – alle am Standort werden lautlos gewarnt.',
+      'Tür abschliessen oder verbarrikadieren (Pulte, Schränke), Licht aus, weg von Tür und Fenster, auf den Boden.',
       'Geräte stumm schalten. Kinder leise halten – bekannte Beruhigungsrituale nutzen, Körperkontakt zulassen.',
-      'Polizei 117 anrufen, sobald gefahrlos möglich: Standort, Täterbeschreibung, letzter bekannter Aufenthaltsort.',
+      'Niemanden auf den Gang lassen und niemandem öffnen, auch nicht auf Klopfen oder Rufen hin.',
       'Tür erst öffnen, wenn sich die Polizei eindeutig zu erkennen gibt.',
+    ],
+    responseSteps: [
+      { text: 'Kein Anruf, keine Rückfrage, kein Ton: Der Alarm ist still, damit niemand auf sich aufmerksam macht. Gerät sofort stumm schalten.' },
+      { text: 'Raum verriegeln: Tür abschliessen oder verbarrikadieren, Licht aus, weg von Tür und Fenster, auf den Boden.' },
+      { text: 'Kinder leise halten – Beruhigungsrituale, Körperkontakt. Niemanden auf den Gang lassen, auch nicht auf Klopfen hin.' },
+      { text: 'Nicht evakuieren, nicht zum Sammelplatz: Anders als beim Brand bleiben alle im Raum, bis die Polizei ihn öffnet.' },
+      { text: 'Hausdienst: Wenn gefahrlos möglich, Eingänge verschliessen, Polizei an der vereinbarten Zufahrt erwarten, Gebäudepläne und Schlüssel bereithalten.', groupIds: ['gr-sicherheit'] },
+      { text: 'Krisenstab: Sammelraum ausserhalb des Gebäudes festlegen, Elterninformation vorbereiten, Kontakt zur Einsatzleitung der Polizei halten – nicht ins Gebäude.', groupIds: ['gr-krisenstab'] },
+      { text: 'Ersthelfer: nicht zum Ereignisort – Versorgung erst nach Freigabe durch die Polizei, Notfallrucksack im Sammelraum bereitstellen.', groupIds: ['gr-ersthelfer'] },
+      { text: 'An einem anderen Standort: Türen schliessen, Aussenaktivitäten abbrechen, auf Weisungen des Krisenstabs warten.' },
+      { text: 'Warten, bis die Polizei den Raum öffnet oder die Entwarnung über die App kommt – keine Entscheidung auf Zuruf.' },
+    ],
+    allClearSteps: [
+      'Raum erst verlassen, wenn die Polizei sich eindeutig zu erkennen gibt oder der Krisenstab die Entwarnung bestätigt hat – nicht auf Zuruf, nicht auf einzelne Nachrichten.',
+      'Anweisungen der Polizei befolgen: Hände sichtbar, keine hastigen Bewegungen, Kinder an der Hand.',
+      'Zum bezeichneten Sammelraum; dort zählen, Vollständigkeit melden, Kinder nicht allein lassen.',
+      'Eltern werden ausschliesslich durch die Schulleitung informiert – keine Fotos, keine Nachrichten in Chats.',
+      'Care-Team und Notfallpsychologie werden aufgeboten – Unterstützung auch für Mitarbeitende annehmen.',
     ],
     followUp: [
       'Sammlung und Zählung erst nach Freigabe durch die Polizei.',
@@ -883,7 +965,7 @@ export const SEED_INTEGRATIONS: IntegrationSettings = {
   teams: { enabled: true, tenant: 'sonnenberg-baar.onmicrosoft.com' },
   sso: { enabled: false, provider: 'Microsoft Entra ID / SAML 2.0', entityId: '' },
   hrSync: { enabled: false, system: 'Abacus HR' },
-  hotline: { enabled: true, number: '+41 41 000 11 22' },
+  hotline: { enabled: true, number: '+41 41 767 49 48' },
   multiLanguage: true,
   geofencing: true,
   webhooks: [

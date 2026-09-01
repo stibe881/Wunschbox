@@ -10,13 +10,18 @@ import type { IntegrationSettings, StoredUser } from './types.js'
 export const INITIAL_ADMIN_PASSWORD = process.env.SOBE_ADMIN_PASSWORD ?? 'SOBE-Start2026!'
 export const INITIAL_ADMIN_EMAIL = process.env.SOBE_ADMIN_EMAIL ?? 'stefan.gross@sonnenberg-baar.ch'
 
+/** Interne Notfallnummer des Kompetenzzentrums – in den Integrationen änderbar */
+export const NOTFALLNUMMER = '+41 41 767 49 48'
+/** Platzhalter aus früheren Versionen, der beim Start ersetzt wird */
+const ALTE_PLATZHALTER = ['', '+41 41 000 11 22']
+
 const LEER_INTEGRATIONEN: IntegrationSettings = {
   smsGateway: { enabled: false, provider: '', senderId: 'SONNENBERG' },
   voip: { enabled: false, sipServer: '' },
   teams: { enabled: false, tenant: '' },
   sso: { enabled: false, provider: 'Microsoft Entra ID / SAML 2.0', entityId: '' },
   hrSync: { enabled: false, system: '' },
-  hotline: { enabled: false, number: '' },
+  hotline: { enabled: true, number: NOTFALLNUMMER },
   multiLanguage: true,
   geofencing: false,
   webhooks: [],
@@ -55,7 +60,14 @@ export function seedDatabase(): void {
   }
 
   if (!getSetting('integrations')) saveIntegrations(LEER_INTEGRATIONEN)
-  else saveIntegrations({ ...LEER_INTEGRATIONEN, ...integrations() })
+  else {
+    const bisher = { ...LEER_INTEGRATIONEN, ...integrations() }
+    // Bestehende Installationen kennen die echte Nummer noch nicht
+    if (ALTE_PLATZHALTER.includes((bisher.hotline?.number ?? '').trim())) {
+      bisher.hotline = { enabled: true, number: NOTFALLNUMMER }
+    }
+    saveIntegrations(bisher)
+  }
 
   ensureAdmin()
 

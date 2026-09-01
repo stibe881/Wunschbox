@@ -840,6 +840,10 @@ function loadStateFor(mode: AppMode): AppState {
           contactIds: s.contactIds ?? [],
           icon: LEGACY_EMOJI_TO_ICON[s.icon] ?? s.icon,
         }))
+        // Platzhalternummer aus früheren Versionen durch die echte Notfallnummer ersetzen
+        if (parsed.integrations?.hotline && ['', '+41 41 000 11 22'].includes(parsed.integrations.hotline.number.trim())) {
+          parsed.integrations = { ...parsed.integrations, hotline: { enabled: true, number: '+41 41 767 49 48' } }
+        }
         return migrateAuth(parsed)
       }
     }

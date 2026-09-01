@@ -44,7 +44,18 @@ export interface PushNachricht {
    * «time-sensitive» – das durchbricht immerhin Fokus-Modi.
    */
   critical?: boolean
+  /**
+   * Stiller Alarm: Die Mitteilung kommt an und erscheint auf dem Sperrbildschirm,
+   * aber ohne Ton und ohne Vibration – niemand soll auf sich aufmerksam machen.
+   */
+  silent?: boolean
+  /** Ohne Alarmton, aber wichtig genug, um Fokus-Modi zu durchbrechen (z. B. Entwarnung) */
+  wichtig?: boolean
 }
+
+/** Android-Kanäle – die App legt sie beim Start mit passender Lautstärke an */
+export const KANAL_ALARM = 'alarme'
+export const KANAL_STILL = 'alarme-still'
 
 /**
  * Versand an alle Geräte der genannten Personen. Fehler werden protokolliert,
@@ -60,14 +71,18 @@ export async function sendPush(userIds: string[], nachricht: PushNachricht): Pro
     title: nachricht.title,
     body: nachricht.body,
     data: nachricht.data ?? {},
-    sound: 'default',
+    // Stiller Alarm: kein Ton – auf iOS entfällt damit auch die Vibration
+    sound: nachricht.silent ? null : 'default',
     priority: 'high',
-    channelId: 'alarme',
+    channelId: nachricht.silent ? KANAL_STILL : KANAL_ALARM,
     // Critical Alert nur an Geräte, die ihn tatsächlich dürfen – sonst lehnt
     // Apple die Nachricht ab. Ohne Bewilligung bleibt «time-sensitive».
-    interruptionLevel: nachricht.critical ? (ziel.criticalAlerts ? 'critical' : 'time-sensitive') : 'active',
+    // Ein stiller Alarm bleibt «time-sensitive»: sichtbar trotz Fokus, aber lautlos.
+    interruptionLevel: nachricht.critical && !nachricht.silent
+      ? (ziel.criticalAlerts ? 'critical' : 'time-sensitive')
+      : nachricht.silent || nachricht.wichtig ? 'time-sensitive' : 'active',
     // Ein Alarm, der eine Stunde später eintrifft, hilft niemandem mehr
-    ttl: nachricht.critical ? 3600 : undefined,
+    ttl: nachricht.critical || nachricht.silent ? 3600 : undefined,
   }))
 
   try {

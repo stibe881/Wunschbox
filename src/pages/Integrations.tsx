@@ -59,8 +59,18 @@ export default function Integrations() {
             <div>
               <Toggle checked={integ.hotline.enabled} onChange={(v) => update({ hotline: { ...integ.hotline, enabled: v } })} label="Interne Notfallnummer (Alarmauslösung per Anruf / Sprachnachricht)" />
               {integ.hotline.enabled && (
-                <div className="mt-2 pl-11 flex items-center gap-2 text-sm text-slate-600">
-                  <Phone size={14} /> {integ.hotline.number}
+                <div className="mt-2 pl-11">
+                  <Field label="Nummer – erscheint auf der Startseite der App">
+                    <div className="flex items-center gap-2">
+                      <Phone size={14} className="text-slate-500 shrink-0" />
+                      <input
+                        className={inputClass}
+                        type="tel"
+                        value={integ.hotline.number}
+                        onChange={(e) => update({ hotline: { ...integ.hotline, number: e.target.value } })}
+                      />
+                    </div>
+                  </Field>
                 </div>
               )}
             </div>

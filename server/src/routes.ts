@@ -5,7 +5,7 @@ import {
 } from './auth.js'
 import { addClient } from './events.js'
 import { broadcast } from './events.js'
-import { alarmPush, ausgehendeWebhooks } from './engine.js'
+import { alarmPush, ausgehendeWebhooks, entwarnungPush } from './engine.js'
 import { registerPushToken, removePushToken } from './push.js'
 import { aktuellerJob, starteUpdate, updateLaeuft, versionsInfo, type UpdateScope } from './update.js'
 import { ensureAdmin } from './setup.js'
@@ -400,7 +400,7 @@ router.post('/alarms/:id/ack', auth, (req: AuthRequest, res) => {
   res.json({ alarm: aktualisiert })
 })
 
-router.post('/alarms/:id/end', auth, staffOnly, (req: AuthRequest, res) => {
+router.post('/alarms/:id/end', auth, staffOnly, async (req: AuthRequest, res) => {
   const alarm = findAlarm(req.params.id)
   if (!alarm) {
     res.status(404).json({ error: 'Alarm nicht gefunden.' })
@@ -417,6 +417,8 @@ router.post('/alarms/:id/end', auth, staffOnly, (req: AuthRequest, res) => {
   addAudit('alarm', `Alarm beendet: ${alarm.message}`, person.id)
   broadcast('state')
   res.json({ alarm: beendet })
+  // Ein bereits beendeter Alarm soll nicht bei jedem Klick erneut «entwarnen»
+  if (alarm.status === 'active') await entwarnungPush(beendet)
 })
 
 // ---------- Alleinarbeit ----------

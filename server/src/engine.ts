@@ -18,16 +18,37 @@ function offeneEmpfaenger(alarm: Alarm): string[] {
   return alle.filter((id) => alarm.deliveries.every((d) => d.userId !== id || d.ack === 'none'))
 }
 
-/** Push an alle Empfänger eines Alarms */
+/**
+ * Push an alle Empfänger eines Alarms. Ein stiller Alarm kommt ebenfalls an –
+ * ohne Ton und Vibration, damit niemand auf sich aufmerksam macht. Antippen
+ * öffnet in der App direkt die Handlungsanweisung (data.kind = 'alarm').
+ */
 export async function alarmPush(alarm: Alarm, empfaenger?: string[]): Promise<void> {
-  if (alarm.silent) return
   const szenario = allScenarios().find((s) => s.id === alarm.scenarioId)
   const ids = empfaenger ?? [...new Set(alarm.deliveries.map((d) => d.userId))]
   await sendPush(ids, {
-    title: szenario ? `Alarm: ${szenario.title}` : 'Alarm ausgelöst',
-    body: alarm.message,
-    data: { alarmId: alarm.id, scenarioId: alarm.scenarioId },
-    critical: true,
+    title: szenario ? `${alarm.silent ? 'Stiller Alarm' : 'Alarm'}: ${szenario.title}` : 'Alarm ausgelöst',
+    body: alarm.silent ? `${alarm.message} – Antippen: Was jetzt zu tun ist. Gerät stumm halten.` : alarm.message,
+    data: { kind: 'alarm', alarmId: alarm.id, scenarioId: alarm.scenarioId },
+    critical: !alarm.silent,
+    silent: alarm.silent,
+  })
+}
+
+/**
+ * Entwarnung an alle, die den Alarm erhalten haben, und an die auslösende
+ * Person. Antippen öffnet die Schritte «Nach der Entwarnung» (data.kind = 'ended').
+ */
+export async function entwarnungPush(alarm: Alarm): Promise<void> {
+  const szenario = allScenarios().find((s) => s.id === alarm.scenarioId)
+  const ids = [...new Set([...alarm.deliveries.map((d) => d.userId), alarm.triggeredByUserId])]
+  await sendPush(ids, {
+    title: szenario ? `Entwarnung: ${szenario.title}` : 'Entwarnung',
+    body: 'Der Alarm ist beendet. Antippen für die nächsten Schritte.',
+    data: { kind: 'ended', alarmId: alarm.id, scenarioId: alarm.scenarioId },
+    // Auch nach einem stillen Alarm darf die Entwarnung leise bleiben
+    silent: alarm.silent,
+    wichtig: true,
   })
 }
 

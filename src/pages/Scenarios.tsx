@@ -197,6 +197,19 @@ function ScenarioDetail({ scenario, onClose }: { scenario: Scenario; onClose: ()
               </ol>
             </>
           )}
+          {(scenario.allClearSteps?.length ?? 0) > 0 && (
+            <>
+              <h4 className="font-semibold text-slate-700 mt-5 mb-2">Nach der Entwarnung</h4>
+              <ol className="space-y-1.5">
+                {scenario.allClearSteps!.map((step, i) => (
+                  <li key={i} className="flex gap-2.5 text-sm text-slate-700">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs font-bold">{i + 1}</span>
+                    <span className="pt-0.5">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
           {scenario.followUp.length > 0 && (
             <>
               <h4 className="font-semibold text-slate-700 mt-5 mb-2">Weiterführende Massnahmen</h4>
@@ -277,6 +290,7 @@ function ScenarioEditor({ scenario, onClose }: { scenario: Scenario; onClose: ()
       scenario: {
         ...draft,
         callGuidance: (draft.callGuidance ?? []).filter((s) => s.trim()),
+        allClearSteps: (draft.allClearSteps ?? []).filter((s) => s.trim()),
         // Altes Feld ohne Gruppen wird beim Speichern endgültig abgelöst
         responseSteps: responseStepsOf(draft).map((s) => ({ ...s, text: s.text.trim() })).filter((s) => s.text),
         responseInstructions: undefined,
@@ -344,6 +358,14 @@ function ScenarioEditor({ scenario, onClose }: { scenario: Scenario; onClose: ()
         schritte={responseStepsOf(draft)}
         onChange={(responseSteps) => setDraft({ ...draft, responseSteps, responseInstructions: undefined })}
       />
+      <Field label="Nach der Entwarnung – was die Alarmierten tun, sobald der Alarm beendet ist (eine pro Zeile)">
+        <textarea
+          className={inputClass} rows={4}
+          placeholder="z. B. Rückkehr ins Gebäude nur nach Freigabe – Klasse erneut zählen."
+          value={(draft.allClearSteps ?? []).join('\n')}
+          onChange={(e) => setDraft({ ...draft, allClearSteps: e.target.value.split('\n') })}
+        />
+      </Field>
       <Field label="Weiterführende Massnahmen nach der Akutphase (eine pro Zeile)">
         <textarea
           className={inputClass} rows={4}

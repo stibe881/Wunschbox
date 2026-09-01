@@ -18,6 +18,15 @@ Notifications.setNotificationHandler({
  * Der Server verweist beim Versand auf diesen Kanal.
  */
 export const ALARM_CHANNEL_ID = 'alarme'
+/** Stille Alarme und Entwarnungen: sichtbar, aber ohne Ton und Vibration */
+export const SILENT_CHANNEL_ID = 'alarme-still'
+
+/** Was der Server einer Mitteilung mitgibt – Antippen öffnet die passende Ansicht */
+export interface PushDaten {
+  kind?: 'alarm' | 'ended'
+  alarmId?: string
+  scenarioId?: string
+}
 
 async function ensureAlarmChannel(): Promise<void> {
   if (Platform.OS !== 'android') return
@@ -31,6 +40,16 @@ async function ensureAlarmChannel(): Promise<void> {
       vibrationPattern: [0, 400, 200, 400],
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       enableVibrate: true,
+    })
+    await Notifications.setNotificationChannelAsync(SILENT_CHANNEL_ID, {
+      name: 'Stille Alarme und Entwarnung',
+      description: 'Erscheinen ohne Ton und Vibration – damit niemand auf sich aufmerksam macht.',
+      importance: Notifications.AndroidImportance.HIGH,
+      bypassDnd: true,
+      sound: null,
+      vibrationPattern: [0],
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      enableVibrate: false,
     })
   } catch {
     // Kanal nicht anlegbar – Benachrichtigungen laufen über den Standardkanal
@@ -101,11 +120,11 @@ async function alarmInhalt(title: string, body: string, kritisch: boolean) {
  * Sofortige lokale Benachrichtigung (z. B. Alarm ausgelöst).
  * `kritisch` steht für einen nicht stillen Alarm.
  */
-export async function notifyNow(title: string, body: string, kritisch = false) {
+export async function notifyNow(title: string, body: string, kritisch = false, daten?: PushDaten) {
   try {
     await ensureAlarmChannel()
     await Notifications.scheduleNotificationAsync({
-      content: await alarmInhalt(title, body, kritisch),
+      content: { ...(await alarmInhalt(title, body, kritisch)), data: { ...(daten ?? {}) } as Record<string, unknown> },
       trigger: null,
     })
   } catch {
@@ -148,6 +167,20 @@ export function remotePushAvailability(): { ok: boolean; reason?: string } {
 }
 
 /** Expo-Push-Token holen (für Versand über Expos Push-Dienst) */
+/**
+ * Antippen einer Mitteilung: Sofort für die laufende App, beim Kaltstart die
+ * Mitteilung, über die die App geöffnet wurde. Gibt die Abmeldefunktion zurück.
+ */
+export function onNotificationTap(handler: (daten: PushDaten) => void): () => void {
+  const lesen = (antwort: Notifications.NotificationResponse | null | undefined) => {
+    const daten = antwort?.notification.request.content.data as PushDaten | undefined
+    if (daten && (daten.alarmId || daten.scenarioId)) handler(daten)
+  }
+  const abo = Notifications.addNotificationResponseReceivedListener(lesen)
+  Notifications.getLastNotificationResponseAsync().then(lesen).catch(() => {})
+  return () => abo.remove()
+}
+
 export async function getPushToken(): Promise<string | null> {
   try {
     const projectId: string | undefined =

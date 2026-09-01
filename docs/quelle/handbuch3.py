@@ -36,7 +36,8 @@ KOERPER = r"""
   <ul>
     <li><b>Alle roten Knöpfe muss man halten</b>, nicht antippen &ndash; etwa eine Sekunde, bis der Balken durchgelaufen ist. So löst nichts versehentlich aus.</li>
     <li><b>Bei unmittelbarer Gefahr gilt zuerst der Notruf</b>: 118 Feuerwehr, 144 Sanität, 117 Polizei. Die App ersetzt ihn nicht, sie hilft beim Melden.</li>
-    <li><b>Jede angemeldete Person darf alarmieren.</b> Sie brauchen keine Erlaubnis und müssen niemanden fragen.</li>
+    <li><b>Jede angemeldete Person darf alarmieren.</b> Sie brauchen keine Erlaubnis und müssen niemanden fragen. Der Knopf <span class="ui">Alarm auslösen</span> steht oben rechts &ndash; auf jeder Seite der App.</li>
+    <li><b>Eine Mitteilung antippen genügt.</b> Kommt ein Alarm oder eine Entwarnung als Push-Mitteilung, öffnet das Antippen direkt die Schritte, die für Sie gelten.</li>
     <li><b>Die App funktioniert auch ohne Empfang.</b> Alle Handlungsanweisungen sind auf dem Gerät gespeichert.</li>
   </ul>
   <div class="hinweis hinweis--gut">
@@ -83,14 +84,18 @@ KOERPER = r"""
   <h2 class="abschnitt"><span class="zahl">3</span> Die Startseite</h2>
   <p>
     Unten führen fünf Schaltflächen durch die App. Sie sind immer erreichbar,
-    egal wo Sie gerade sind.
+    egal wo Sie gerade sind. Oben rechts steht auf jeder Seite der rote Knopf
+    <span class="ui">Alarm auslösen</span> &ndash; für den Fall, dass Sie ein
+    Ereignis entdecken (Abschnitt 6). Darunter auf der Startseite: laufende
+    Alarme, Entwarnungen der letzten Stunden, der SOS-Knopf und die interne
+    Notfallnummer <b>+41 41 767 49 48</b>, die per Antippen anruft.
   </p>
   <div class="tabelle-huelle">
     <table>
       <caption>Die fünf Bereiche</caption>
       <thead><tr><th>Bereich</th><th>Wofür</th></tr></thead>
       <tbody>
-        <tr><td><b>Start</b></td><td>Laufende Alarme und der SOS-Knopf</td></tr>
+        <tr><td><b>Start</b></td><td>Laufende Alarme, Entwarnungen, der SOS-Knopf und die interne Notfallnummer</td></tr>
         <tr><td><b>Szenarien</b></td><td>Handlungsanweisungen zum Nachschlagen</td></tr>
         <tr><td><b>Alleinarbeit</b></td><td>Der Timer, wenn Sie allein unterwegs sind</td></tr>
         <tr><td><b>Notruf</b></td><td>Alle Notrufnummern zum direkten Anrufen</td></tr>
@@ -135,9 +140,11 @@ KOERPER = r"""
 <section id="c5">
   <h2 class="abschnitt"><span class="zahl">5</span> Einen Alarm erhalten</h2>
   <p>
-    Wird an Ihrem Standort alarmiert, erscheint die Meldung zuoberst auf der
-    Startseite. Ist der Alarm nicht still, ist er auch bei stummgeschaltetem Telefon
-    hörbar.
+    Wird an Ihrem Standort alarmiert, erhalten Sie eine Push-Mitteilung, und die
+    Meldung erscheint zuoberst auf der Startseite. Ist der Alarm nicht still, ist er
+    auch bei stummgeschaltetem Telefon hörbar. <b>Tippen Sie die Mitteilung an</b>:
+    Die App öffnet direkt die Handlungsanweisung zu diesem Alarm &ndash; Sie müssen
+    nichts suchen.
   </p>
   <div class="geraet-reihe">
     <figure class="geraet">
@@ -184,15 +191,68 @@ KOERPER = r"""
       wenigen Minuten weitere Personen &ndash; unnötig, wenn Sie längst unterwegs sind.
     </p>
   </div>
+
+  <h3>Stiller Alarm</h3>
+  <p>
+    Manche Alarme kommen <em>still</em>: Die Mitteilung erscheint auf dem
+    Sperrbildschirm, aber ohne Ton und ohne Vibration, und in der App ist sie violett
+    gekennzeichnet. Das ist Absicht. Bei herausforderndem Verhalten, einer
+    verdächtigen Person, einem Todesfall oder einer Bedrohungslage darf niemand durch
+    ein klingelndes Telefon auffallen. Verhalten Sie sich entsprechend: Gerät stumm
+    lassen, keine Rückfragen, den Schritten in der App folgen.
+  </p>
+
+  <h3>Die Entwarnung</h3>
+  <p>
+    Beendet der Krisenstab den Alarm, erhalten Sie eine zweite Mitteilung:
+    <span class="ui">Entwarnung</span>. Antippen öffnet die Schritte für die Rückkehr in
+    den Normalbetrieb &ndash; denn der beginnt nicht von selbst: zurück ins Gebäude erst
+    nach Freigabe, Klasse erneut zählen, Vorfall festhalten. Auf der Startseite bleibt
+    die Entwarnung einige Stunden sichtbar.
+  </p>
+  <div class="geraet-reihe">
+    <figure class="geraet">
+      <img src="bilder/app-16-entwarnung-start.webp" alt="Startseite mit einer grünen Entwarnungskarte und dem Knopf Nächste Schritte">
+      <figcaption><b>Abb.</b> &nbsp; Die Entwarnung auf der Startseite.</figcaption>
+    </figure>
+    <figure class="geraet">
+      <img src="bilder/app-17-entwarnung.webp" alt="Ansicht Entwarnung mit der beendeten Alarmmeldung und den nummerierten Schritten nach der Entwarnung">
+      <figcaption><b>Abb.</b> &nbsp; Was nach der Entwarnung zu tun ist &ndash; zum Abhaken.</figcaption>
+    </figure>
+  </div>
 </section>
 
 <section id="c6">
   <h2 class="abschnitt"><span class="zahl">6</span> Der geführte Ablauf</h2>
   <p>
-    Dieser Ablauf ist für den Fall, dass <em>Sie</em> das Ereignis entdecken. Er führt
-    in vier Phasen hindurch. Sie tippen sich mit <span class="ui">Weiter</span> durch
-    &ndash; die Reihenfolge ist die Reihenfolge, in der gehandelt wird.
+    Dieser Ablauf ist für den Fall, dass <em>Sie</em> das Ereignis entdecken. Der
+    schnellste Weg hinein ist der rote Knopf <span class="ui">Alarm auslösen</span>
+    oben rechts: Sie wählen das Ereignis, und die App springt direkt in Phase 1.
+    Denselben Ablauf erreichen Sie auch über <span class="ui">Szenarien</span>. Er
+    führt in vier Phasen hindurch. Sie tippen sich mit <span class="ui">Weiter</span>
+    durch &ndash; die Reihenfolge ist die Reihenfolge, in der gehandelt wird.
   </p>
+  <div class="geraet-reihe">
+    <figure class="geraet">
+      <img src="bilder/app-14-alarm-auswahl.webp" alt="Ansicht Alarm auslösen mit der Frage Welches Ereignis liegt vor und den Kacheln der Szenarien">
+      <figcaption><b>Abb.</b> &nbsp; Nach dem Knopf oben rechts: Welches Ereignis?</figcaption>
+    </figure>
+    <figure class="geraet">
+      <img src="bilder/app-15-doppelalarm.webp" alt="Phase Alarmieren mit dem violetten Hinweis Für dieses Ereignis läuft bereits ein Alarm">
+      <figcaption><b>Abb.</b> &nbsp; Läuft für das Ereignis schon ein Alarm, sagt es die App, bevor Sie halten.</figcaption>
+    </figure>
+  </div>
+  <div class="hinweis">
+    <p class="marke-klein">Wenn schon jemand alarmiert hat</p>
+    <p>
+      Entdecken zwei Personen denselben Brand, löst die erste aus &ndash; und die zweite
+      sieht in Phase 1 den violetten Hinweis mit Name und Zeit. Dann genügt
+      <span class="ui">Was jetzt zu tun ist</span>: Sie wechseln in die Schritte für
+      Empfänger. Halten Sie den roten Knopf nur, wenn ein weiterer Standort betroffen
+      ist oder Sie wesentlich Neues wissen. Ein zweiter Alarm ist kein Fehler, aber
+      alle erhalten dieselbe Meldung doppelt und müssen doppelt quittieren.
+    </p>
+  </div>
   <figure class="geraet">
     <img src="bilder/app-04-phasenuebersicht.webp" alt="Übersicht der vier Phasen eines Szenarios mit den Knöpfen Geführt starten – ich habe es entdeckt und Ich wurde alarmiert – was jetzt?">
     <figcaption><b>Abb.</b> &nbsp; Die vier Phasen und darunter die beiden Einstiege: <span class="ui">Geführt starten &ndash; ich habe es entdeckt</span> beginnt bei Phase 1. <span class="ui">Ich wurde alarmiert &ndash; was jetzt?</span> zeigt stattdessen die Schritte für Empfänger.</figcaption>
@@ -268,8 +328,8 @@ KOERPER = r"""
     findet sich im Ernstfall schneller zurecht.
   </p>
   <figure class="geraet">
-    <img src="bilder/app-09-szenarienliste.webp" alt="Liste der neun freigegebenen Szenarien">
-    <figcaption><b>Abb.</b> &nbsp; Die neun Szenarien: Brand, Evakuierung, medizinischer Notfall, herausforderndes Verhalten, verdächtige Person, Todesfall, Notfall im Therapiebad, ICT-Ausfall, Krisenstab einberufen.</figcaption>
+    <img src="bilder/app-09-szenarienliste.webp" alt="Liste der zehn freigegebenen Szenarien">
+    <figcaption><b>Abb.</b> &nbsp; Die zehn Szenarien: Brand, Evakuierung, medizinischer Notfall, herausforderndes Verhalten, verdächtige Person, Todesfall, Notfall im Therapiebad, ICT-Ausfall, Krisenstab einberufen, Amok / Bedrohungslage.</figcaption>
   </figure>
 </section>
 
@@ -351,6 +411,23 @@ KOERPER = r"""
     <img src="bilder/mit-01-kein-portal.webp" alt="Hinweisseite Kein Zugriff auf das Webportal mit dem Knopf App jetzt öffnen">
     <figcaption><b>Abb.</b> &nbsp; Diese Seite erscheint, wenn Sie das Portal am Rechner öffnen. Sie ist kein Fehler.</figcaption>
   </figure>
+
+  <h4>Was ist der Unterschied zwischen einem Alarm und einem stillen Alarm?</h4>
+  <p>
+    Beide erreichen dieselben Personen und zeigen dieselben Schritte. Der normale
+    Alarm klingelt &ndash; auch bei stummgeschaltetem Telefon und in Fokus-Modi. Der
+    stille Alarm kommt ohne Ton und ohne Vibration und ist violett markiert. Er wird
+    dort eingesetzt, wo Aufsehen schadet: herausforderndes Verhalten, verdächtige
+    Person, Todesfall, Amok / Bedrohungslage. Das Szenario gibt die Voreinstellung vor.
+  </p>
+
+  <h4>Zwei Personen lösen dasselbe Ereignis aus. Was passiert?</h4>
+  <p>
+    Beide Alarme werden zugestellt, alle Empfänger sehen zwei Meldungen und
+    quittieren beide. Damit das selten vorkommt, zeigt die App in Phase 1 einen
+    Hinweis, sobald für dasselbe Ereignis am selben Standort schon ein Alarm läuft.
+    Wer ihn sieht, wechselt zu <span class="ui">Was jetzt zu tun ist</span>.
+  </p>
 
   <h4>Ich habe mein Passwort vergessen.</h4>
   <p>

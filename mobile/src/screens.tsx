@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
 import {
   BellRing, Check, CheckCircle2, ChevronLeft, Clock, KeyRound, LogOut, MapPin, Phone, Play, Search as SearchIcon,
-  Scale, ShieldAlert, Siren, Timer, X,
+  Scale, ShieldAlert, ShieldCheck, Siren, Timer, X,
 } from 'lucide-react-native'
 import { createAlarm, resolveRecipients, uid, useStore } from './store'
 import { ScenarioIcon } from './ScenarioIcon'
@@ -10,17 +10,29 @@ import { cancelScheduled, ensurePermissions, getPushToken, remotePushAvailabilit
 import type { Alarm, LoneWorkSession, Scenario, User } from './types'
 import { Badge, Card, HoldButton, colors, formatDuration, formatRelative } from './ui'
 import { MIN_PASSWORD_LENGTH, passwordProblem } from './auth'
-import { activeScenarios, responseStepsFor, responseStepsOf } from './scenarios'
+import { activeScenarios, allClearStepsOf, responseStepsFor, responseStepsOf } from './scenarios'
 
 // ---------- Start: Alarme + SOS ----------
 
-export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Alarm) => void }) {
+/** Wie lange eine Entwarnung auf dem Start-Tab stehen bleibt */
+const ENTWARNUNG_SICHTBAR_MS = 12 * 60 * 60_000
+
+export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Alarm, modus?: 'empfaenger' | 'entwarnung') => void }) {
   const { state, dispatch } = useStore()
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
   const mySos = state.alarms.filter((a) => a.status === 'active' && a.triggeredByUserId === me.id)
   const myAlarms = state.alarms.filter(
     (a) => a.status === 'active' && a.triggeredByUserId !== me.id && a.deliveries.some((d) => d.userId === me.id),
   )
+  // Beendete Alarme der letzten Stunden: Die Entwarnung bringt eigene Schritte mit
+  const entwarnungen = state.alarms
+    .filter(
+      (a) => a.status === 'ended' && (a.endedAt ?? 0) > Date.now() - ENTWARNUNG_SICHTBAR_MS &&
+        (a.triggeredByUserId === me.id || a.deliveries.some((d) => d.userId === me.id)),
+    )
+    .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))
+    .slice(0, 3)
+  const hotline = state.integrations?.hotline
 
   function sos() {
     const location = state.locations.find((l) => l.id === me.locationId)
@@ -138,6 +150,25 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario, 
         </Card>
       )}
 
+      {entwarnungen.map((a) => {
+        const scenario = state.scenarios.find((s) => s.id === a.scenarioId)
+        return (
+          <Card key={a.id} style={{ borderColor: colors.green, borderWidth: 2 }}>
+            <View style={styles.row}>
+              <ShieldCheck size={18} color={colors.green} />
+              <Text style={[styles.cardTitle, { flex: 1 }]}>Entwarnung · {scenario?.title ?? 'Alarm'}</Text>
+              <Text style={styles.faint}>{formatRelative(a.endedAt ?? a.triggeredAt)}</Text>
+            </View>
+            <Text style={styles.body}>Der Alarm ist beendet. Für die Rückkehr zum Normalbetrieb gelten eigene Schritte.</Text>
+            {scenario && (
+              <Pressable style={[styles.darkButton, { backgroundColor: colors.green }]} onPress={() => onOpenScenario(scenario, a, 'entwarnung')}>
+                <Text style={styles.darkButtonText}>Nächste Schritte</Text>
+              </Pressable>
+            )}
+          </Card>
+        )
+      })}
+
       {mySos.length === 0 && (
         <>
           <HoldButton label="SOS" onTrigger={sos} />
@@ -147,14 +178,67 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario, 
         </>
       )}
 
-      <Pressable style={styles.contactRow} onPress={() => Linking.openURL('tel:+41410001122')}>
-        <Phone size={18} color={colors.brand} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>Interne Notfallnummer</Text>
-          <Text style={styles.faint}>Alarmauslösung per Anruf</Text>
-        </View>
-        <Text style={styles.contactNumber}>+41 41 000 11 22</Text>
+      {hotline?.enabled && hotline.number.trim() !== '' && (
+        <Pressable style={styles.contactRow} onPress={() => Linking.openURL(`tel:${hotline.number.replace(/\s/g, '')}`)}>
+          <Phone size={18} color={colors.brand} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle}>Interne Notfallnummer</Text>
+            <Text style={styles.faint}>Alarmauslösung per Anruf</Text>
+          </View>
+          <Text style={styles.contactNumber}>{hotline.number}</Text>
+        </Pressable>
+      )}
+    </ScrollView>
+  )
+}
+
+// ---------- Alarm auslösen: Ereignis wählen ----------
+
+/**
+ * Einstieg über den Knopf oben rechts: Welches Ereignis? Danach geht es direkt
+ * in die Phase «Alarmieren» des gewählten Szenarios – Notruf zuerst, dann die
+ * interne Alarmierung.
+ */
+export function AlarmAuswahlScreen({ onPick, onBack }: { onPick: (s: Scenario) => void; onBack: () => void }) {
+  const { state } = useStore()
+  const rang = { hoch: 0, mittel: 1, tief: 2 } as const
+  const szenarien = [...activeScenarios(state.scenarios)].sort((a, b) => rang[a.priority] - rang[b.priority])
+
+  return (
+    <ScrollView contentContainerStyle={styles.screen}>
+      <Pressable onPress={onBack} style={[styles.row, { marginBottom: 4 }]}>
+        <ChevronLeft size={18} color={colors.muted} />
+        <Text style={styles.muted}>Zurück</Text>
       </Pressable>
+      <View style={[styles.row, { marginBottom: 4 }]}>
+        <View style={{ width: 46, height: 46, borderRadius: 12, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center' }}>
+          <Siren size={24} color={colors.brand} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.h1}>Alarm auslösen</Text>
+          <Text style={styles.faint}>Welches Ereignis liegt vor?</Text>
+        </View>
+      </View>
+      <View style={styles.empfaengerHinweis}>
+        <Text style={styles.empfaengerHinweisText}>
+          Bei Lebensgefahr zuerst der Notruf – die passende Nummer steht im nächsten Schritt. Danach halten Sie den roten Knopf gedrückt, um intern zu alarmieren.
+        </Text>
+      </View>
+      <View style={styles.grid}>
+        {szenarien.map((s) => (
+          <Pressable key={s.id} style={styles.tile} onPress={() => onPick(s)}>
+            <View style={[styles.row, { justifyContent: 'space-between' }]}>
+              <ScenarioIcon name={s.icon} size={22} color={s.priority === 'hoch' ? colors.brand : colors.muted} />
+              {s.silentDefault && <Badge label="still" color="violet" />}
+            </View>
+            <Text style={styles.tileTitle}>{s.title}</Text>
+            <Text style={styles.faint}>{s.category}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={[styles.faint, { textAlign: 'center' }]}>
+        Persönlicher Notfall ohne Szenario: SOS auf dem Start-Tab alarmiert Schulsanität und Hausdienst.
+      </Text>
     </ScrollView>
   )
 }
@@ -191,19 +275,21 @@ export function ScenariosScreen({ onOpen }: { onOpen: (s: Scenario) => void }) {
   )
 }
 
-type ScenarioModus = 'entdecker' | 'empfaenger'
+type ScenarioModus = 'entdecker' | 'empfaenger' | 'entwarnung'
 
 export function ScenarioDetailScreen({
-  scenario, onBack, startModus = 'entdecker', alarm = null,
+  scenario, onBack, startModus = 'entdecker', alarm = null, startPhase = null,
 }: {
   scenario: Scenario
   onBack: () => void
   startModus?: ScenarioModus
   alarm?: Alarm | null
+  /** Direkt in eine Phase springen, z. B. 0 = Alarmieren über den Knopf im Header */
+  startPhase?: number | null
 }) {
   const { state, dispatch } = useStore()
   const [modus, setModus] = useState<ScenarioModus>(startModus)
-  const [phase, setPhase] = useState<number | null>(null)
+  const [phase, setPhase] = useState<number | null>(startPhase)
   const [checkedSteps, setCheckedSteps] = useState<Record<number, boolean>>({})
   const [checkedList, setCheckedList] = useState<Record<number, boolean>>({})
   const [notifiedUserIds, setNotifiedUserIds] = useState<string[]>([])
@@ -223,6 +309,15 @@ export function ScenarioDetailScreen({
   const myScenarioAlarm = state.alarms.find(
     (a) => a.status === 'active' && a.scenarioId === scenario.id && a.triggeredByUserId === me.id && !a.message.startsWith('Info an') && !a.message.startsWith('Krisenteam-Aufgebot'),
   )
+  // Läuft für dieses Ereignis bereits ein Alarm von jemand anderem am selben
+  // Standort? Dann ist eine zweite Auslösung meist überflüssig.
+  const fremderAlarm = state.alarms.find(
+    (a) =>
+      a.status === 'active' && a.scenarioId === scenario.id && a.triggeredByUserId !== me.id &&
+      !a.message.startsWith('Info an') && !a.message.startsWith('Krisenteam-Aufgebot') &&
+      (a.locationIds.length === 0 || alarmLocationIds.length === 0 || a.locationIds.some((id) => alarmLocationIds.includes(id))),
+  )
+  const fremderAusloeser = fremderAlarm ? state.users.find((u) => u.id === fremderAlarm.triggeredByUserId) : undefined
   const myCrisisAlarm = state.alarms.find(
     (a) => a.status === 'active' && a.triggeredByUserId === me.id && a.message.startsWith('Krisenteam-Aufgebot'),
   )
@@ -322,6 +417,24 @@ export function ScenarioDetailScreen({
       </View>
     </View>
   )
+
+  // ---------- Nach der Entwarnung ----------
+  if (modus === 'entwarnung') {
+    const beendeterAlarm =
+      (alarm && state.alarms.find((a) => a.id === alarm.id)) ??
+      [...state.alarms]
+        .filter((a) => a.status === 'ended' && a.scenarioId === scenario.id)
+        .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0))[0] ??
+      null
+    return (
+      <EntwarnungScreen
+        scenario={scenario}
+        alarm={beendeterAlarm}
+        onBack={onBack}
+        onSzenario={() => { setModus('entdecker'); setPhase(null) }}
+      />
+    )
+  }
 
   // ---------- Empfängerweg ----------
   if (modus === 'empfaenger') {
@@ -448,11 +561,26 @@ export function ScenarioDetailScreen({
             {alarmLocationIds.length === 0 ? ' an allen Standorten' : ' am gewählten Standort'} – mit Quittierung.{' '}
             <Text style={{ fontWeight: '700', color: colors.text }}>{alarmRecipientCount} Empfänger:innen</Text> werden benachrichtigt.
           </Text>
+          {!myScenarioAlarm && fremderAlarm && (
+            <View style={{ borderWidth: 2, borderColor: colors.violet, backgroundColor: colors.violetBg, borderRadius: 14, padding: 13, gap: 6 }}>
+              <View style={styles.row}>
+                <BellRing size={16} color={colors.violet} />
+                <Text style={[styles.cardTitle, { color: colors.violet, flex: 1 }]}>Für dieses Ereignis läuft bereits ein Alarm</Text>
+              </View>
+              <Text style={[styles.body, { marginTop: 0 }]}>
+                {fremderAusloeser ? `${fremderAusloeser.firstName} ${fremderAusloeser.lastName}` : 'Jemand'} hat {formatRelative(fremderAlarm.triggeredAt)} alarmiert.
+                Ein zweiter Alarm ist nur nötig, wenn ein weiterer Standort betroffen ist oder Sie wesentlich Neues wissen – sonst erhalten alle dieselbe Meldung doppelt.
+              </Text>
+              <Pressable style={[styles.darkButton, { marginTop: 4 }]} onPress={() => setModus('empfaenger')}>
+                <Text style={styles.darkButtonText}>Was jetzt zu tun ist</Text>
+              </Pressable>
+            </View>
+          )}
           {myScenarioAlarm ? (
             <AlarmStatus alarm={myScenarioAlarm} />
           ) : (
             <HoldButton
-              label={`${responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(' & ') : 'Alle'} alarmieren (${alarmRecipientCount})`}
+              label={`${fremderAlarm ? 'Trotzdem zusätzlich: ' : ''}${responsibleGroups.length > 0 ? responsibleGroups.map((g) => g.name).join(' & ') : 'Alle'} alarmieren (${alarmRecipientCount})`}
               hint="Zum Alarmieren gedrückt halten"
               onTrigger={triggerGroupAlarm}
             />
@@ -596,6 +724,91 @@ function LegalSection({ eintraege }: { eintraege: string[] }) {
  * entdeckt hat. Notruf und Auslösung sind bereits geschehen; hier steht die
  * eigene Aufgabe, dazu die Quittierung.
  */
+/**
+ * Nach der Entwarnung: Der Alarm ist beendet, aber der Normalbetrieb beginnt
+ * nicht von selbst – Rückkehr, Zählung, Nachsorge.
+ */
+function EntwarnungScreen({
+  scenario, alarm, onBack, onSzenario,
+}: {
+  scenario: Scenario
+  alarm: Alarm | null
+  onBack: () => void
+  onSzenario: () => void
+}) {
+  const { state } = useStore()
+  const [erledigt, setErledigt] = useState<Record<number, boolean>>({})
+  const schritte = allClearStepsOf(scenario)
+  const beendetDurch = alarm?.log
+    .map((l) => l.message)
+    .reverse()
+    .find((m) => m.startsWith('Alarm beendet durch '))
+    ?.replace(/^Alarm beendet durch /, '')
+    .replace(/ – Entwarnung versendet\.$/, '')
+  const orte = alarm
+    ? alarm.locationIds.map((id) => state.locations.find((l) => l.id === id)?.name).filter(Boolean).join(', ')
+    : ''
+
+  return (
+    <ScrollView contentContainerStyle={styles.screen}>
+      <Pressable onPress={onBack} style={[styles.row, { marginBottom: 4 }]}>
+        <ChevronLeft size={18} color={colors.muted} />
+        <Text style={styles.muted}>Zurück</Text>
+      </Pressable>
+      <View style={[styles.row, { marginBottom: 12 }]}>
+        <View style={{ width: 46, height: 46, borderRadius: 12, backgroundColor: colors.greenBg, alignItems: 'center', justifyContent: 'center' }}>
+          <ShieldCheck size={24} color={colors.green} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.h1}>Entwarnung</Text>
+          <Text style={styles.faint}>{scenario.title}</Text>
+        </View>
+      </View>
+
+      {alarm ? (
+        <Card style={{ borderColor: colors.green, borderWidth: 2 }}>
+          <Text style={styles.body}>{alarm.message}</Text>
+          <Text style={styles.faint}>
+            Beendet {formatRelative(alarm.endedAt ?? alarm.triggeredAt)}
+            {beendetDurch ? ` durch ${beendetDurch}` : ''}
+            {orte ? ` · ${orte}` : ''}
+          </Text>
+        </Card>
+      ) : (
+        <Card>
+          <Text style={styles.faint}>Zu diesem Szenario ist kein beendeter Alarm bekannt. Das sind die Schritte für den Fall einer Entwarnung.</Text>
+        </Card>
+      )}
+
+      <View style={[styles.empfaengerHinweis, { backgroundColor: colors.greenBg, borderColor: '#6ee7b7' }]}>
+        <Text style={[styles.empfaengerHinweisText, { color: '#065f46' }]}>
+          Der Alarm ist beendet. Der Normalbetrieb beginnt aber nicht von selbst – das gilt jetzt:
+        </Text>
+      </View>
+
+      <Text style={styles.faint}>Schritte antippen, wenn erledigt:</Text>
+      {schritte.map((schritt, i) => (
+        <Pressable
+          key={i}
+          style={[styles.row, { alignItems: 'flex-start', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12 }]}
+          onPress={() => setErledigt({ ...erledigt, [i]: !erledigt[i] })}
+        >
+          <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: erledigt[i] ? colors.faint : colors.green, alignItems: 'center', justifyContent: 'center' }}>
+            {erledigt[i] ? <Check size={14} color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>{i + 1}</Text>}
+          </View>
+          <Text style={[styles.body, { flex: 1, marginTop: 0, color: erledigt[i] ? colors.faint : colors.text, textDecorationLine: erledigt[i] ? 'line-through' : 'none' }]}>{schritt}</Text>
+        </Pressable>
+      ))}
+
+      <Pressable onPress={onSzenario} style={{ marginTop: 16 }}>
+        <Text style={[styles.muted, { textDecorationLine: 'underline', textAlign: 'center' }]}>
+          Vollständiges Szenario ansehen
+        </Text>
+      </Pressable>
+    </ScrollView>
+  )
+}
+
 function EmpfaengerScreen({
   scenario, alarm, onBack, onEntdecker,
 }: {

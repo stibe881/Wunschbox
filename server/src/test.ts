@@ -67,7 +67,8 @@ async function main(): Promise<void> {
 
   // --- Ablauf der Szenarien: Alarmieren steht in callGuidance, nicht in den Sofortmassnahmen ---
   const aktive = stand.body.scenarios.filter((s: any) => s.active !== false)
-  pruefe('9 Szenarien für Mitarbeitende freigegeben', aktive.length === 9, `gefunden: ${aktive.length}`)
+  pruefe('10 Szenarien für Mitarbeitende freigegeben', aktive.length === 10, `gefunden: ${aktive.length}`)
+  pruefe('Amok / Bedrohungslage ist freigegeben und still', aktive.some((s: any) => s.id === 'sc-amok' && s.silentDefault === true))
   pruefe('jedes freigegebene Szenario hat Hinweise zum Alarmieren',
     aktive.every((s: any) => Array.isArray(s.callGuidance) && s.callGuidance.length > 0),
     aktive.filter((s: any) => !s.callGuidance?.length).map((s: any) => s.id).join(', '))
@@ -103,6 +104,13 @@ async function main(): Promise<void> {
   pruefe('Empfängerschritte verweisen nur auf vorhandene Gruppen', fremdeGruppen.length === 0, fremdeGruppen.join(', '))
   const ohneAllgemein = aktive.filter((s: any) => !(s.responseSteps ?? []).some((st: any) => !st.groupIds?.length)).map((s: any) => s.id)
   pruefe('jedes Szenario hat mindestens einen Schritt für alle Empfänger', ohneAllgemein.length === 0, ohneAllgemein.join(', '))
+
+  // Mit der Entwarnung kommt eine zweite Mitteilung – sie braucht Inhalt
+  pruefe('jedes freigegebene Szenario hat Schritte nach der Entwarnung',
+    aktive.every((s: any) => Array.isArray(s.allClearSteps) && s.allClearSteps.length >= 3),
+    aktive.filter((s: any) => (s.allClearSteps?.length ?? 0) < 3).map((s: any) => s.id).join(', '))
+  pruefe('interne Notfallnummer hinterlegt', stand.body.integrations?.hotline?.number === '+41 41 767 49 48',
+    String(stand.body.integrations?.hotline?.number))
 
   // --- Passwortwechsel ---
   const zuKurz = await ruf('/auth/password', {
