@@ -101,7 +101,7 @@ export default function Scenarios() {
                   {(s.legalBasis?.length ?? 0) > 0 && <Badge color="green">Rechtsgrundlagen</Badge>}
                 </div>
                 <div className="text-xs text-slate-400 mt-2">
-                  {s.instructions.length} Sofortmassnahmen · {s.followUp.length} Folgemassnahmen · {s.checklist.length} Checklistenpunkte
+                  {s.instructions.length} Sofortmassnahmen · {s.responseInstructions?.length ?? 0} für Empfänger · {s.checklist.length} Checklistenpunkte
                 </div>
                 {s.responsibleGroupIds.length > 0 && (
                   <div className="text-xs text-slate-400 mt-1 flex items-center gap-1">
@@ -177,6 +177,19 @@ function ScenarioDetail({ scenario, onClose }: { scenario: Scenario; onClose: ()
               </li>
             ))}
           </ol>
+          {(scenario.responseInstructions?.length ?? 0) > 0 && (
+            <>
+              <h4 className="font-semibold text-slate-700 mt-5 mb-2">Wenn Sie diesen Alarm erhalten</h4>
+              <ol className="space-y-2">
+                {scenario.responseInstructions!.map((step, i) => (
+                  <li key={i} className="flex gap-2.5 text-sm">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">{i + 1}</span>
+                    <span className="text-slate-700 pt-0.5">{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
           {scenario.followUp.length > 0 && (
             <>
               <h4 className="font-semibold text-slate-700 mt-5 mb-2">Weiterführende Massnahmen</h4>
@@ -257,6 +270,7 @@ function ScenarioEditor({ scenario, onClose }: { scenario: Scenario; onClose: ()
       scenario: {
         ...draft,
         callGuidance: (draft.callGuidance ?? []).filter((s) => s.trim()),
+        responseInstructions: (draft.responseInstructions ?? []).filter((s) => s.trim()),
         instructions: draft.instructions.filter((s) => s.trim()),
         followUp: draft.followUp.filter((s) => s.trim()),
         checklist: draft.checklist.filter((s) => s.trim()),
@@ -315,6 +329,14 @@ function ScenarioEditor({ scenario, onClose }: { scenario: Scenario; onClose: ()
           className={inputClass} rows={6}
           value={draft.instructions.join('\n')}
           onChange={(e) => setDraft({ ...draft, instructions: e.target.value.split('\n') })}
+        />
+      </Field>
+      <Field label="Empfänger: Was tun, wenn Sie diesen Alarm erhalten (eine pro Zeile – kein Notruf, keine erneute Auslösung)">
+        <textarea
+          className={inputClass} rows={5}
+          placeholder="z. B. Kein zweiter Notruf: Die Feuerwehr ist alarmiert."
+          value={(draft.responseInstructions ?? []).join('\n')}
+          onChange={(e) => setDraft({ ...draft, responseInstructions: e.target.value.split('\n') })}
         />
       </Field>
       <Field label="Weiterführende Massnahmen nach der Akutphase (eine pro Zeile)">

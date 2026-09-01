@@ -76,6 +76,12 @@ export interface Scenario {
    */
   callGuidance?: string[]
   /**
+   * Was Empfänger:innen dieses Alarms tun. Sie sind nicht am Ort des
+   * Geschehens und haben den Alarm von jemand anderem erhalten: kein Notruf,
+   * keine erneute Auslösung – stattdessen die eigene Aufgabe.
+   */
+  responseInstructions?: string[]
+  /**
    * Schweizer Rechtsgrundlagen und Normen, die für dieses Szenario gelten.
    * Orientierungshilfe – keine Rechtsberatung.
    */

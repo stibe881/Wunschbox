@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar'
 import { BellRing, BookOpen, CheckCircle2, MapPin, Phone, Siren, Timer, User, WifiOff } from 'lucide-react-native'
 import { StoreProvider, useStore } from './src/store'
 import { ensurePermissions } from './src/notifications'
-import type { Scenario } from './src/types'
+import type { Alarm, Scenario } from './src/types'
 import { colors } from './src/ui'
 import { ContactsScreen, LoneWorkScreen, ProfileScreen, ScenarioDetailScreen, ScenariosScreen, StartScreen } from './src/screens'
 import LoginScreen, { ForcePasswordChange } from './src/LoginScreen'
@@ -28,6 +28,15 @@ function Root() {
     if (hydrated) ensurePermissions()
   }, [hydrated])
   const [openScenario, setOpenScenario] = useState<Scenario | null>(null)
+  // Aus der Liste geöffnet: Ich habe es entdeckt. Über einen erhaltenen Alarm
+  // geöffnet: Ich wurde alarmiert – ein anderer Ablauf ohne Notruf.
+  const [openModus, setOpenModus] = useState<'entdecker' | 'empfaenger'>('entdecker')
+  const [openAlarm, setOpenAlarm] = useState<Alarm | null>(null)
+  function oeffneSzenario(s: Scenario, modus: 'entdecker' | 'empfaenger' = 'entdecker', alarm: Alarm | null = null) {
+    setOpenScenario(s)
+    setOpenModus(modus)
+    setOpenAlarm(alarm)
+  }
 
   const sessionUser = state.users.find((u) => u.id === state.session?.userId)
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
@@ -78,11 +87,11 @@ function Root() {
 
       <View style={{ flex: 1, backgroundColor: colors.bg }}>
         {openScenario ? (
-          <ScenarioDetailScreen scenario={openScenario} onBack={() => setOpenScenario(null)} />
+          <ScenarioDetailScreen scenario={openScenario} startModus={openModus} alarm={openAlarm} onBack={() => setOpenScenario(null)} />
         ) : tab === 'start' ? (
-          <StartScreen onOpenScenario={setOpenScenario} />
+          <StartScreen onOpenScenario={(s, a) => oeffneSzenario(s, 'empfaenger', a)} />
         ) : tab === 'szenarien' ? (
-          <ScenariosScreen onOpen={setOpenScenario} />
+          <ScenariosScreen onOpen={(s) => oeffneSzenario(s)} />
         ) : tab === 'alleinarbeit' ? (
           <LoneWorkScreen />
         ) : tab === 'notruf' ? (

@@ -92,8 +92,8 @@ KOERPER = r"""
       <figcaption><b>Abb.</b> &nbsp; Ein Aufgebot mit Quittierpflicht.</figcaption>
     </figure>
     <figure class="geraet">
-      <img src="bilder/app-03-quittiert.webp" alt="Derselbe Alarm nach dem Quittieren mit der Bestätigung, dass die Person teilnimmt">
-      <figcaption><b>Abb.</b> &nbsp; Nach dem Quittieren.</figcaption>
+      <img src="bilder/app-03-empfaenger.webp" alt="Ansicht für Empfänger mit Alarmmeldung, Quittierung und den Schritten für Empfänger">
+      <figcaption><b>Abb.</b> &nbsp; Die Ansicht für Empfänger: quittieren, dann die eigene Aufgabe.</figcaption>
     </figure>
   </div>
   <ol class="schritte">
@@ -103,8 +103,10 @@ KOERPER = r"""
       löst nach der hinterlegten Frist die nächste Eskalationsstufe aus.
     </li>
     <li>
-      <b>Handlungsanweisungen öffnen.</b> Der dunkle Knopf führt direkt in das
-      Szenario, um das es geht.
+      <b><span class="ui">Was jetzt zu tun ist</span> antippen.</b> Sie bekommen die
+      Schritte für Empfänger &ndash; ohne Notruf und ohne erneute Auslösung, beides ist
+      bereits geschehen. Für den Krisenstab heisst das meist: Führungsraum beziehen,
+      Rolle übernehmen, unterwegs keine Auskünfte.
     </li>
     <li>
       <b>Losfahren oder zurückrufen.</b> Wer den Alarm ausgelöst hat, steht in der

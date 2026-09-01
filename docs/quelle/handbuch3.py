@@ -141,12 +141,12 @@ KOERPER = r"""
   </p>
   <div class="geraet-reihe">
     <figure class="geraet">
-      <img src="bilder/app-02-alarm-empfangen.webp" alt="Eingegangener Alarm mit den Knöpfen Ich komme und Nicht verfügbar">
+      <img src="bilder/app-02-alarm-empfangen.webp" alt="Eingegangener Alarm mit den Knöpfen Ich komme und Nicht verfügbar sowie dem Knopf Was jetzt zu tun ist">
       <figcaption><b>Abb.</b> &nbsp; Ein Alarm mit Rückmeldepflicht.</figcaption>
     </figure>
     <figure class="geraet">
-      <img src="bilder/app-03-quittiert.webp" alt="Derselbe Alarm nach der Rückmeldung">
-      <figcaption><b>Abb.</b> &nbsp; Nach der Rückmeldung.</figcaption>
+      <img src="bilder/app-03-empfaenger.webp" alt="Ansicht für Empfänger mit der Alarmmeldung, der Quittierung und den Schritten für Empfänger">
+      <figcaption><b>Abb.</b> &nbsp; Was Sie als Empfängerin oder Empfänger tun.</figcaption>
     </figure>
   </div>
   <ol class="schritte">
@@ -156,9 +156,21 @@ KOERPER = r"""
       wer im Wasser steht oder ein Kind betreut, meldet sich als nicht verfügbar.
     </li>
     <li>
-      <b>Anweisungen öffnen.</b> Der dunkle Knopf führt in den Ablauf zum Ereignis.
+      <b><span class="ui">Was jetzt zu tun ist</span> antippen.</b> Sie bekommen die Schritte
+      für <em>Empfänger</em> &ndash; nicht den Ablauf für die Person, die das Ereignis
+      entdeckt hat.
     </li>
   </ol>
+  <div class="hinweis">
+    <p class="marke-klein">Der Unterschied ist wichtig</p>
+    <p>
+      Wer den Brand entdeckt, ruft die Feuerwehr und löst den Alarm aus. Wer den Alarm
+      <em>erhält</em>, tut beides <b>nicht</b> &ndash; es ist bereits geschehen. Ein
+      zweiter Notruf blockiert die Leitung, ein zweiter Alarm verwirrt alle. Für
+      Empfänger gilt darum ein eigener Ablauf: Klasse sammeln, Sammelplatz, zählen,
+      melden. Die App zeigt Ihnen automatisch den richtigen.
+    </p>
+  </div>
   <div class="hinweis hinweis--warnung">
     <p class="marke-klein">Bitte immer antworten</p>
     <p>
@@ -171,13 +183,13 @@ KOERPER = r"""
 <section id="c6">
   <h2 class="abschnitt"><span class="zahl">6</span> Der geführte Ablauf</h2>
   <p>
-    Jedes Szenario führt in vier Phasen durch das Ereignis. Sie tippen sich mit
-    <span class="ui">Weiter</span> durch &ndash; die Reihenfolge ist die Reihenfolge,
-    in der gehandelt wird.
+    Dieser Ablauf ist für den Fall, dass <em>Sie</em> das Ereignis entdecken. Er führt
+    in vier Phasen hindurch. Sie tippen sich mit <span class="ui">Weiter</span> durch
+    &ndash; die Reihenfolge ist die Reihenfolge, in der gehandelt wird.
   </p>
   <figure class="geraet">
-    <img src="bilder/app-04-phasenuebersicht.webp" alt="Übersicht der vier Phasen eines Szenarios mit dem Knopf Geführt starten">
-    <figcaption><b>Abb.</b> &nbsp; Die vier Phasen. <span class="ui">Geführt starten</span> beginnt bei Phase 1; einzelne Phasen lassen sich auch direkt antippen.</figcaption>
+    <img src="bilder/app-04-phasenuebersicht.webp" alt="Übersicht der vier Phasen eines Szenarios mit den Knöpfen Geführt starten – ich habe es entdeckt und Ich wurde alarmiert – was jetzt?">
+    <figcaption><b>Abb.</b> &nbsp; Die vier Phasen und darunter die beiden Einstiege: <span class="ui">Geführt starten &ndash; ich habe es entdeckt</span> beginnt bei Phase 1. <span class="ui">Ich wurde alarmiert &ndash; was jetzt?</span> zeigt stattdessen die Schritte für Empfänger.</figcaption>
   </figure>
 
   <h3>Phase 1 &middot; Alarmieren</h3>

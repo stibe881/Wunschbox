@@ -81,6 +81,18 @@ async function main(): Promise<void> {
   )
   pruefe('keine Alarmierungsschritte in den Sofortmassnahmen', alarmSchritte.length === 0, alarmSchritte.join(' | '))
 
+  // Wer einen Alarm erhält, hat ihn nicht entdeckt: Für ihn gilt ein eigener
+  // Ablauf ohne Notruf und ohne erneute Auslösung.
+  pruefe('jedes freigegebene Szenario hat Anweisungen für Empfänger',
+    aktive.every((s: any) => Array.isArray(s.responseInstructions) && s.responseInstructions.length >= 3),
+    aktive.filter((s: any) => (s.responseInstructions?.length ?? 0) < 3).map((s: any) => s.id).join(', '))
+  const empfaengerLoest = aktive.flatMap((s: any) =>
+    (s.responseInstructions ?? [])
+      .filter((i: string) => /Alarm in der App auslösen|Aufgebot in der App|(118|144) (anrufen|alarmieren)/i.test(i))
+      .map((i: string) => `${s.id}: ${i.slice(0, 60)}`),
+  )
+  pruefe('Empfänger werden nicht zum erneuten Alarmieren angehalten', empfaengerLoest.length === 0, empfaengerLoest.join(' | '))
+
   // --- Passwortwechsel ---
   const zuKurz = await ruf('/auth/password', {
     method: 'POST', token: adminToken,

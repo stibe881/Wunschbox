@@ -7,14 +7,14 @@ import {
 import { createAlarm, resolveRecipients, uid, useStore } from './store'
 import { ScenarioIcon } from './ScenarioIcon'
 import { cancelScheduled, ensurePermissions, getPushToken, remotePushAvailability, scheduleAt } from './notifications'
-import type { LoneWorkSession, Scenario, User } from './types'
+import type { Alarm, LoneWorkSession, Scenario, User } from './types'
 import { Badge, Card, HoldButton, colors, formatDuration, formatRelative } from './ui'
 import { MIN_PASSWORD_LENGTH, passwordProblem } from './auth'
 import { activeScenarios } from './scenarios'
 
 // ---------- Start: Alarme + SOS ----------
 
-export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario) => void }) {
+export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Alarm) => void }) {
   const { state, dispatch } = useStore()
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
   const mySos = state.alarms.filter((a) => a.status === 'active' && a.triggeredByUserId === me.id)
@@ -96,8 +96,8 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario) 
             </View>
             <Text style={styles.body}>{a.message}</Text>
             {scenario && (
-              <Pressable style={styles.darkButton} onPress={() => onOpenScenario(scenario)}>
-                <Text style={styles.darkButtonText}>Handlungsanweisungen öffnen</Text>
+              <Pressable style={styles.darkButton} onPress={() => onOpenScenario(scenario, a)}>
+                <Text style={styles.darkButtonText}>Was jetzt zu tun ist</Text>
               </Pressable>
             )}
             {a.requireAck && myAck === 'none' && (
@@ -191,8 +191,18 @@ export function ScenariosScreen({ onOpen }: { onOpen: (s: Scenario) => void }) {
   )
 }
 
-export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario; onBack: () => void }) {
+type ScenarioModus = 'entdecker' | 'empfaenger'
+
+export function ScenarioDetailScreen({
+  scenario, onBack, startModus = 'entdecker', alarm = null,
+}: {
+  scenario: Scenario
+  onBack: () => void
+  startModus?: ScenarioModus
+  alarm?: Alarm | null
+}) {
   const { state, dispatch } = useStore()
+  const [modus, setModus] = useState<ScenarioModus>(startModus)
   const [phase, setPhase] = useState<number | null>(null)
   const [checkedSteps, setCheckedSteps] = useState<Record<number, boolean>>({})
   const [checkedList, setCheckedList] = useState<Record<number, boolean>>({})
@@ -313,6 +323,26 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
     </View>
   )
 
+  // ---------- Empfängerweg ----------
+  if (modus === 'empfaenger') {
+    // Immer den aktuellen Stand aus dem Zustand nehmen: Das übergebene Objekt
+    // veraltet, sobald quittiert wird
+    const aktiverAlarm =
+      (alarm && state.alarms.find((a) => a.id === alarm.id)) ??
+      state.alarms.find(
+        (a) => a.status === 'active' && a.scenarioId === scenario.id && a.deliveries.some((d) => d.userId === me.id),
+      ) ??
+      null
+    return (
+      <EmpfaengerScreen
+        scenario={scenario}
+        alarm={aktiverAlarm}
+        onBack={onBack}
+        onEntdecker={() => { setModus('entdecker'); setPhase(null) }}
+      />
+    )
+  }
+
   if (phase === null) {
     return (
       <ScrollView contentContainerStyle={styles.screen}>
@@ -339,8 +369,13 @@ export function ScenarioDetailScreen({ scenario, onBack }: { scenario: Scenario;
         ))}
         <Pressable style={[styles.bigButton, { backgroundColor: colors.dark }]} onPress={() => setPhase(0)}>
           <Play size={16} color="#fff" />
-          <Text style={styles.bigButtonText}>Geführt starten</Text>
+          <Text style={styles.bigButtonText}>Geführt starten – ich habe es entdeckt</Text>
         </Pressable>
+        {(scenario.responseInstructions?.length ?? 0) > 0 && (
+          <Pressable style={styles.outlineButton} onPress={() => setModus('empfaenger')}>
+            <Text style={styles.outlineButtonText}>Ich wurde alarmiert – was jetzt?</Text>
+          </Pressable>
+        )}
       </ScrollView>
     )
   }
@@ -551,6 +586,116 @@ function LegalSection({ eintraege }: { eintraege: string[] }) {
         </View>
       )}
     </Card>
+  )
+}
+
+// ---------- Empfängerweg ----------
+
+/**
+ * Was jemand tut, der den Alarm erhalten hat – und die Lage nicht selbst
+ * entdeckt hat. Notruf und Auslösung sind bereits geschehen; hier steht die
+ * eigene Aufgabe, dazu die Quittierung.
+ */
+function EmpfaengerScreen({
+  scenario, alarm, onBack, onEntdecker,
+}: {
+  scenario: Scenario
+  alarm: Alarm | null
+  onBack: () => void
+  onEntdecker: () => void
+}) {
+  const { state, dispatch } = useStore()
+  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+  const [erledigt, setErledigt] = useState<Record<number, boolean>>({})
+  const schritte = scenario.responseInstructions ?? []
+  const ausloeser = alarm ? state.users.find((u) => u.id === alarm.triggeredByUserId) : undefined
+  const orte = alarm
+    ? alarm.locationIds.map((id) => state.locations.find((l) => l.id === id)?.name).filter(Boolean).join(', ')
+    : ''
+  const myAck = alarm?.deliveries.find((d) => d.userId === me.id)?.ack ?? 'none'
+
+  return (
+    <ScrollView contentContainerStyle={styles.screen}>
+      <Pressable onPress={onBack} style={[styles.row, { marginBottom: 4 }]}>
+        <ChevronLeft size={18} color={colors.muted} />
+        <Text style={styles.muted}>Zurück</Text>
+      </Pressable>
+      <View style={[styles.row, { marginBottom: 12 }]}>
+        <View style={{ width: 46, height: 46, borderRadius: 12, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center' }}>
+          <ScenarioIcon name={scenario.icon} size={24} color={colors.brand} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.h1}>{scenario.title}</Text>
+          <Text style={styles.faint}>Sie wurden alarmiert</Text>
+        </View>
+      </View>
+
+      {alarm ? (
+        <Card style={{ borderColor: alarm.silent ? colors.violet : colors.brandLight, borderWidth: 2 }}>
+          <Text style={styles.body}>{alarm.message}</Text>
+          <Text style={styles.faint}>
+            {ausloeser ? `Ausgelöst von ${ausloeser.firstName} ${ausloeser.lastName} · ` : ''}
+            {formatRelative(alarm.triggeredAt)}
+            {orte ? ` · ${orte}` : ''}
+          </Text>
+          {alarm.requireAck && myAck === 'none' && (
+            <View style={[styles.row, { marginTop: 8, gap: 8 }]}>
+              <Pressable
+                style={[styles.ackButton, { backgroundColor: colors.green }]}
+                onPress={() => dispatch({ type: 'ACK_ALARM', alarmId: alarm.id, userId: me.id, ack: 'acknowledged' })}
+              >
+                <Check size={15} color="#fff" />
+                <Text style={styles.ackButtonText}>Ich komme</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.ackButton, { backgroundColor: '#cbd5e1' }]}
+                onPress={() => dispatch({ type: 'ACK_ALARM', alarmId: alarm.id, userId: me.id, ack: 'declined' })}
+              >
+                <X size={15} color={colors.text} />
+                <Text style={[styles.ackButtonText, { color: colors.text }]}>Nicht verfügbar</Text>
+              </Pressable>
+            </View>
+          )}
+          {alarm.requireAck && myAck !== 'none' && (
+            <View style={{ marginTop: 8 }}>
+              {myAck === 'acknowledged'
+                ? <Badge label="quittiert – Sie nehmen teil" color="green" />
+                : <Badge label="als nicht verfügbar gemeldet" color="slate" />}
+            </View>
+          )}
+        </Card>
+      ) : (
+        <Card>
+          <Text style={styles.faint}>Zurzeit läuft kein Alarm zu diesem Szenario. Das ist der Ablauf für den Fall, dass Sie einen erhalten.</Text>
+        </Card>
+      )}
+
+      <View style={styles.empfaengerHinweis}>
+        <Text style={styles.empfaengerHinweisText}>
+          Kein Notruf, keine erneute Auslösung – das ist bereits geschehen. Hier steht, was Sie jetzt tun.
+        </Text>
+      </View>
+
+      <Text style={styles.faint}>Schritte antippen, wenn erledigt:</Text>
+      {schritte.map((step, i) => (
+        <Pressable
+          key={i}
+          style={[styles.row, { alignItems: 'flex-start', backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 12, padding: 12 }]}
+          onPress={() => setErledigt({ ...erledigt, [i]: !erledigt[i] })}
+        >
+          <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: erledigt[i] ? colors.green : '#d97706', alignItems: 'center', justifyContent: 'center' }}>
+            {erledigt[i] ? <Check size={14} color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>{i + 1}</Text>}
+          </View>
+          <Text style={[styles.body, { flex: 1, marginTop: 0, color: erledigt[i] ? colors.faint : colors.text, textDecorationLine: erledigt[i] ? 'line-through' : 'none' }]}>{step}</Text>
+        </Pressable>
+      ))}
+
+      <Pressable onPress={onEntdecker} style={{ marginTop: 16 }}>
+        <Text style={[styles.muted, { textDecorationLine: 'underline', textAlign: 'center' }]}>
+          Vollständiges Szenario ansehen – für den Fall, dass Sie die Lage selbst entdecken
+        </Text>
+      </Pressable>
+    </ScrollView>
   )
 }
 
@@ -984,6 +1129,8 @@ const styles = StyleSheet.create({
   callGuidanceRow: { flexDirection: 'row', gap: 8 },
   callGuidanceBullet: { color: '#d97706', fontSize: 14, lineHeight: 20 },
   callGuidanceText: { flex: 1, fontSize: 14, lineHeight: 20, color: '#78350f' },
+  empfaengerHinweis: { backgroundColor: '#fffbeb', borderColor: '#fde68a', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginTop: 10, marginBottom: 6 },
+  empfaengerHinweisText: { fontSize: 12.5, lineHeight: 18, color: '#78350f' },
   cardTitle: { fontSize: 15, fontWeight: '700', color: colors.text },
   body: { fontSize: 14, color: colors.text, marginTop: 4 },
   muted: { fontSize: 14, color: colors.muted },

@@ -211,6 +211,7 @@ KOERPER = r"""
       <tbody>
         <tr><td><b>Alarmieren</b></td><td>Phase 1</td><td>Wann ein Notruf nötig ist und was am Telefon zu melden ist</td></tr>
         <tr><td><b>Sofortmassnahmen</b></td><td>Phase 2</td><td>Nur Handgriffe &ndash; keine Anweisungen zum Anrufen</td></tr>
+        <tr><td><b>Empfänger</b></td><td>eigener Weg «Ich wurde alarmiert»</td><td>Was jemand tut, der den Alarm erhält: kein Notruf, keine Auslösung, sondern die eigene Aufgabe</td></tr>
         <tr><td><b>Weiterführende Massnahmen</b></td><td>Phase 4</td><td>Alles nach der Akutphase: informieren, dokumentieren, nachsorgen</td></tr>
         <tr><td><b>Checkliste</b></td><td>Phase 4</td><td>Punkte zum Abhaken für die Nachkontrolle</td></tr>
         <tr><td><b>Rechtsgrundlagen</b></td><td>Phase 4, aufklappbar</td><td>Orientierungshilfe, keine Rechtsberatung</td></tr>
@@ -223,6 +224,17 @@ KOERPER = r"""
       Schreiben Sie das Alarmieren nicht zusätzlich in die Sofortmassnahmen. Der
       geführte Ablauf beginnt bereits mit dieser Phase; eine Wiederholung im zweiten
       Schritt widerspricht der Reihenfolge und kostet im Ernstfall Zeit.
+    </p>
+  </div>
+  <div class="hinweis">
+    <p class="marke-klein">Zwei Leser, zwei Abläufe</p>
+    <p>
+      Ein Szenario hat zwei Leser: die Person, die das Ereignis entdeckt, und alle,
+      die den Alarm erhalten. Die erste ruft an und löst aus; die zweiten tun genau das
+      nicht. Das Feld <b>Empfänger</b> gehört darum zu jedem Szenario, das alarmiert
+      wird &ndash; es beschreibt die eigene Aufgabe: Klasse sammeln, Führungsraum
+      beziehen, Bereich sichern. Wer den Alarm in der App erhält, sieht automatisch
+      diesen Weg, nicht den geführten Ablauf.
     </p>
   </div>
   <h3>Ein Szenario ein- oder ausblenden</h3>
