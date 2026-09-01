@@ -98,10 +98,15 @@ selbständig an TestFlight übergeben. Ohne Rückfragen braucht Expo dafür
    ```json
    "submit": {
      "production": {
-       "ascAppId": "1234567890"
+       "ios": {
+         "ascAppId": "1234567890"
+       }
      }
    }
    ```
+
+   Wichtig: unter `ios`, nicht direkt im Profil – sonst meldet EAS
+   «eas.json is not valid», und der Build startet gar nicht.
 
    Interaktiv fragt EAS diese Nummer bei Apple ab; nicht interaktiv kann es
    das nicht und legt dann **gar keine** Übermittlung an – der Build läuft
