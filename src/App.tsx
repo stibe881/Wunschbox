@@ -144,8 +144,8 @@ function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 }`
               }
             >
-              <item.icon size={16} />
-              {item.label}
+              <item.icon size={16} className={item.to === '/alarm' ? 'text-alarm-400' : undefined} />
+              <span className={item.to === '/alarm' ? 'font-semibold text-alarm-100' : undefined}>{item.label}</span>
               {item.to === '/monitor' && activeAlarms.length > 0 && (
                 <span className="ml-auto bg-alarm-600 text-white text-xs rounded-full px-1.5 py-0.5 alarm-pulse">{activeAlarms.length}</span>
               )}

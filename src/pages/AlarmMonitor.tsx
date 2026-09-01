@@ -35,7 +35,7 @@ export default function AlarmMonitor() {
             <p className="text-sm text-slate-400 mt-1">Ausgelöste Alarme erscheinen hier in Echtzeit mit Zustellstatus und Journal.</p>
             <Link
               to="/alarm"
-              className="inline-flex items-center gap-2 mt-4 rounded-xl bg-brand-600 text-white px-4 py-2.5 text-sm font-semibold hover:bg-brand-700 transition"
+              className="inline-flex items-center gap-2 mt-4 rounded-xl bg-alarm-600 text-white px-4 py-2.5 text-sm font-semibold hover:bg-alarm-700 transition"
             >
               <Siren size={15} /> Test-Alarm auslösen
             </Link>

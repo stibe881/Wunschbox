@@ -32,7 +32,7 @@ export default function Dashboard() {
         <div className="flex flex-wrap gap-2">
           <Link
             to="/alarm"
-            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 text-white px-4 py-2.5 text-sm font-semibold hover:bg-brand-700 transition shadow-sm"
+            className="inline-flex items-center gap-2 rounded-xl bg-alarm-600 text-white px-4 py-2.5 text-sm font-semibold hover:bg-alarm-700 transition shadow-sm"
           >
             <Siren size={16} /> Alarm auslösen
           </Link>
