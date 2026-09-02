@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import { BellRing, BookOpen, CheckCircle2, MapPin, Phone, Siren, Timer, User } from 'lucide-react-native'
 import { StoreProvider, useStore } from './src/store'
 import { ensurePermissions, onNotificationTap, type PushDaten } from './src/notifications'
+import { alleinarbeitAbgleichen } from './src/liveActivity'
 import type { Alarm, Scenario } from './src/types'
 import { colors } from './src/ui'
 import { AlarmAuswahlScreen, ContactsScreen, LoneWorkScreen, ProfileScreen, ScenarioDetailScreen, ScenariosScreen, StartScreen } from './src/screens'
@@ -81,6 +82,28 @@ function Root() {
 
   const sessionUser = state.users.find((u) => u.id === state.session?.userId)
   const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+
+  // Laufende Alleinarbeit als Live-Aktivität auf dem Sperrbildschirm und in
+  // der Dynamic Island – wird aus dem Zustand nachgeführt, egal ob der Timer
+  // in der App oder im Portal gestartet wurde
+  useEffect(() => {
+    if (!hydrated || !state.session) return
+    void alleinarbeitAbgleichen(state.loneWorkSessions.filter((s) => s.userId === state.currentUserId))
+  }, [hydrated, state.session, state.currentUserId, state.loneWorkSessions])
+
+  // Antippen der Live-Aktivität öffnet die Alleinarbeit (sobenotfall://alleinarbeit)
+  useEffect(() => {
+    const oeffne = (url: string | null) => {
+      if (url && /alleinarbeit/i.test(url)) {
+        setOpenScenario(null)
+        setAlarmWahl(false)
+        setTab('alleinarbeit')
+      }
+    }
+    Linking.getInitialURL().then(oeffne).catch(() => {})
+    const abo = Linking.addEventListener('url', (e) => oeffne(e.url))
+    return () => abo.remove()
+  }, [])
   const myLocation = state.locations.find((l) => l.id === me.locationId)
   const myAlarms = state.alarms.filter(
     (a) => a.status === 'active' && (a.deliveries.some((d) => d.userId === me.id) || a.triggeredByUserId === me.id),

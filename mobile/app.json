@@ -2,11 +2,13 @@
   "expo": {
     "name": "SOBE Notfall",
     "slug": "sonnenberg-notfall",
+    "scheme": "sobenotfall",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "plugins": [
-      "expo-notifications"
+      "expo-notifications",
+      "expo-live-activity"
     ],
     "userInterfaceStyle": "light",
     "backgroundColor": "#0f172a",

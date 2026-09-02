@@ -259,3 +259,37 @@ Critical Alert – Apple würde die Nachricht abweisen.
 
 Der Kanal `alarme` wird beim Start mit höchster Wichtigkeit angelegt und umgeht
 «Nicht stören». Dort braucht es keine Bewilligung.
+
+---
+
+## Live-Aktivität für die Alleinarbeit
+
+Ein laufender Alleinarbeits-Timer erscheint als Live-Aktivität auf dem
+Sperrbildschirm und in der Dynamic Island (iOS 16.2 oder neuer). Dafür sorgt
+das Paket `expo-live-activity` mit seinem Config-Plugin; es legt beim Build
+ein zweites Ziel `LiveActivity` mit der Bundle-ID
+`ch.sonnenberg.notfall.LiveActivity` an. Die Bilder dafür liegen unter
+`assets/liveActivity/` und dürfen je höchstens 4 KB gross sein.
+
+Folgen für den Build:
+
+- Das neue Ziel braucht ein eigenes Bereitstellungsprofil. EAS legt es an,
+  muss dafür aber einmal bei Apple anmelden können. **Der erste Build nach
+  dieser Änderung ist deshalb interaktiv zu starten**, wie oben beschrieben:
+
+  ```bash
+  cd mobile
+  npx eas-cli build --platform ios --profile production --auto-submit
+  ```
+
+  Danach verwenden auch die Builds vom Update-Knopf das Profil wieder.
+- Die App meldet die URL-Vorlage `sobenotfall://` an; Antippen der Aktivität
+  öffnet die Alleinarbeit.
+- Auf Android und in Expo Go passiert nichts – das Modul fehlt dort, die App
+  läuft trotzdem.
+
+Das Paket ist beim Hersteller als nicht mehr gepflegt markiert. Es
+funktioniert mit Expo SDK 54; beim nächsten SDK-Wechsel ist der Ersatz durch
+`expo-widgets` von Expo selbst vorgesehen, das ab SDK 57 dieselbe Aufgabe
+übernimmt.
+
