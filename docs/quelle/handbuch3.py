@@ -86,16 +86,16 @@ KOERPER = r"""
     Unten führen fünf Schaltflächen durch die App. Sie sind immer erreichbar,
     egal wo Sie gerade sind. Oben rechts steht auf jeder Seite der rote Knopf
     <span class="ui">Alarm auslösen</span> &ndash; für den Fall, dass Sie ein
-    Ereignis entdecken (Abschnitt 6). Darunter auf der Startseite: laufende
-    Alarme, Entwarnungen der letzten Stunden, der SOS-Knopf und die interne
-    Notfallnummer <b>+41 41 767 49 48</b>, die per Antippen anruft.
+    Ereignis entdecken (Abschnitt 6). Auf der Startseite steht zuoberst die interne
+    Notfallnummer <b>+41 41 767 49 48</b>, die per Antippen anruft; darunter laufende
+    Alarme, Entwarnungen der letzten Stunden und der SOS-Knopf.
   </p>
   <div class="tabelle-huelle">
     <table>
       <caption>Die fünf Bereiche</caption>
       <thead><tr><th>Bereich</th><th>Wofür</th></tr></thead>
       <tbody>
-        <tr><td><b>Start</b></td><td>Laufende Alarme, Entwarnungen, der SOS-Knopf und die interne Notfallnummer</td></tr>
+        <tr><td><b>Start</b></td><td>Interne Notfallnummer, laufende Alarme, Entwarnungen und der SOS-Knopf</td></tr>
         <tr><td><b>Szenarien</b></td><td>Handlungsanweisungen zum Nachschlagen</td></tr>
         <tr><td><b>Alleinarbeit</b></td><td>Der Timer, wenn Sie allein unterwegs sind</td></tr>
         <tr><td><b>Notruf</b></td><td>Alle Notrufnummern zum direkten Anrufen</td></tr>
@@ -162,6 +162,9 @@ KOERPER = r"""
       <b>Antworten.</b> <span class="ui">Ich komme</span> oder
       <span class="ui">Nicht verfügbar</span>. Beides ist eine gültige Antwort &ndash;
       wer im Wasser steht oder ein Kind betreut, meldet sich als nicht verfügbar.
+      Unter der Meldung sehen Sie laufend, wie viele Personen benachrichtigt wurden,
+      wie viele kommen, wie viele nicht verfügbar sind und wie viele noch nicht
+      geantwortet haben.
     </li>
     <li>
       <b><span class="ui">Was jetzt zu tun ist</span> antippen.</b> Sie bekommen die Schritte
@@ -381,6 +384,13 @@ KOERPER = r"""
   <ol class="schritte">
     <li>Tätigkeit eintragen &ndash; sie steht später im Alarm und sagt den Helfenden, wo sie suchen müssen.</li>
     <li>Dauer wählen. Lieber etwas kürzer: Verlängern geht jederzeit.</li>
+    <li>
+      Wählen, wer bei Ablauf alarmiert wird. Vorgewählt sind Schulsanität und Hausdienst
+      an Ihrem Standort; Gruppen lassen sich an- und abwählen, und über
+      <span class="ui">Zusätzlich einzelne Personen wählen</span> kommen bestimmte
+      Kolleginnen oder Kollegen dazu, unabhängig von Gruppe und Standort. Die App zeigt,
+      wie viele Personen das ergibt.
+    </li>
     <li><span class="ui">Timer starten</span>.</li>
     <li>Zurück melden, sobald Sie fertig sind. <b>Das ist der wichtigste Schritt.</b></li>
   </ol>
@@ -389,7 +399,9 @@ KOERPER = r"""
     <p>
       Ein vergessener Timer löst einen echten Alarm aus, und Kolleginnen und Kollegen
       machen sich unnötig auf den Weg. Melden Sie sich zurück, sobald Sie wieder in
-      Gesellschaft sind.
+      Gesellschaft sind. Ist es doch passiert, zeigt die Alleinarbeit oben
+      <span class="ui">Mir geht es gut &ndash; Entwarnung senden</span>: Damit beenden
+      Sie den Alarm selbst, und alle Alarmierten erhalten die Entwarnung.
     </p>
   </div>
 </section>

@@ -364,6 +364,13 @@ KOERPER = r"""
     <img src="bilder/web-05-alleinarbeit.webp" alt="Portalseite Alleinarbeit mit laufenden Timern">
     <figcaption><b>Abb.</b> &nbsp; Alleinarbeit im Portal. Von hier lässt sich auch für eine andere Person ein Timer starten.</figcaption>
   </figure>
+  <p>
+    Beim Start wird festgelegt, wer bei Ablauf alarmiert wird: Gruppen am Standort
+    (vorgewählt Schulsanität und Hausdienst) und wahlweise einzelne Personen unabhängig
+    von Gruppe und Standort. Läuft ein Timer ab, darf die betroffene Person den Alarm
+    selbst mit <span class="ui">Mir geht es gut</span> beenden; die Entwarnung geht dann
+    an alle Alarmierten.
+  </p>
   <figure class="bild-breit">
     <img src="bilder/web-06-alarmknoepfe.webp" alt="Übersicht der Alarmknöpfe mit Batteriestand und Funkverbindung">
     <figcaption><b>Abb.</b> &nbsp; Die fest installierten und tragbaren Alarmknöpfe mit Batteriestand und Funkverbindung. Ein Knopf mit schwacher Batterie ist hier zu erkennen, bevor er ausfällt.</figcaption>

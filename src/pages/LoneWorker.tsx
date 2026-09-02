@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle2, Clock, Play, ShieldAlert } from 'lucide-react'
-import { uid, useStore } from '../store'
-import type { LoneWorkSession } from '../types'
+import { alleinarbeitEmpfaenger, resolveRecipients, uid, useStore } from '../store'
+import { LONE_WORK_DEFAULT_GROUPS, type LoneWorkSession } from '../types'
 import { Badge, Button, Card, EmptyState, Field, Toggle, formatDateTime, formatDuration, inputClass } from '../components/ui'
 
 export default function LoneWorker() {
@@ -11,6 +11,10 @@ export default function LoneWorker() {
   const [activity, setActivity] = useState('')
   const [durationMin, setDurationMin] = useState(30)
   const [silent, setSilent] = useState(false)
+  const [alertGroupIds, setAlertGroupIds] = useState<string[]>(() =>
+    LONE_WORK_DEFAULT_GROUPS.filter((id) => state.groups.some((g) => g.id === id)),
+  )
+  const [alertUserIds, setAlertUserIds] = useState<string[]>([])
   const [now, setNow] = useState(Date.now())
 
   useEffect(() => {
@@ -20,6 +24,13 @@ export default function LoneWorker() {
 
   const running = state.loneWorkSessions.filter((s) => s.status === 'running')
   const past = state.loneWorkSessions.filter((s) => s.status !== 'running')
+  const toggleId = (liste: string[], id: string) => (liste.includes(id) ? liste.filter((x) => x !== id) : [...liste, id])
+  const vorschau = alleinarbeitEmpfaenger(state, {
+    id: '', userId, locationId, activity: '', startedAt: 0, durationMin, expiresAt: 0, silent, status: 'running', alertGroupIds, alertUserIds,
+  })
+  const anzahlEmpfaenger = vorschau.recipientUserIds
+    ? vorschau.recipientUserIds.length
+    : resolveRecipients(state, vorschau.groupIds, [locationId]).filter((u) => u.id !== userId).length
 
   function start() {
     const session: LoneWorkSession = {
@@ -32,6 +43,8 @@ export default function LoneWorker() {
       expiresAt: Date.now() + durationMin * 60_000,
       silent,
       status: 'running',
+      alertGroupIds,
+      alertUserIds,
     }
     dispatch({ type: 'START_LONE_WORK', session })
     setActivity('')
@@ -66,10 +79,34 @@ export default function LoneWorker() {
             <input type="range" min={1} max={120} value={durationMin} onChange={(e) => setDurationMin(Number(e.target.value))} className="w-full" />
             <div className="text-xs text-slate-400">Vor Ablauf muss ein Lebenszeichen gegeben werden, sonst wird automatisch alarmiert.</div>
           </Field>
+          <Field label="Bei Ablauf alarmieren – Gruppen am Standort">
+            <div className="grid sm:grid-cols-2 gap-1">
+              {state.groups.filter((g) => g.id !== 'gr-alle').map((g) => (
+                <label key={g.id} className="flex items-center gap-2 py-1 text-sm">
+                  <input type="checkbox" checked={alertGroupIds.includes(g.id)} onChange={() => setAlertGroupIds(toggleId(alertGroupIds, g.id))} />
+                  {g.name}
+                </label>
+              ))}
+            </div>
+          </Field>
+          <Field label="Zusätzlich einzelne Personen (unabhängig von Gruppe und Standort)">
+            <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 divide-y divide-slate-100">
+              {[...state.users].filter((u) => u.id !== userId).sort((a, b) => a.lastName.localeCompare(b.lastName, 'de')).map((u) => (
+                <label key={u.id} className="flex items-center gap-2 px-3 py-1.5 text-sm">
+                  <input type="checkbox" checked={alertUserIds.includes(u.id)} onChange={() => setAlertUserIds(toggleId(alertUserIds, u.id))} />
+                  <span className="flex-1">{u.firstName} {u.lastName}</span>
+                  <span className="text-xs text-slate-400">{state.locations.find((l) => l.id === u.locationId)?.name}</span>
+                </label>
+              ))}
+            </div>
+            <div className={`text-xs mt-1.5 ${anzahlEmpfaenger === 0 ? 'text-alarm-600' : 'text-slate-500'}`}>
+              <b>{anzahlEmpfaenger} Person{anzahlEmpfaenger === 1 ? '' : 'en'}</b> würden bei Ablauf alarmiert{anzahlEmpfaenger === 0 ? ' – bitte mindestens eine Gruppe oder Person wählen' : ''}.
+            </div>
+          </Field>
           <div className="mb-4">
             <Toggle checked={silent} onChange={setSilent} label="Stille Alarmauslösung (unauffälliger Schutz)" />
           </div>
-          <Button onClick={start}><Play size={16} /> Timer starten</Button>
+          <Button onClick={start} disabled={anzahlEmpfaenger === 0}><Play size={16} /> Timer starten</Button>
         </Card>
 
         <Card title={<span className="flex items-center gap-2"><Clock size={16} /> Laufende Überwachungen</span>}>
@@ -118,6 +155,12 @@ function RunningSession({ session, now }: { session: LoneWorkSession; now: numbe
             {session.silent && <Badge color="violet">still</Badge>}
           </div>
           <div className="text-xs text-slate-500">{session.activity} · {location?.name}</div>
+          <div className="text-xs text-slate-400 mt-0.5">
+            Alarmiert bei Ablauf: {[
+              ...(session.alertGroupIds?.length ? session.alertGroupIds : LONE_WORK_DEFAULT_GROUPS).map((id) => state.groups.find((g) => g.id === id)?.name),
+              ...(session.alertUserIds ?? []).map((id) => { const u = state.users.find((x) => x.id === id); return u ? `${u.firstName} ${u.lastName}` : '' }),
+            ].filter(Boolean).join(', ')}
+          </div>
         </div>
         <div className={`text-2xl font-mono font-bold ${critical ? 'text-alarm-600' : 'text-slate-800'}`}>
           {formatDuration(remaining)}

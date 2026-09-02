@@ -4,10 +4,10 @@ import {
   BellRing, Check, CheckCircle2, ChevronLeft, Clock, KeyRound, LogOut, MapPin, Phone, Play, Search as SearchIcon,
   Scale, ShieldAlert, ShieldCheck, Siren, Timer, X,
 } from 'lucide-react-native'
-import { createAlarm, resolveRecipients, uid, useStore } from './store'
+import { alleinarbeitEmpfaenger, createAlarm, resolveRecipients, uid, useStore } from './store'
 import { ScenarioIcon } from './ScenarioIcon'
 import { cancelScheduled, ensurePermissions, getPushToken, remotePushAvailability, scheduleAt } from './notifications'
-import type { Alarm, LoneWorkSession, Scenario, User } from './types'
+import { LONE_WORK_DEFAULT_GROUPS, type Alarm, type LoneWorkSession, type Scenario, type User } from './types'
 import { Badge, Card, HoldButton, colors, formatDuration, formatRelative } from './ui'
 import { MIN_PASSWORD_LENGTH, passwordProblem } from './auth'
 import { activeScenarios, allClearStepsOf, responseStepsFor, responseStepsOf } from './scenarios'
@@ -42,6 +42,31 @@ export function entwarnungGeben(dispatch: Dispatch, alarmId: string) {
     'Der Alarm wird beendet und alle Empfänger erhalten die Entwarnung. Hinweis für die Empfänger (optional), z. B. Rückkehr ab 10:30 über den Haupteingang:',
     'Entwarnung senden',
     (text) => dispatch({ type: 'END_ALARM', alarmId, note: text }),
+  )
+}
+
+/** Live: Wie viele wurden benachrichtigt, wie viele kommen, wie viele sind nicht verfügbar */
+export function rueckmeldungen(alarm: Alarm): { benachrichtigt: number; kommen: number; nichtVerfuegbar: number; offen: number } {
+  const personen = new Map<string, 'none' | 'acknowledged' | 'declined'>()
+  for (const d of alarm.deliveries) {
+    const bisher = personen.get(d.userId)
+    if (!bisher || bisher === 'none') personen.set(d.userId, d.ack)
+  }
+  const werte = [...personen.values()]
+  const kommen = werte.filter((a) => a === 'acknowledged').length
+  const nichtVerfuegbar = werte.filter((a) => a === 'declined').length
+  return { benachrichtigt: werte.length, kommen, nichtVerfuegbar, offen: werte.length - kommen - nichtVerfuegbar }
+}
+
+function Rueckmeldestand({ alarm }: { alarm: Alarm }) {
+  const r = rueckmeldungen(alarm)
+  return (
+    <View style={[styles.row, { flexWrap: 'wrap', gap: 10, marginTop: 6 }]}>
+      <Text style={styles.faint}><Text style={{ fontWeight: '700', color: colors.text }}>{r.benachrichtigt}</Text> benachrichtigt</Text>
+      <Text style={[styles.faint, { color: colors.green }]}><Text style={{ fontWeight: '700' }}>{r.kommen}</Text> kommen</Text>
+      <Text style={[styles.faint, { color: colors.muted }]}><Text style={{ fontWeight: '700' }}>{r.nichtVerfuegbar}</Text> nicht verfügbar</Text>
+      <Text style={styles.faint}><Text style={{ fontWeight: '700' }}>{r.offen}</Text> offen</Text>
+    </View>
   )
 }
 
@@ -104,12 +129,23 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario, 
 
   return (
     <ScrollView contentContainerStyle={styles.screen}>
+      {hotline?.enabled && hotline.number.trim() !== '' && (
+        <Pressable style={styles.contactRow} onPress={() => Linking.openURL(`tel:${hotline.number.replace(/\s/g, '')}`)}>
+          <Phone size={18} color={colors.brand} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardTitle}>Interne Notfallnummer</Text>
+            <Text style={styles.faint}>Alarmauslösung per Anruf</Text>
+          </View>
+          <Text style={styles.contactNumber}>{hotline.number}</Text>
+        </Pressable>
+      )}
       {mySos.map((a) => {
         const delivered = a.deliveries.filter((d) => d.status === 'delivered').length
         const helpers = [...new Set(a.deliveries.filter((d) => d.ack === 'acknowledged').map((d) => d.userId))]
           .map((id) => state.users.find((u) => u.id === id))
           .filter(Boolean)
-        const istSos = a.message.startsWith('SOS-Alarm')
+        const istTimer = a.triggeredVia === 'timer'
+        const istSos = a.message.startsWith('SOS-Alarm') || istTimer
         const istFuehrung = me.role !== 'mitarbeiter'
         const scenario = state.scenarios.find((s) => s.id === a.scenarioId)
         return (
@@ -117,7 +153,7 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario, 
             <View style={styles.row}>
               <Siren size={18} color={colors.alarm} />
               <Text style={[styles.cardTitle, { color: colors.alarm, flex: 1 }]}>
-                {istSos ? 'Ihr SOS-Alarm ist aktiv' : `Ihr Alarm ist aktiv${scenario ? ` · ${scenario.title}` : ''}`}
+                {istTimer ? 'Alleinarbeits-Timer abgelaufen – Alarm aktiv' : istSos ? 'Ihr SOS-Alarm ist aktiv' : `Ihr Alarm ist aktiv${scenario ? ` · ${scenario.title}` : ''}`}
               </Text>
               {a.drill && <Badge label="ÜBUNG" color="amber" />}
               <Text style={styles.faint}>{formatRelative(a.triggeredAt)}</Text>
@@ -139,15 +175,15 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario, 
             )}
             {istSos ? (
               <Pressable
-                style={styles.outlineButton}
+                style={[styles.outlineButton, istTimer && { backgroundColor: colors.green, borderColor: colors.green }]}
                 onPress={() =>
-                  Alert.alert('Entwarnung', 'Entwarnung geben und den SOS-Alarm beenden?', [
+                  Alert.alert('Entwarnung', istTimer ? 'Ihnen geht es gut und der Alarm soll beendet werden? Alle Alarmierten erhalten die Entwarnung.' : 'Entwarnung geben und den SOS-Alarm beenden?', [
                     { text: 'Abbrechen', style: 'cancel' },
-                    { text: 'Entwarnung geben', style: 'destructive', onPress: () => dispatch({ type: 'END_ALARM', alarmId: a.id }) },
+                    { text: 'Entwarnung geben', style: 'destructive', onPress: () => dispatch({ type: 'END_ALARM', alarmId: a.id, note: istTimer ? 'Mir geht es gut – der Timer wurde nicht rechtzeitig verlängert.' : undefined }) },
                   ])
                 }
               >
-                <Text style={styles.outlineButtonText}>Entwarnung – mir geht es gut</Text>
+                <Text style={[styles.outlineButtonText, istTimer && { color: '#fff' }]}>Entwarnung – mir geht es gut</Text>
               </Pressable>
             ) : istFuehrung ? (
               <Pressable style={styles.outlineButton} onPress={() => entwarnungGeben(dispatch, a.id)}>
@@ -176,6 +212,7 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario, 
               {a.silent && <Badge label="still" color="violet" />}
             </View>
             <Text style={styles.body}>{a.message}</Text>
+            <Rueckmeldestand alarm={a} />
             <Lagemeldungen alarm={a} />
             {scenario && (
               <Pressable style={styles.darkButton} onPress={() => onOpenScenario(scenario, a)}>
@@ -253,16 +290,6 @@ export function StartScreen({ onOpenScenario }: { onOpenScenario: (s: Scenario, 
         </>
       )}
 
-      {hotline?.enabled && hotline.number.trim() !== '' && (
-        <Pressable style={styles.contactRow} onPress={() => Linking.openURL(`tel:${hotline.number.replace(/\s/g, '')}`)}>
-          <Phone size={18} color={colors.brand} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Interne Notfallnummer</Text>
-            <Text style={styles.faint}>Alarmauslösung per Anruf</Text>
-          </View>
-          <Text style={styles.contactNumber}>{hotline.number}</Text>
-        </Pressable>
-      )}
     </ScrollView>
   )
 }
@@ -951,6 +978,7 @@ function EmpfaengerScreen({
             {formatRelative(alarm.triggeredAt)}
             {orte ? ` · ${orte}` : ''}
           </Text>
+          <Rueckmeldestand alarm={alarm} />
           <Lagemeldungen alarm={alarm} />
           {alarm.requireAck && myAck === 'none' && (
             <View style={[styles.row, { marginTop: 8, gap: 8 }]}>
@@ -1063,6 +1091,12 @@ export function LoneWorkScreen() {
   const [activity, setActivity] = useState('')
   const [durationMin, setDurationMin] = useState(30)
   const [silent, setSilent] = useState(false)
+  // Wer bei Ablauf alarmiert wird: Gruppen am eigenen Standort, dazu einzelne Personen
+  const [alertGroupIds, setAlertGroupIds] = useState<string[]>(() =>
+    LONE_WORK_DEFAULT_GROUPS.filter((id) => state.groups.some((g) => g.id === id)),
+  )
+  const [alertUserIds, setAlertUserIds] = useState<string[]>([])
+  const [personenOffen, setPersonenOffen] = useState(false)
   const [now, setNow] = useState(Date.now())
 
   useEffect(() => {
@@ -1072,6 +1106,30 @@ export function LoneWorkScreen() {
 
   const mySessions = state.loneWorkSessions.filter((s) => s.userId === me.id)
   const running = mySessions.find((s) => s.status === 'running')
+  // Timer abgelaufen, Alarm läuft noch: «mir geht es gut» beendet ihn
+  const abgelaufenerAlarm = state.alarms.find((a) => a.status === 'active' && a.triggeredVia === 'timer' && a.triggeredByUserId === me.id)
+  const waehlbareGruppen = state.groups.filter((g) => g.id !== 'gr-alle')
+  const waehlbarePersonen = [...state.users]
+    .filter((u) => u.id !== me.id)
+    .sort((a, b) => a.lastName.localeCompare(b.lastName, 'de'))
+  const vorschau = alleinarbeitEmpfaenger(state.users, {
+    id: '', userId: me.id, locationId: me.locationId, activity: '', startedAt: 0, durationMin, expiresAt: 0, silent, status: 'running',
+    alertGroupIds, alertUserIds,
+  })
+  const anzahlEmpfaenger = vorschau.recipientUserIds
+    ? vorschau.recipientUserIds.length
+    : resolveRecipients(state.users, vorschau.groupIds, [me.locationId]).filter((u) => u.id !== me.id).length
+  const toggle = (liste: string[], id: string) => (liste.includes(id) ? liste.filter((x) => x !== id) : [...liste, id])
+  const nameVon = (id: string) => {
+    const u = state.users.find((x) => x.id === id)
+    return u ? `${u.firstName} ${u.lastName}` : ''
+  }
+  const empfaengerText = (s: LoneWorkSession) => {
+    const gruppen = (s.alertGroupIds?.length ? s.alertGroupIds : LONE_WORK_DEFAULT_GROUPS)
+      .map((id) => state.groups.find((g) => g.id === id)?.name).filter(Boolean)
+    const personen = (s.alertUserIds ?? []).map(nameVon).filter(Boolean)
+    return [...gruppen, ...personen].join(', ')
+  }
 
   function start() {
     const session: LoneWorkSession = {
@@ -1084,6 +1142,8 @@ export function LoneWorkScreen() {
       expiresAt: Date.now() + durationMin * 60_000,
       silent,
       status: 'running',
+      alertGroupIds,
+      alertUserIds,
     }
     dispatch({ type: 'START_LONE_WORK', session })
     scheduleLoneWorkNotifications(session.id, session.activity, session.expiresAt)
@@ -1100,6 +1160,7 @@ export function LoneWorkScreen() {
           <Text style={[styles.countdown, critical && { color: colors.alarm }]}>{formatDuration(remaining)}</Text>
           <Text style={[styles.faint, { textAlign: 'center', marginBottom: 14 }]}>
             {critical ? 'Bald läuft der Timer ab – Lebenszeichen geben!' : 'Läuft der Timer ab, wird automatisch alarmiert.'}
+            {'\n'}Alarmiert werden: {empfaengerText(running)}
           </Text>
           <Pressable
             style={[styles.bigButton, { backgroundColor: colors.green }]}
@@ -1130,6 +1191,31 @@ export function LoneWorkScreen() {
 
   return (
     <ScrollView contentContainerStyle={styles.screen}>
+      {abgelaufenerAlarm && (
+        <Card style={{ borderColor: colors.alarmLight, borderWidth: 2 }}>
+          <View style={styles.row}>
+            <Siren size={18} color={colors.alarm} />
+            <Text style={[styles.cardTitle, { color: colors.alarm, flex: 1 }]}>Timer abgelaufen – Alarm ausgelöst</Text>
+            <Text style={styles.faint}>{formatRelative(abgelaufenerAlarm.triggeredAt)}</Text>
+          </View>
+          <Text style={styles.body}>
+            Schulsanität und Hausdienst sind alarmiert. Wenn Ihnen nichts fehlt und Sie nur vergessen haben, den Timer zu verlängern, geben Sie hier Entwarnung.
+          </Text>
+          <Rueckmeldestand alarm={abgelaufenerAlarm} />
+          <Pressable
+            style={[styles.bigButton, { backgroundColor: colors.green, marginTop: 12 }]}
+            onPress={() =>
+              Alert.alert('Entwarnung', 'Ihnen geht es gut und der Alarm soll beendet werden? Alle Alarmierten erhalten die Entwarnung.', [
+                { text: 'Abbrechen', style: 'cancel' },
+                { text: 'Entwarnung senden', onPress: () => dispatch({ type: 'END_ALARM', alarmId: abgelaufenerAlarm.id, note: 'Mir geht es gut – der Timer wurde nicht rechtzeitig verlängert.' }) },
+              ])
+            }
+          >
+            <CheckCircle2 size={16} color="#fff" />
+            <Text style={styles.bigButtonText}>Mir geht es gut – Entwarnung senden</Text>
+          </Pressable>
+        </Card>
+      )}
       <Card>
         <View style={[styles.row, { marginBottom: 10 }]}>
           <Timer size={18} color={colors.text} />
@@ -1154,16 +1240,62 @@ export function LoneWorkScreen() {
             </Pressable>
           ))}
         </View>
+        <Text style={[styles.body, { marginTop: 14, fontWeight: '600' }]}>Bei Ablauf alarmieren</Text>
+        <Text style={styles.faint}>Gruppen an Ihrem Standort – antippen zum An- und Abwählen:</Text>
+        <View style={[styles.row, { marginTop: 8, flexWrap: 'wrap', gap: 8 }]}>
+          {waehlbareGruppen.map((g) => {
+            const an = alertGroupIds.includes(g.id)
+            return (
+              <Pressable key={g.id} onPress={() => setAlertGroupIds(toggle(alertGroupIds, g.id))} style={[styles.chip, an && { backgroundColor: colors.dark }]}>
+                <Text style={[styles.chipText, an && { color: '#fff' }]}>{g.name}</Text>
+              </Pressable>
+            )
+          })}
+        </View>
+        <Pressable onPress={() => setPersonenOffen(!personenOffen)} style={{ marginTop: 10 }}>
+          <Text style={[styles.muted, { textDecorationLine: 'underline', fontSize: 13 }]}>
+            {personenOffen ? 'Einzelne Personen ausblenden' : `Zusätzlich einzelne Personen wählen${alertUserIds.length ? ` (${alertUserIds.length} gewählt)` : ''}`}
+          </Text>
+        </Pressable>
+        {personenOffen && (
+          <View style={{ marginTop: 6, borderWidth: 1, borderColor: colors.border, borderRadius: 12, maxHeight: 260 }}>
+            <ScrollView nestedScrollEnabled>
+              {waehlbarePersonen.map((u) => {
+                const an = alertUserIds.includes(u.id)
+                const ort = state.locations.find((l) => l.id === u.locationId)?.name
+                return (
+                  <Pressable key={u.id} onPress={() => setAlertUserIds(toggle(alertUserIds, u.id))} style={[styles.row, { paddingHorizontal: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: colors.border }]}>
+                    <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: an ? colors.brand : '#cbd5e1', backgroundColor: an ? colors.brand : colors.card, alignItems: 'center', justifyContent: 'center' }}>
+                      {an && <Check size={14} color="#fff" />}
+                    </View>
+                    <Text style={[styles.body, { marginTop: 0, flex: 1 }]}>{u.firstName} {u.lastName}</Text>
+                    <Text style={styles.faint}>{ort}</Text>
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
+          </View>
+        )}
+        {alertUserIds.length > 0 && (
+          <Text style={[styles.faint, { marginTop: 6 }]}>Zusätzlich: {alertUserIds.map(nameVon).filter(Boolean).join(', ')}</Text>
+        )}
+        <Text style={[styles.faint, { marginTop: 8 }]}>
+          <Text style={{ fontWeight: '700', color: anzahlEmpfaenger === 0 ? colors.alarm : colors.text }}>{anzahlEmpfaenger} Person{anzahlEmpfaenger === 1 ? '' : 'en'}</Text> würden bei Ablauf alarmiert{anzahlEmpfaenger === 0 ? ' – bitte mindestens eine Gruppe oder Person wählen' : ''}.
+        </Text>
         <View style={[styles.row, { marginTop: 14 }]}>
           <Switch value={silent} onValueChange={setSilent} />
           <Text style={styles.body}>Stille Alarmauslösung</Text>
         </View>
-        <Pressable style={[styles.bigButton, { backgroundColor: colors.dark, marginTop: 14 }]} onPress={start}>
+        <Pressable
+          style={[styles.bigButton, { backgroundColor: anzahlEmpfaenger === 0 ? colors.faint : colors.dark, marginTop: 14 }]}
+          onPress={start}
+          disabled={anzahlEmpfaenger === 0}
+        >
           <Play size={16} color="#fff" />
           <Text style={styles.bigButtonText}>Timer starten</Text>
         </Pressable>
         <Text style={[styles.faint, { marginTop: 8 }]}>
-          Melden Sie sich vor Ablauf zurück – sonst alarmiert das System automatisch Schulsanität und Hausdienst.
+          Melden Sie sich vor Ablauf zurück – sonst alarmiert das System automatisch die gewählten Personen.
         </Text>
       </Card>
 

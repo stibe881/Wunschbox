@@ -245,6 +245,18 @@ async function main(): Promise<void> {
   pruefe('Auslösende Person beendet den eigenen SOS-Alarm',
     (await ruf(`/alarms/${sos.body.alarm.id}/end`, { method: 'POST', token: peterToken })).status === 200)
 
+  // --- Abgelaufener Alleinarbeits-Timer: die betroffene Person darf selbst entwarnen ---
+  const timerAlarm = await ruf('/alarms', {
+    method: 'POST', token: peterToken,
+    body: JSON.stringify({
+      scenarioId: 'sc-medizin', message: 'ALLEINARBEIT: Timer von Peter Muster abgelaufen (Kontrollgang). Keine Rückmeldung – bitte sofort prüfen!',
+      requireAck: true, channels: ['push'], groupIds: ['gr-ersthelfer'], locationIds: ['loc-baar'], triggeredVia: 'timer',
+    }),
+  })
+  pruefe('Alleinarbeits-Alarm angelegt', timerAlarm.status === 200)
+  const selbstEntwarnt = await ruf(`/alarms/${timerAlarm.body.alarm.id}/end`, { method: 'POST', token: peterToken, body: JSON.stringify({ note: 'Mir geht es gut – Timer vergessen.' }) })
+  pruefe('Betroffene Person entwarnt den eigenen Alleinarbeits-Alarm', selbstEntwarnt.status === 200 && selbstEntwarnt.body.alarm.endNote === 'Mir geht es gut – Timer vergessen.')
+
   // --- Übung ---
   const uebung = await ruf('/alarms', {
     method: 'POST', token: adminToken,
@@ -272,8 +284,13 @@ async function main(): Promise<void> {
   pruefe('App sieht den beendeten Alarm', standPeter.body.alarms.some((a: any) => a.id === alarmId && a.status === 'ended'))
 
   // --- Alleinarbeit ---
-  const timer = await ruf('/lone-work', { method: 'POST', token: peterToken, body: JSON.stringify({ activity: 'Kontrollgang', durationMin: 30, locationId: 'loc-baar' }) })
+  const timer = await ruf('/lone-work', {
+    method: 'POST', token: peterToken,
+    body: JSON.stringify({ activity: 'Kontrollgang', durationMin: 30, locationId: 'loc-baar', alertGroupIds: ['gr-krisenstab'], alertUserIds: [peterId] }),
+  })
   pruefe('Alleinarbeits-Timer gestartet', timer.status === 200 && timer.body.session.status === 'running')
+  pruefe('Empfänger bei Ablauf werden gespeichert',
+    JSON.stringify(timer.body.session.alertGroupIds) === '["gr-krisenstab"]' && JSON.stringify(timer.body.session.alertUserIds) === JSON.stringify([peterId]))
   const verlaengert = await ruf(`/lone-work/${timer.body.session.id}/extend`, { method: 'POST', token: peterToken, body: JSON.stringify({ minutes: 20 }) })
   pruefe('Timer verlängert', verlaengert.body.session.expiresAt > timer.body.session.expiresAt)
   pruefe('Timer beendet', (await ruf(`/lone-work/${timer.body.session.id}/complete`, { method: 'POST', token: peterToken })).status === 200)

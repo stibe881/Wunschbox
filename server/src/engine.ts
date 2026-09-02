@@ -6,7 +6,7 @@ import {
   addAudit, allAlarms, allLoneWork, allScenarios, allStoredUsers, buildDeliveries, createAlarm,
   integrations, resolveRecipients, saveAlarm, upsertDoc,
 } from './store.js'
-import type { Alarm, AlarmLogEntry, AlarmUpdate } from './types.js'
+import { LONE_WORK_DEFAULT_GROUPS, type Alarm, type AlarmLogEntry, type AlarmUpdate, type LoneWorkSession } from './types.js'
 
 /** Kennzeichnung einer Übung in Titel und Protokoll */
 export const UEBUNG = 'ÜBUNG'
@@ -156,16 +156,18 @@ export async function tick(): Promise<void> {
   for (const sitzung of abgelaufen) {
     upsertDoc('lone_work', sitzung.id, { ...sitzung, status: 'alarm' })
     const person = allStoredUsers().find((u) => u.id === sitzung.userId)
+    const { groupIds, recipientUserIds } = alleinarbeitEmpfaenger(sitzung)
     const alarm = createAlarm({
       scenarioId: 'sc-medizin',
       message: `ALLEINARBEIT: Timer von ${person ? `${person.firstName} ${person.lastName}` : '?'} abgelaufen (${sitzung.activity}). Keine Rückmeldung – bitte sofort prüfen!`,
       silent: sitzung.silent,
       requireAck: true,
       channels: ['push', 'sms', 'voice'],
-      groupIds: ['gr-ersthelfer', 'gr-sicherheit'],
+      groupIds,
       locationIds: [sitzung.locationId],
       triggeredByUserId: sitzung.userId,
       triggeredVia: 'timer',
+      recipientUserIds,
       escalation: [{ afterMinutes: 5, channels: ['voice'], groupIds: ['gr-krisenstab'], notifyEmergencyServices: true }],
     })
     saveAlarm(alarm)
@@ -212,6 +214,20 @@ async function woechentlicherTestpush(jetzt: number): Promise<void> {
   if (admins.length === 0) return
   const anzahl = await testPush(admins)
   addAudit('system', `Wöchentliche Testmeldung an ${anzahl} Gerät(e) der Administration gesendet.`)
+}
+
+/**
+ * Empfänger eines Alleinarbeits-Alarms: die beim Start gewählten Gruppen am
+ * Standort plus die gewählten Einzelpersonen. Ohne Wahl gelten die
+ * Standardgruppen. Die Person selbst wird nie alarmiert.
+ */
+export function alleinarbeitEmpfaenger(sitzung: LoneWorkSession): { groupIds: string[]; recipientUserIds?: string[] } {
+  const groupIds = sitzung.alertGroupIds?.length ? sitzung.alertGroupIds : LONE_WORK_DEFAULT_GROUPS
+  const einzelne = (sitzung.alertUserIds ?? []).filter((id) => id !== sitzung.userId)
+  if (einzelne.length === 0) return { groupIds }
+  const users = allStoredUsers()
+  const ausGruppen = resolveRecipients(users, groupIds, [sitzung.locationId]).map((u) => u.id)
+  return { groupIds, recipientUserIds: [...new Set([...ausGruppen, ...einzelne])].filter((id) => id !== sitzung.userId) }
 }
 
 export function startEngine(): NodeJS.Timeout {

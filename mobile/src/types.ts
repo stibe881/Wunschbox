@@ -212,7 +212,14 @@ export interface LoneWorkSession {
   expiresAt: number
   silent: boolean
   status: 'running' | 'completed' | 'alarm'
+  /** Wer beim Ablauf alarmiert wird: Gruppen am Standort (Standard Schulsanität und Hausdienst) … */
+  alertGroupIds?: string[]
+  /** … und wahlweise einzelne Personen, unabhängig von Gruppe und Standort */
+  alertUserIds?: string[]
 }
+
+/** Standardempfänger eines Alleinarbeits-Alarms */
+export const LONE_WORK_DEFAULT_GROUPS = ['gr-ersthelfer', 'gr-sicherheit']
 
 export interface Webhook {
   id: string

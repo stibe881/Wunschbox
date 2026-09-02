@@ -4,8 +4,8 @@ import {
   ArrowRight, BellRing, BookOpen, Check, CheckCircle2, ChevronLeft, ClipboardCheck, Clock, KeyRound, LayoutDashboard,
   ListChecks, LogOut, MapPin, Megaphone, Phone, PhoneCall, Play, Scale, Search, ShieldAlert, ShieldCheck, Siren, Timer, User, Users, Volume2, X,
 } from 'lucide-react'
-import { createAlarm, resolveRecipients, uid, useStore } from '../store'
-import type { Alarm, Channel, LoneWorkSession, Scenario, User as AppUser } from '../types'
+import { alleinarbeitEmpfaenger, createAlarm, resolveRecipients, uid, useStore } from '../store'
+import { LONE_WORK_DEFAULT_GROUPS, type Alarm, type Channel, type LoneWorkSession, type Scenario, type User as AppUser } from '../types'
 import { Badge, HoldButton, Toggle, formatDuration, formatRelative, inputClass, kanalName, useConfirm, usePrompt } from '../components/ui'
 import { ScenarioIcon } from '../components/ScenarioIcon'
 import { MIN_PASSWORD_LENGTH, passwordProblem } from '../lib/auth'
@@ -161,6 +161,31 @@ function Lagemeldungen({ alarm }: { alarm: Alarm }) {
   )
 }
 
+/** Live: Wie viele wurden benachrichtigt, wie viele kommen, wie viele sind nicht verfügbar */
+export function rueckmeldungen(alarm: Alarm): { benachrichtigt: number; kommen: number; nichtVerfuegbar: number; offen: number } {
+  const personen = new Map<string, 'none' | 'acknowledged' | 'declined'>()
+  for (const d of alarm.deliveries) {
+    const bisher = personen.get(d.userId)
+    if (!bisher || bisher === 'none') personen.set(d.userId, d.ack)
+  }
+  const werte = [...personen.values()]
+  const kommen = werte.filter((a) => a === 'acknowledged').length
+  const nichtVerfuegbar = werte.filter((a) => a === 'declined').length
+  return { benachrichtigt: werte.length, kommen, nichtVerfuegbar, offen: werte.length - kommen - nichtVerfuegbar }
+}
+
+function Rueckmeldestand({ alarm }: { alarm: Alarm }) {
+  const r = rueckmeldungen(alarm)
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500" aria-live="polite">
+      <span><b className="text-slate-700">{r.benachrichtigt}</b> benachrichtigt</span>
+      <span className="text-emerald-700"><b>{r.kommen}</b> kommen</span>
+      <span className="text-slate-600"><b>{r.nichtVerfuegbar}</b> nicht verfügbar</span>
+      <span><b>{r.offen}</b> offen</span>
+    </div>
+  )
+}
+
 const FEHLALARM_TEXT = 'Alle Empfänger und der Krisenstab erhalten Ihre Meldung; die Entwarnung gibt der Krisenstab. Kurze Begründung (optional):'
 const ENTWARNUNG_TEXT = 'Der Alarm wird beendet und alle Empfänger erhalten die Entwarnung. Hinweis für die Empfänger (optional):'
 
@@ -208,18 +233,32 @@ function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Ala
     <div className="space-y-4">
       {confirmEl}
       {promptEl}
+      {state.integrations.hotline.enabled && (
+        <a
+          href={`tel:${state.integrations.hotline.number.replace(/\s/g, '')}`}
+          className="flex items-center gap-3 rounded-2xl bg-white border border-slate-200 p-4"
+        >
+          <Phone size={20} className="text-brand-600" />
+          <div className="flex-1">
+            <div className="text-sm font-semibold text-slate-800">Interne Notfallnummer</div>
+            <div className="text-xs text-slate-400">Alarmauslösung per Anruf</div>
+          </div>
+          <span className="font-bold text-brand-600">{state.integrations.hotline.number}</span>
+        </a>
+      )}
       {mySos.map((a) => {
         const delivered = a.deliveries.filter((d) => d.status === 'delivered').length
         const helpers = [...new Set(a.deliveries.filter((d) => d.ack === 'acknowledged').map((d) => d.userId))]
           .map((id) => state.users.find((u) => u.id === id))
           .filter(Boolean)
-        const istSos = a.message.startsWith('SOS-Alarm')
+        const istTimer = a.triggeredVia === 'timer'
+        const istSos = a.message.startsWith('SOS-Alarm') || istTimer
         const scenario = state.scenarios.find((s) => s.id === a.scenarioId)
         const fehlalarmGemeldet = (a.updates ?? []).some((u) => u.kind === 'fehlalarm')
         return (
           <div key={a.id} className="rounded-2xl border-2 border-alarm-500 bg-white p-4 alarm-pulse">
             <div className="flex items-center gap-2 font-bold text-alarm-700">
-              <Siren size={18} className="animate-pulse" /> {istSos ? 'Ihr SOS-Alarm ist aktiv' : `Ihr Alarm ist aktiv${scenario ? ` · ${scenario.title}` : ''}`}
+              <Siren size={18} className="animate-pulse" /> {istTimer ? 'Alleinarbeits-Timer abgelaufen – Alarm aktiv' : istSos ? 'Ihr SOS-Alarm ist aktiv' : `Ihr Alarm ist aktiv${scenario ? ` · ${scenario.title}` : ''}`}
               {a.drill && <Badge color="amber">ÜBUNG</Badge>}
               <span className="ml-auto text-xs font-normal text-slate-400">{formatRelative(a.triggeredAt)}</span>
             </div>
@@ -245,9 +284,13 @@ function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Ala
             </div>
             {istSos ? (
               <button
-                className="mt-3 w-full rounded-xl border border-slate-300 text-slate-700 py-2.5 text-sm font-semibold"
+                className={`mt-3 w-full rounded-xl py-2.5 text-sm font-semibold ${istTimer ? 'bg-emerald-600 text-white' : 'border border-slate-300 text-slate-700'}`}
                 onClick={() =>
-                  ask('Entwarnung geben und den SOS-Alarm beenden?', () => dispatch({ type: 'END_ALARM', alarmId: a.id, byUserId: me.id }), 'Entwarnung geben')
+                  ask(
+                    istTimer ? 'Ihnen geht es gut und der Alarm soll beendet werden? Alle Alarmierten erhalten die Entwarnung.' : 'Entwarnung geben und den SOS-Alarm beenden?',
+                    () => dispatch({ type: 'END_ALARM', alarmId: a.id, byUserId: me.id, note: istTimer ? 'Mir geht es gut – der Timer wurde nicht rechtzeitig verlängert.' : undefined }),
+                    'Entwarnung geben',
+                  )
                 }
               >
                 Entwarnung – mir geht es gut
@@ -280,6 +323,7 @@ function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Ala
               {a.silent && <Badge color="violet">still</Badge>}
             </div>
             <p className="text-sm text-slate-700 mt-2">{a.message}</p>
+            <Rueckmeldestand alarm={a} />
             <Lagemeldungen alarm={a} />
             {!a.silent && (
               <div className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-1">
@@ -367,19 +411,6 @@ function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Ala
         </>
       )}
 
-      {state.integrations.hotline.enabled && (
-        <a
-          href={`tel:${state.integrations.hotline.number.replace(/\s/g, '')}`}
-          className="flex items-center gap-3 rounded-2xl bg-white border border-slate-200 p-4"
-        >
-          <Phone size={20} className="text-brand-600" />
-          <div className="flex-1">
-            <div className="text-sm font-semibold text-slate-800">Interne Notfallnummer</div>
-            <div className="text-xs text-slate-400">Alarmauslösung per Anruf</div>
-          </div>
-          <span className="font-bold text-brand-600">{state.integrations.hotline.number}</span>
-        </a>
-      )}
     </div>
   )
 }
@@ -911,6 +942,12 @@ function LoneWorkTab() {
   const [activity, setActivity] = useState('')
   const [durationMin, setDurationMin] = useState(30)
   const [silent, setSilent] = useState(false)
+  // Wer bei Ablauf alarmiert wird: Gruppen am eigenen Standort, dazu einzelne Personen
+  const [alertGroupIds, setAlertGroupIds] = useState<string[]>(() =>
+    LONE_WORK_DEFAULT_GROUPS.filter((id) => state.groups.some((g) => g.id === id)),
+  )
+  const [alertUserIds, setAlertUserIds] = useState<string[]>([])
+  const [personenOffen, setPersonenOffen] = useState(false)
   const [now, setNow] = useState(Date.now())
 
   useEffect(() => {
@@ -920,6 +957,24 @@ function LoneWorkTab() {
 
   const mySessions = state.loneWorkSessions.filter((s) => s.userId === me.id)
   const running = mySessions.find((s) => s.status === 'running')
+  // Timer abgelaufen, Alarm läuft noch: «mir geht es gut» beendet ihn
+  const abgelaufenerAlarm = state.alarms.find((a) => a.status === 'active' && a.triggeredVia === 'timer' && a.triggeredByUserId === me.id)
+  const waehlbareGruppen = state.groups.filter((g) => g.id !== 'gr-alle')
+  const waehlbarePersonen = [...state.users].filter((u) => u.id !== me.id).sort((a, b) => a.lastName.localeCompare(b.lastName, 'de'))
+  const vorschau = alleinarbeitEmpfaenger(state, {
+    id: '', userId: me.id, locationId: me.locationId, activity: '', startedAt: 0, durationMin, expiresAt: 0, silent, status: 'running',
+    alertGroupIds, alertUserIds,
+  })
+  const anzahlEmpfaenger = vorschau.recipientUserIds
+    ? vorschau.recipientUserIds.length
+    : resolveRecipients(state, vorschau.groupIds, [me.locationId]).filter((u) => u.id !== me.id).length
+  const toggleId = (liste: string[], id: string) => (liste.includes(id) ? liste.filter((x) => x !== id) : [...liste, id])
+  const empfaengerText = (s: LoneWorkSession) => {
+    const gruppen = (s.alertGroupIds?.length ? s.alertGroupIds : LONE_WORK_DEFAULT_GROUPS)
+      .map((id) => state.groups.find((g) => g.id === id)?.name).filter(Boolean)
+    const personen = (s.alertUserIds ?? []).map((id) => { const u = state.users.find((x) => x.id === id); return u ? `${u.firstName} ${u.lastName}` : '' }).filter(Boolean)
+    return [...gruppen, ...personen].join(', ')
+  }
 
   function start() {
     const session: LoneWorkSession = {
@@ -932,6 +987,8 @@ function LoneWorkTab() {
       expiresAt: Date.now() + durationMin * 60_000,
       silent,
       status: 'running',
+      alertGroupIds,
+      alertUserIds,
     }
     dispatch({ type: 'START_LONE_WORK', session })
     setActivity('')
@@ -951,6 +1008,7 @@ function LoneWorkTab() {
             {critical
               ? 'Bald läuft der Timer ab – Lebenszeichen geben!'
               : 'Läuft der Timer ab, wird automatisch alarmiert.'}
+            <div className="mt-1">Alarmiert werden: {empfaengerText(running)}</div>
           </div>
           <button
             className="w-full rounded-xl bg-emerald-600 text-white py-3.5 font-semibold text-base active:scale-[0.99] transition"
@@ -972,6 +1030,24 @@ function LoneWorkTab() {
 
   return (
     <div className="space-y-4">
+      {abgelaufenerAlarm && (
+        <div className="rounded-2xl border-2 border-alarm-500 bg-white p-4 alarm-pulse">
+          <div className="flex items-center gap-2 font-bold text-alarm-700">
+            <Siren size={18} className="animate-pulse" /> Timer abgelaufen – Alarm ausgelöst
+            <span className="ml-auto text-xs font-normal text-slate-400">{formatRelative(abgelaufenerAlarm.triggeredAt)}</span>
+          </div>
+          <p className="text-sm text-slate-700 mt-2">
+            Schulsanität und Hausdienst sind alarmiert. Wenn Ihnen nichts fehlt und Sie nur vergessen haben, den Timer zu verlängern, geben Sie hier Entwarnung.
+          </p>
+          <Rueckmeldestand alarm={abgelaufenerAlarm} />
+          <button
+            className="mt-3 w-full rounded-xl bg-emerald-600 text-white py-3 font-semibold text-sm flex items-center justify-center gap-1.5"
+            onClick={() => dispatch({ type: 'END_ALARM', alarmId: abgelaufenerAlarm.id, byUserId: me.id, note: 'Mir geht es gut – der Timer wurde nicht rechtzeitig verlängert.' })}
+          >
+            <CheckCircle2 size={16} /> Mir geht es gut – Entwarnung senden
+          </button>
+        </div>
+      )}
       <div className="rounded-2xl bg-white border border-slate-200 p-4">
         <h2 className="font-semibold text-slate-800 flex items-center gap-2 mb-3"><Timer size={18} /> Alleinarbeit starten</h2>
         <input
@@ -982,14 +1058,51 @@ function LoneWorkTab() {
         />
         <div className="text-sm font-medium text-slate-600 mb-1">Timer: {durationMin} Minuten</div>
         <input type="range" min={1} max={120} value={durationMin} onChange={(e) => setDurationMin(Number(e.target.value))} className="w-full mb-3" />
+        <div className="text-sm font-medium text-slate-600 mb-1">Bei Ablauf alarmieren</div>
+        <div className="text-xs text-slate-400 mb-1.5">Gruppen an Ihrem Standort – antippen zum An- und Abwählen:</div>
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {waehlbareGruppen.map((g) => {
+            const an = alertGroupIds.includes(g.id)
+            return (
+              <button
+                key={g.id}
+                onClick={() => setAlertGroupIds(toggleId(alertGroupIds, g.id))}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${an ? 'bg-slate-800 border-slate-800 text-white' : 'bg-white border-slate-300 text-slate-600'}`}
+              >
+                {g.name}
+              </button>
+            )
+          })}
+        </div>
+        <button className="text-xs text-slate-500 underline underline-offset-2" onClick={() => setPersonenOffen(!personenOffen)}>
+          {personenOffen ? 'Einzelne Personen ausblenden' : `Zusätzlich einzelne Personen wählen${alertUserIds.length ? ` (${alertUserIds.length} gewählt)` : ''}`}
+        </button>
+        {personenOffen && (
+          <div className="mt-2 max-h-64 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100">
+            {waehlbarePersonen.map((u) => (
+              <label key={u.id} className="flex items-center gap-2.5 px-3 py-2 text-sm">
+                <input type="checkbox" checked={alertUserIds.includes(u.id)} onChange={() => setAlertUserIds(toggleId(alertUserIds, u.id))} />
+                <span className="flex-1 text-slate-700">{u.firstName} {u.lastName}</span>
+                <span className="text-xs text-slate-400">{state.locations.find((l) => l.id === u.locationId)?.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        <div className={`text-xs mt-2 mb-3 ${anzahlEmpfaenger === 0 ? 'text-alarm-600' : 'text-slate-500'}`}>
+          <b>{anzahlEmpfaenger} Person{anzahlEmpfaenger === 1 ? '' : 'en'}</b> würden bei Ablauf alarmiert{anzahlEmpfaenger === 0 ? ' – bitte mindestens eine Gruppe oder Person wählen' : ''}.
+        </div>
         <div className="mb-4">
           <Toggle checked={silent} onChange={setSilent} label="Stille Alarmauslösung" />
         </div>
-        <button className="w-full rounded-xl bg-slate-800 text-white py-3 font-semibold flex items-center justify-center gap-2" onClick={start}>
+        <button
+          className="w-full rounded-xl bg-slate-800 text-white py-3 font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+          onClick={start}
+          disabled={anzahlEmpfaenger === 0}
+        >
           <Play size={16} /> Timer starten
         </button>
         <div className="text-xs text-slate-400 mt-2">
-          Melden Sie sich vor Ablauf zurück – sonst alarmiert das System automatisch Schulsanität und Hausdienst.
+          Melden Sie sich vor Ablauf zurück – sonst alarmiert das System automatisch die gewählten Personen.
         </div>
       </div>
 
@@ -1152,6 +1265,7 @@ function EmpfaengerAnsicht({
             {orte && <span className="flex items-center gap-1"><MapPin size={11} /> {orte}</span>}
             {alarm.silent && <Badge color="violet">still</Badge>}
           </div>
+          <Rueckmeldestand alarm={alarm} />
           <Lagemeldungen alarm={alarm} />
           {alarm.requireAck && myAck === 'none' && (
             <div className="flex gap-2 mt-3">

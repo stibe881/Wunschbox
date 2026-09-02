@@ -4,7 +4,7 @@ import type { AppMode, AppState, Alarm, AlarmButton, AlarmPlan, Channel, Deliver
 
 /** Datenbestand, wie ihn der Alarmserver liefert – ohne lokale Anteile */
 export type ServerData = Omit<AppState, 'mode' | 'session' | 'currentUserId' | 'scenarioContentVersion' | 'authVersion'>
-import { CHANNEL_LABELS } from './types'
+import { CHANNEL_LABELS, LONE_WORK_DEFAULT_GROUPS } from './types'
 import { LIVE_INITIAL_PASSWORD, SCENARIO_CONTENT_VERSION, SEED_SCENARIOS, SEED_USERS, createInitialState, createLiveInitialState } from './data/seed'
 import { authenticate, hashPassword, passwordProblem, randomSalt, verifyPassword } from './lib/auth'
 import { ApiError, api, authToken, setAuthToken, subscribeToServer } from './lib/api'
@@ -78,6 +78,18 @@ function audit(state: AppState, type: string, message: string, userId?: string):
 // ---------- Alarm-Logik ----------
 
 /** Empfänger eines Alarms bestimmen: Gruppen ∩ Standorte, Abwesenheiten ausfiltern */
+/**
+ * Empfänger eines Alleinarbeits-Alarms: gewählte Gruppen am Standort plus
+ * gewählte Einzelpersonen; ohne Wahl die Standardgruppen. Nie die Person selbst.
+ */
+export function alleinarbeitEmpfaenger(state: AppState, s: LoneWorkSession): { groupIds: string[]; recipientUserIds?: string[] } {
+  const groupIds = s.alertGroupIds?.length ? s.alertGroupIds : LONE_WORK_DEFAULT_GROUPS
+  const einzelne = (s.alertUserIds ?? []).filter((id) => id !== s.userId)
+  if (einzelne.length === 0) return { groupIds }
+  const ausGruppen = resolveRecipients(state, groupIds, [s.locationId]).map((u) => u.id)
+  return { groupIds, recipientUserIds: [...new Set([...ausGruppen, ...einzelne])].filter((id) => id !== s.userId) }
+}
+
 export function resolveRecipients(state: AppState, groupIds: string[], locationIds: string[]): User[] {
   const today = new Date().toISOString().slice(0, 10)
   return state.users.filter((u) => {
@@ -225,13 +237,15 @@ function tick(state: AppState, now: number): AppState {
     )
     for (const session of expired) {
       const user = state.users.find((u) => u.id === session.userId)
+      const ziel = alleinarbeitEmpfaenger(state, session)
       const alarm = createAlarm(state, {
         scenarioId: 'sc-medizin',
         message: `ALLEINARBEIT: Timer von ${user ? user.firstName + ' ' + user.lastName : session.userId} abgelaufen (Tätigkeit: ${session.activity}). Keine Rückmeldung – bitte sofort prüfen!`,
         silent: session.silent,
         requireAck: true,
         channels: ['push', 'sms', 'voice'],
-        groupIds: ['gr-ersthelfer', 'gr-sicherheit'],
+        groupIds: ziel.groupIds,
+        recipientUserIds: ziel.recipientUserIds,
         locationIds: [session.locationId],
         triggeredByUserId: session.userId,
         triggeredVia: 'timer',
@@ -855,7 +869,7 @@ async function serverEffekt(action: Action, state: AppState): Promise<boolean | 
       return true
     case 'START_LONE_WORK': {
       const s = action.session
-      await api.startLoneWork({ activity: s.activity, durationMin: s.durationMin, locationId: s.locationId, silent: s.silent })
+      await api.startLoneWork({ activity: s.activity, durationMin: s.durationMin, locationId: s.locationId, silent: s.silent, alertGroupIds: s.alertGroupIds, alertUserIds: s.alertUserIds })
       return true
     }
     case 'EXTEND_LONE_WORK':

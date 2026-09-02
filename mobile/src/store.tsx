@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useReducer, u
 import { Vibration } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import type { Alarm, AlarmLogEntry, Channel, Delivery, EmergencyContact, EscalationLevel, Group, IntegrationSettings, Location, LoneWorkSession, Scenario, Session, User } from './types'
-import { CHANNEL_LABELS } from './types'
+import { CHANNEL_LABELS, LONE_WORK_DEFAULT_GROUPS } from './types'
 import { LIVE_INITIAL_PASSWORD, SCENARIO_CONTENT_VERSION, SEED_CONTACTS, SEED_GROUPS, SEED_INTEGRATIONS, SEED_LOCATIONS, SEED_SCENARIOS, SEED_USERS } from './seed'
 import { hashPassword, randomSalt } from './auth'
 import { criticalAlertsGranted, getPushToken, notifyNow } from './notifications'
@@ -69,6 +69,18 @@ function initialState(mode: AppMode): MobileState {
 }
 
 // ---------- Alarm-Logik (identisch zur Web-App, Alarmserver wird lokal simuliert) ----------
+
+/**
+ * Empfänger eines Alleinarbeits-Alarms: gewählte Gruppen am Standort plus
+ * gewählte Einzelpersonen; ohne Wahl die Standardgruppen. Nie die Person selbst.
+ */
+export function alleinarbeitEmpfaenger(users: User[], s: LoneWorkSession): { groupIds: string[]; recipientUserIds?: string[] } {
+  const groupIds = s.alertGroupIds?.length ? s.alertGroupIds : LONE_WORK_DEFAULT_GROUPS
+  const einzelne = (s.alertUserIds ?? []).filter((id) => id !== s.userId)
+  if (einzelne.length === 0) return { groupIds }
+  const ausGruppen = resolveRecipients(users, groupIds, [s.locationId]).map((u) => u.id)
+  return { groupIds, recipientUserIds: [...new Set([...ausGruppen, ...einzelne])].filter((id) => id !== s.userId) }
+}
 
 export function resolveRecipients(users: User[], groupIds: string[], locationIds: string[]): User[] {
   const today = new Date().toISOString().slice(0, 10)
@@ -230,6 +242,7 @@ function tick(state: MobileState, now: number): MobileState {
     )
     for (const session of expired) {
       const user = state.users.find((u) => u.id === session.userId)
+      const ziel = alleinarbeitEmpfaenger(state.users, session)
       newAlarms = [
         createAlarm(state.users, {
           scenarioId: 'sc-medizin',
@@ -237,7 +250,8 @@ function tick(state: MobileState, now: number): MobileState {
           silent: session.silent,
           requireAck: true,
           channels: ['push', 'sms', 'voice'],
-          groupIds: ['gr-ersthelfer', 'gr-sicherheit'],
+          groupIds: ziel.groupIds,
+          recipientUserIds: ziel.recipientUserIds,
           locationIds: [session.locationId],
           triggeredByUserId: session.userId,
           triggeredVia: 'timer',
@@ -612,7 +626,7 @@ async function serverEffekt(action: Action): Promise<boolean | 'merged'> {
       return true
     case 'START_LONE_WORK': {
       const s = action.session
-      await api.startLoneWork({ activity: s.activity, durationMin: s.durationMin, locationId: s.locationId, silent: s.silent })
+      await api.startLoneWork({ activity: s.activity, durationMin: s.durationMin, locationId: s.locationId, silent: s.silent, alertGroupIds: s.alertGroupIds, alertUserIds: s.alertUserIds })
       return true
     }
     case 'EXTEND_LONE_WORK':

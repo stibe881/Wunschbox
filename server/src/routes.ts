@@ -578,9 +578,13 @@ router.post('/alarms/:id/ack', auth, (req: AuthRequest, res) => {
   res.json({ alarm: aktualisiert })
 })
 
-/** Ein SOS-Alarm darf von der Person beendet werden, die ihn ausgelöst hat («mir geht es gut») */
-function istEigenerSos(alarm: Alarm, person: StoredUser): boolean {
-  return alarm.triggeredByUserId === person.id && alarm.message.startsWith('SOS-Alarm')
+/**
+ * Ein SOS-Alarm oder ein abgelaufener Alleinarbeits-Timer darf von der Person
+ * beendet werden, um die es geht («mir geht es gut») – etwa wenn sie vergessen
+ * hat, den Timer zu verlängern.
+ */
+function darfSelbstEntwarnen(alarm: Alarm, person: StoredUser): boolean {
+  return alarm.triggeredByUserId === person.id && (alarm.message.startsWith('SOS-Alarm') || alarm.triggeredVia === 'timer')
 }
 
 router.post('/alarms/:id/end', auth, async (req: AuthRequest, res) => {
@@ -591,8 +595,8 @@ router.post('/alarms/:id/end', auth, async (req: AuthRequest, res) => {
   }
   const person = req.user!
   const istFuehrung = person.role === 'admin' || person.role === 'krisenstab'
-  if (!istFuehrung && !istEigenerSos(alarm, person)) {
-    res.status(403).json({ error: 'Alarme beenden dürfen Administration und Krisenstab – oder die auslösende Person ihren eigenen SOS-Alarm.' })
+  if (!istFuehrung && !darfSelbstEntwarnen(alarm, person)) {
+    res.status(403).json({ error: 'Alarme beenden dürfen Administration und Krisenstab – oder die betroffene Person ihren eigenen SOS- oder Alleinarbeits-Alarm.' })
     return
   }
   const note = String(req.body?.note ?? '').trim()
@@ -627,9 +631,16 @@ router.post('/lone-work', auth, (req: AuthRequest, res) => {
     expiresAt: jetzt + dauer * 60_000,
     silent: Boolean(o.silent),
     status: 'running' as const,
+    // Wer beim Ablauf alarmiert wird – leer heisst: Standardgruppen
+    alertGroupIds: Array.isArray(o.alertGroupIds) ? o.alertGroupIds.map(String) : undefined,
+    alertUserIds: Array.isArray(o.alertUserIds) ? o.alertUserIds.map(String) : undefined,
   }
   upsertDoc('lone_work', sitzung.id, sitzung)
-  addAudit('alleinarbeit', `Alleinarbeits-Timer gestartet (${sitzung.activity}, ${dauer} Min.)`, req.user!.id)
+  const ziele = [
+    ...allGroups().filter((g) => (sitzung.alertGroupIds ?? []).includes(g.id)).map((g) => g.name),
+    ...allStoredUsers().filter((u) => (sitzung.alertUserIds ?? []).includes(u.id)).map((u) => `${u.firstName} ${u.lastName}`),
+  ]
+  addAudit('alleinarbeit', `Alleinarbeits-Timer gestartet (${sitzung.activity}, ${dauer} Min.${ziele.length ? `, alarmiert bei Ablauf: ${ziele.join(', ')}` : ''})`, req.user!.id)
   broadcast('state')
   res.json({ session: sitzung })
 })
