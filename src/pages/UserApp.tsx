@@ -34,7 +34,7 @@ const TABS: { key: Tab; label: string; icon: typeof Siren }[] = [
 ]
 
 export default function UserApp() {
-  const { state } = useStore()
+  const { state, dispatch } = useStore()
   const [tab, setTab] = useState<Tab>('start')
   const [openScenario, setOpenScenario] = useState<Scenario | null>(null)
   const [openModus, setOpenModus] = useState<ScenarioModus>('entdecker')
@@ -51,8 +51,12 @@ export default function UserApp() {
     setAlarmWahl(false)
   }
 
-  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+  const me = state.users.find((u) => u.id === (state.previewUserId ?? state.currentUserId)) ?? state.users[0]
   const myLocation = state.locations.find((l) => l.id === me.locationId)
+  // Krisenstab und Administration dürfen die App aus Sicht jeder erfassten Person ansehen
+  const angemeldetId = state.session?.userId ?? state.currentUserId
+  const angemeldet = state.users.find((u) => u.id === angemeldetId)
+  const darfVorschau = (angemeldet?.role ?? 'mitarbeiter') !== 'mitarbeiter' && state.users.length > 1
   const myAlarms = state.alarms.filter(
     (a) => a.status === 'active' && (a.deliveries.some((d) => d.userId === me.id) || a.triggeredByUserId === me.id),
   )
@@ -75,6 +79,32 @@ export default function UserApp() {
           <Siren size={14} /> Alarm auslösen
         </button>
       </header>
+
+      {darfVorschau && (
+        <div className="bg-amber-50 border-b border-amber-200 px-3 py-1.5 flex items-center gap-2 text-xs text-amber-900">
+          <Users size={13} className="shrink-0" />
+          <label className="shrink-0" htmlFor="vorschau-person">Vorschau als</label>
+          <select
+            id="vorschau-person"
+            className="flex-1 min-w-0 rounded-md border border-amber-300 bg-white px-2 py-1 text-xs text-slate-800"
+            value={state.previewUserId ?? angemeldetId}
+            onChange={(e) => dispatch({ type: 'SET_PREVIEW_USER', userId: e.target.value === angemeldetId ? null : e.target.value })}
+          >
+            {[...state.users]
+              .sort((a, b) => a.lastName.localeCompare(b.lastName, 'de'))
+              .map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.firstName} {u.lastName}{u.id === angemeldetId ? ' (ich)' : ''} · {state.locations.find((l) => l.id === u.locationId)?.name ?? ''}
+                </option>
+              ))}
+          </select>
+          {state.previewUserId && (
+            <span className="shrink-0 font-semibold" title="Im Live-Betrieb sind Aktionen in der Vorschau gesperrt">
+              {state.mode === 'live' ? 'nur Ansicht' : 'handelt als diese Person'}
+            </span>
+          )}
+        </div>
+      )}
 
       {myAlarms.length > 0 && tab !== 'start' && !alarmWahl && (
         <button
@@ -193,12 +223,12 @@ function StartTab({ onOpenScenario }: { onOpenScenario: (s: Scenario, alarm: Ala
   const { state, dispatch } = useStore()
   const { ask, confirmEl } = useConfirm()
   const { frage, promptEl } = usePrompt()
-  const istFuehrung = (state.users.find((u) => u.id === state.currentUserId)?.role ?? 'mitarbeiter') !== 'mitarbeiter'
+  const istFuehrung = (state.users.find((u) => u.id === (state.previewUserId ?? state.currentUserId))?.role ?? 'mitarbeiter') !== 'mitarbeiter'
   const fehlalarmMelden = (alarmId: string) =>
     frage('Fehlalarm melden', FEHLALARM_TEXT, (text) => dispatch({ type: 'ALARM_UPDATE', alarmId, message: text, kind: 'fehlalarm' }), 'Melden')
   const entwarnungGeben = (alarmId: string) =>
     frage('Entwarnung geben', ENTWARNUNG_TEXT, (text) => dispatch({ type: 'END_ALARM', alarmId, byUserId: state.currentUserId, note: text }), 'Entwarnung senden', 'z. B. Rückkehr ab 10:30 über den Haupteingang')
-  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+  const me = state.users.find((u) => u.id === (state.previewUserId ?? state.currentUserId)) ?? state.users[0]
   const mySos = state.alarms.filter((a) => a.status === 'active' && a.triggeredByUserId === me.id)
   const myAlarms = state.alarms.filter(
     (a) => a.status === 'active' && a.triggeredByUserId !== me.id && a.deliveries.some((d) => d.userId === me.id),
@@ -520,7 +550,7 @@ function ScenarioView({
   const [checkedList, setCheckedList] = useState<Record<number, boolean>>({})
   const [notifiedUserIds, setNotifiedUserIds] = useState<string[]>([])
 
-  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+  const me = state.users.find((u) => u.id === (state.previewUserId ?? state.currentUserId)) ?? state.users[0]
   const [alarmLocationIds, setAlarmLocationIds] = useState<string[]>([me.locationId])
   const myLocation = state.locations.find((l) => l.id === me.locationId)
   const contacts = state.contacts.filter((c) => scenario.contactIds.includes(c.id))
@@ -938,7 +968,7 @@ function ScenarioView({
 
 function LoneWorkTab() {
   const { state, dispatch } = useStore()
-  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+  const me = state.users.find((u) => u.id === (state.previewUserId ?? state.currentUserId)) ?? state.users[0]
   const [activity, setActivity] = useState('')
   const [durationMin, setDurationMin] = useState(30)
   const [silent, setSilent] = useState(false)
@@ -1226,7 +1256,7 @@ function EmpfaengerAnsicht({
   onEntdecker: () => void
 }) {
   const { state, dispatch } = useStore()
-  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+  const me = state.users.find((u) => u.id === (state.previewUserId ?? state.currentUserId)) ?? state.users[0]
   const [erledigt, setErledigt] = useState<Record<number, boolean>>({})
   const [zeigeAndere, setZeigeAndere] = useState(false)
   // Nur die Schritte der eigenen Gruppen – die übrigen bleiben auf Wunsch einsehbar
@@ -1421,7 +1451,7 @@ function LegalSection({ eintraege }: { eintraege: string[] }) {
 function ProfileTab() {
   const { state, dispatch, logout } = useStore()
   const navigate = useNavigate()
-  const me = state.users.find((u) => u.id === state.currentUserId) ?? state.users[0]
+  const me = state.users.find((u) => u.id === (state.previewUserId ?? state.currentUserId)) ?? state.users[0]
   const myLocation = state.locations.find((l) => l.id === me.locationId)
   const myGroups = state.groups.filter((g) => me.groupIds.includes(g.id))
   const isStaff = me.role === 'admin' || me.role === 'krisenstab'

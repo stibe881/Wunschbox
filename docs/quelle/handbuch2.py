@@ -62,6 +62,13 @@ KOERPER = r"""
       arbeiten Sie im Portal &ndash; dort sehen Sie, wer tatsächlich kommt.
     </p>
   </div>
+  <p>
+    Über <span class="ui">App-Vorschau</span> im Dashboard sehen Sie die App aus Sicht
+    jeder erfassten Person: In der gelben Leiste <span class="ui">Vorschau als</span>
+    wählen Sie die Person. So prüfen Sie, was etwa eine Ersthelferin in Menzingen bei
+    einem Alarm zu sehen bekommt. Im Live-Betrieb ist das reine Ansicht; Aktionen sind
+    dort gesperrt.
+  </p>
 </section>
 
 <section id="b2">

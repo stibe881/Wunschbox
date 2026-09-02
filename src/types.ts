@@ -281,6 +281,12 @@ export interface AppState {
   /** Version der Anmelde-Migration – für einmalige Korrekturen an Passwortdaten */
   authVersion?: number
   currentUserId: string
+  /**
+   * App-Vorschau als andere Person (nur Portal, nicht auf dem Server): Die
+   * Ansicht zeigt deren Alarme und Schritte, Aktionen bleiben im Live-Betrieb
+   * gesperrt – sie liefen sonst unter dem angemeldeten Konto.
+   */
+  previewUserId?: string
   users: User[]
   groups: Group[]
   locations: Location[]

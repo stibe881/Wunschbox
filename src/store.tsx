@@ -31,6 +31,7 @@ export type Action =
   | { type: 'LOGOUT' }
   | { type: 'SET_PASSWORD'; userId: string; password: string; mustChange?: boolean }
   | { type: 'SET_CURRENT_USER'; userId: string }
+  | { type: 'SET_PREVIEW_USER'; userId: string | null }
   | { type: 'UPSERT_USER'; user: User; password?: string }
   | { type: 'DELETE_USER'; userId: string }
   | { type: 'IMPORT_USERS'; users: User[] }
@@ -303,6 +304,13 @@ function reducer(state: AppState, action: Action): AppState {
     }
     case 'SET_CURRENT_USER':
       return { ...state, currentUserId: action.userId }
+    case 'SET_PREVIEW_USER': {
+      // Demo: die gewählte Person handelt auch (wie die Demo-Ansicht in der Seitenleiste).
+      // Live: nur die Ansicht wechselt; angemeldet bleibt das eigene Konto.
+      const eigene = state.session?.userId ?? state.currentUserId
+      if (state.mode === 'demo') return { ...state, currentUserId: action.userId ?? eigene, previewUserId: undefined }
+      return { ...state, previewUserId: action.userId && action.userId !== eigene ? action.userId : undefined }
+    }
     case 'UPSERT_USER': {
       const exists = state.users.some((u) => u.id === action.user.id)
       // Der letzte Administrator darf sich nicht selbst die Rechte entziehen
@@ -770,6 +778,12 @@ function sendOutboundWebhooks(state: AppState, alarm: Alarm) {
  * Zustand angewendet, sondern verschickt; der neue Stand kommt anschliessend
  * über /state zurück. Gibt true zurück, wenn die Aktion behandelt wurde.
  */
+/** Aktionen, die in der App-Vorschau als andere Person nicht ausgeführt werden */
+const VORSCHAU_GESPERRT = new Set<Action['type']>([
+  'TRIGGER_ALARM', 'ACK_ALARM', 'END_ALARM', 'ALARM_UPDATE',
+  'START_LONE_WORK', 'EXTEND_LONE_WORK', 'COMPLETE_LONE_WORK', 'SET_PASSWORD',
+])
+
 async function serverEffekt(action: Action, state: AppState): Promise<boolean | 'merged'> {
   switch (action.type) {
     case 'UPSERT_USER': {
@@ -1075,6 +1089,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           return
         }
         const vorher = stateRef.current
+        // In der Vorschau als andere Person sind Alarm- und Timer-Aktionen gesperrt:
+        // Sie liefen sonst unter dem angemeldeten Konto, nicht unter der angezeigten Person.
+        if (vorher.previewUserId && VORSCHAU_GESPERRT.has(action.type)) {
+          pushToast('Vorschau: Aktionen sind gesperrt – dafür die Vorschau beenden.', 'alarm')
+          return
+        }
         serverEffekt(action, vorher)
           .then((behandelt) => {
             if (!behandelt) {
