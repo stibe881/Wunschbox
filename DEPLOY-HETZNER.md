@@ -45,8 +45,7 @@ cd ~/public_html/temp-gross-ict.ch
 # Verzeichnis muss leer sein - sonst verweigert git clone
 ls -A
 
-git clone -b claude/e-mergency-webapp-5hc2yl \
-  https://github.com/stibe881/Wunschbox.git .
+git clone -b main https://github.com/stibe881/sobe-notfall.git .
 ```
 
 **Prüfen:**
@@ -482,6 +481,38 @@ davon.
 > kurz nicht erreichbar.
 
 ---
+
+## 9b. Repository gewechselt: bestehende Installation umstellen
+
+Das Projekt liegt seit September 2026 unter
+`https://github.com/stibe881/sobe-notfall.git`, Zweig `main`. Eine
+Installation, die noch auf das alte Repository (`Wunschbox`, Zweig
+`claude/e-mergency-webapp-5hc2yl`) zeigt, wird einmalig umgehängt – danach
+funktioniert der Update-Knopf wieder, denn er holt immer vom Remote `origin`
+den Zweig, der gerade ausgecheckt ist.
+
+```bash
+ssh benutzer@server
+cd ~/public_html/temp-gross-ict.ch
+
+git status --short          # muss leer sein; sonst: git checkout -- . && git clean -fd -e server/.env -e server/data
+git remote set-url origin https://github.com/stibe881/sobe-notfall.git
+git fetch origin
+git checkout -B main origin/main
+git branch --set-upstream-to=origin/main main
+git log --oneline -1        # zeigt den neusten Commit aus sobe-notfall
+```
+
+`server/.env`, die Datenbank unter `server/data` und `node_modules` bleiben
+dabei unberührt – sie sind nicht Teil des Repositories. Anschliessend im
+Portal **Update – Nur Server** auslösen oder von Hand bauen und neu starten
+(Schritt 4 und 5).
+
+**Prüfen:** Im Update-Dialog steht oben `main` als Zweig, und «Änderungen vom
+Repository holen» läuft ohne Fehler durch. Ist das Repository privat, braucht
+der Server zum Holen ein Zugriffstoken in der Remote-Adresse
+(`https://<token>@github.com/stibe881/sobe-notfall.git`); ein öffentliches
+Repository kommt ohne aus.
 
 ## 10. Sicherung einrichten
 
